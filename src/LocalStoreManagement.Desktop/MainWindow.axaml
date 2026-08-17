@@ -47,7 +47,7 @@
                                 x:Name="BarcodeInput"
                                 FontSize="20"
                                 KeyDown="BarcodeInput_OnKeyDown"
-                                Watermark="Scansiona codice a barre e premi Invio" />
+                                PlaceholderText="Scansiona codice a barre e premi Invio" />
                             <TextBlock x:Name="LastScanText" Foreground="#44515E" Text="Nessun codice scansionato." />
                         </StackPanel>
                     </Border>
@@ -84,7 +84,7 @@
                     <TextBox
                         x:Name="ProductSearchInput"
                         TextChanged="ProductSearchInput_OnTextChanged"
-                        Watermark="Cerca per SKU, barcode, nome, marca, categoria, variante o taglia..." />
+                        PlaceholderText="Cerca per SKU, barcode, nome, marca, categoria, variante o taglia..." />
                     <Button Grid.Column="1" Click="EditProductButton_OnClick" Content="Modifica selezionato" />
                     <Button Grid.Column="2" Click="NewProductButton_OnClick" Content="+ Nuovo prodotto" />
                 </Grid>
@@ -101,7 +101,7 @@
 
                 <Border Grid.Row="2" BorderBrush="#D8DDE3" BorderThickness="1" CornerRadius="10">
                     <Grid>
-                        <ListBox x:Name="ProductsList" HorizontalContentAlignment="Stretch">
+                        <ListBox x:Name="ProductsList">
                             <ListBox.ItemTemplate>
                                 <DataTemplate>
                                     <Grid Margin="12,9" ColumnDefinitions="120,*,150,150,95,70,90">
@@ -136,7 +136,7 @@
                     <TextBox
                         x:Name="WarehouseSearchInput"
                         TextChanged="WarehouseSearchInput_OnTextChanged"
-                        Watermark="Cerca o scansiona SKU/barcode, prodotto, marca o categoria..." />
+                        PlaceholderText="Cerca o scansiona SKU/barcode, prodotto, marca o categoria..." />
                     <Button Grid.Column="1" Click="IncomingButton_OnClick" Content="+ Carico" />
                     <Button Grid.Column="2" Click="OutgoingButton_OnClick" Content="− Scarico" />
                     <Button Grid.Column="3" Click="AdjustmentButton_OnClick" Content="Rettifica" />
@@ -152,7 +152,7 @@
 
                 <Border Grid.Row="2" BorderBrush="#D8DDE3" BorderThickness="1" CornerRadius="10">
                     <Grid>
-                        <ListBox x:Name="WarehouseProductsList" HorizontalContentAlignment="Stretch" DoubleTapped="WarehouseProductsList_OnDoubleTapped">
+                        <ListBox x:Name="WarehouseProductsList" DoubleTapped="WarehouseProductsList_OnDoubleTapped">
                             <ListBox.ItemTemplate>
                                 <DataTemplate>
                                     <Grid Margin="12,10" ColumnDefinitions="125,*,170,160,90">
@@ -180,7 +180,7 @@
                 <TextBox
                     x:Name="MovementSearchInput"
                     TextChanged="MovementSearchInput_OnTextChanged"
-                    Watermark="Filtra storico per SKU, barcode, prodotto, marca, categoria o nota..." />
+                    PlaceholderText="Filtra storico per SKU, barcode, prodotto, marca, categoria o nota..." />
 
                 <Grid Grid.Row="1" Margin="12,18,12,8" ColumnDefinitions="145,110,120,*,130,90,90">
                     <TextBlock FontWeight="SemiBold" Text="Data" />
@@ -194,7 +194,7 @@
 
                 <Border Grid.Row="2" BorderBrush="#D8DDE3" BorderThickness="1" CornerRadius="10">
                     <Grid>
-                        <ListBox x:Name="MovementsList" HorizontalContentAlignment="Stretch">
+                        <ListBox x:Name="MovementsList">
                             <ListBox.ItemTemplate>
                                 <DataTemplate>
                                     <Grid Margin="12,10" ColumnDefinitions="145,110,120,*,130,90,90">
