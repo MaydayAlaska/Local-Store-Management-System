@@ -40,15 +40,35 @@
             <ScrollViewer x:Name="DashboardPanel">
                 <StackPanel Margin="28" Spacing="18">
                     <Border Padding="22" CornerRadius="10" BorderBrush="#D8DDE3" BorderThickness="1">
-                        <StackPanel Spacing="10">
+                        <StackPanel Spacing="12">
                             <TextBlock FontSize="18" FontWeight="SemiBold" Text="Scansione rapida" />
-                            <TextBlock Foreground="#66707A" Text="Collega lo scanner USB e scansiona un codice. Lo scanner viene letto come tastiera HID." />
-                            <TextBox
-                                x:Name="BarcodeInput"
-                                FontSize="20"
-                                KeyDown="BarcodeInput_OnKeyDown"
-                                PlaceholderText="Scansiona codice a barre e premi Invio" />
-                            <TextBlock x:Name="LastScanText" Foreground="#44515E" Text="Nessun codice scansionato." />
+                            <TextBlock Foreground="#66707A" Text="Lo scanner USB viene letto come tastiera HID. Scegli l'azione e poi scansiona il codice." />
+
+                            <Grid ColumnDefinitions="240,*" ColumnSpacing="12">
+                                <StackPanel Spacing="6">
+                                    <TextBlock FontWeight="SemiBold" Text="Modalità scanner" />
+                                    <ComboBox x:Name="ScannerModeInput" SelectedIndex="0">
+                                        <ComboBoxItem Content="Cerca / apri prodotto" />
+                                        <ComboBoxItem Content="Carico rapido (+1)" />
+                                        <ComboBoxItem Content="Scarico rapido (-1)" />
+                                    </ComboBox>
+                                </StackPanel>
+
+                                <StackPanel Grid.Column="1" Spacing="6">
+                                    <TextBlock FontWeight="SemiBold" Text="Codice" />
+                                    <TextBox
+                                        x:Name="BarcodeInput"
+                                        FontSize="20"
+                                        KeyDown="BarcodeInput_OnKeyDown"
+                                        PlaceholderText="Scansiona barcode/SKU e premi Invio" />
+                                </StackPanel>
+                            </Grid>
+
+                            <TextBlock FontSize="12" Foreground="#66707A" Text="In Carico/Scarico rapido ogni scansione vale 1 pezzo. Se il codice non esiste, si apre la scheda di creazione con il barcode già compilato." />
+
+                            <Border Padding="12" CornerRadius="8" Background="#F5F7F9">
+                                <TextBlock x:Name="LastScanText" TextWrapping="Wrap" Foreground="#44515E" Text="Nessun codice scansionato." />
+                            </Border>
                         </StackPanel>
                     </Border>
 
