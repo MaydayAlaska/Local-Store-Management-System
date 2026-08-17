@@ -38,7 +38,7 @@
 
             <StackPanel Spacing="6">
                 <TextBlock FontWeight="SemiBold" Text="Nota (opzionale)" />
-                <TextBox x:Name="NoteInput" AcceptsReturn="True" Height="82" TextWrapping="Wrap" Watermark="Es. consegna fornitore, merce danneggiata, correzione conteggio..." />
+                <TextBox x:Name="NoteInput" AcceptsReturn="True" Height="82" TextWrapping="Wrap" PlaceholderText="Es. consegna fornitore, merce danneggiata, correzione conteggio..." />
             </StackPanel>
 
             <Border x:Name="ErrorPanel" IsVisible="False" Padding="12" CornerRadius="7" Background="#FDECEC">
