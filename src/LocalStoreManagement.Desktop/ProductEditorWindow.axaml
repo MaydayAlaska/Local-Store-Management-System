@@ -23,14 +23,14 @@
                 <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
                     <StackPanel Spacing="5">
                         <TextBlock FontWeight="SemiBold" Text="Codice interno / SKU *" />
-                        <TextBox x:Name="SkuInput" Watermark="ART000001" />
+                        <TextBox x:Name="SkuInput" PlaceholderText="ART000001" />
                     </StackPanel>
                     <Button Grid.Column="1" VerticalAlignment="Bottom" Click="GenerateSkuButton_OnClick" Content="Genera" />
                 </Grid>
 
                 <StackPanel Spacing="5">
                     <TextBlock FontWeight="SemiBold" Text="Barcode / EAN" />
-                    <TextBox x:Name="BarcodeInput" KeyDown="BarcodeInput_OnKeyDown" Watermark="Scansiona o inserisci il codice" />
+                    <TextBox x:Name="BarcodeInput" KeyDown="BarcodeInput_OnKeyDown" PlaceholderText="Scansiona o inserisci il codice" />
                 </StackPanel>
 
                 <StackPanel Spacing="5">
@@ -52,22 +52,22 @@
                 <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
                     <StackPanel Spacing="5">
                         <TextBlock FontWeight="SemiBold" Text="Variante" />
-                        <TextBox x:Name="VariantInput" Watermark="es. Nero, Classic, Limited" />
+                        <TextBox x:Name="VariantInput" PlaceholderText="es. Nero, Classic, Limited" />
                     </StackPanel>
                     <StackPanel Grid.Column="1" Spacing="5">
                         <TextBlock FontWeight="SemiBold" Text="Taglia" />
-                        <TextBox x:Name="SizeInput" Watermark="es. M, 42, 10 anni" />
+                        <TextBox x:Name="SizeInput" PlaceholderText="es. M, 42, 10 anni" />
                     </StackPanel>
                 </Grid>
 
                 <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
                     <StackPanel Spacing="5">
                         <TextBlock FontWeight="SemiBold" Text="Prezzo acquisto (€)" />
-                        <TextBox x:Name="PurchasePriceInput" Watermark="0,00" />
+                        <TextBox x:Name="PurchasePriceInput" PlaceholderText="0,00" />
                     </StackPanel>
                     <StackPanel Grid.Column="1" Spacing="5">
                         <TextBlock FontWeight="SemiBold" Text="Prezzo vendita (€)" />
-                        <TextBox x:Name="SalePriceInput" Watermark="0,00" />
+                        <TextBox x:Name="SalePriceInput" PlaceholderText="0,00" />
                     </StackPanel>
                 </Grid>
 
