@@ -9,51 +9,36 @@ Gestionale desktop multipiattaforma per negozio, pensato per funzionare **offlin
 - SQLite tramite `Microsoft.Data.Sqlite`
 - Architettura desktop nativa: **nessun browser e nessun server web richiesto**
 
-## Roadmap funzionale
+## Funzioni concordate
 
-1. **Prodotti**
-   - SKU/codice interno e barcode;
-   - nome, marca e categoria;
-   - **variante e taglia come attributi distinti**;
-   - prezzo di acquisto e prezzo di vendita;
-   - note e stato attivo/disattivato;
-   - nessuna scorta minima.
-2. **Magazzino**
-   - carico, scarico e rettifica;
-   - storico di ogni movimento;
-   - giacenza calcolata dai movimenti e non modificata direttamente nella scheda prodotto.
-3. **Scanner**
-   - lettura HID/tastiera;
-   - ricerca immediata del prodotto;
-   - proposta di creazione quando il codice non esiste;
-   - modalità carico/scarico veloce.
-4. **Etichette**
-   - generazione barcode;
-   - anteprima e numero copie;
-   - stampa ApiX110 tramite backend separati Windows/Linux.
-5. **Backup ed esportazione**
-   - backup del database SQLite;
-   - esportazione Excel completa di tutto il magazzino, raggruppata per marca e con marche in ordine alfabetico;
-   - esportazione Excel parziale filtrando una o più marche e/o una o più categorie;
-   - build e pacchetti per Windows e Linux.
+1. **Prodotti**: SKU, barcode/EAN, nome, marca, categoria, variante, taglia, prezzo di acquisto, prezzo di vendita, note e stato attivo/disattivato. Variante e taglia sono attributi distinti; non è prevista una scorta minima.
+2. **Magazzino**: carico, scarico, rettifica e storico completo dei movimenti. La giacenza è sempre derivata dalla somma dei movimenti e non è modificata direttamente nell'anagrafica prodotto.
+3. **Scanner**: ricerca tramite scanner USB/HID, riconoscimento immediato di SKU/barcode e flusso rapido di magazzino.
+4. **Etichette**: generazione barcode, anteprima, numero copie e stampa ApiX110 su Windows/Linux tramite backend di stampa separato.
+5. **Backup ed Excel**: backup locale del database; esportazione completa dell'inventario raggruppata per marca in ordine alfabetico oppure esportazione parziale filtrando una o più marche e/o una o più categorie.
 
-Non è previsto un modulo separato di inventario fisico/conteggio sessione.
+Non è previsto un modulo separato di inventario fisico/conteggio sessioni.
 
-## Stato attuale (`test`)
+## Stato attuale sul branch `test`
 
-Il modulo **Prodotti v1** contiene l'anagrafica completa, ricerca e modifica. La quantità mostrata deriva dalla somma dei movimenti di magazzino; il modulo di carico/scarico verrà implementato nel passaggio successivo.
+- anagrafica prodotti: implementata;
+- magazzino: carico, scarico, rettifica e storico movimenti implementati;
+- scanner: input HID di base attivo, flusso rapido da completare;
+- etichette: da implementare;
+- backup/esportazione Excel: da implementare.
 
 ## Struttura
 
 ```text
 src/LocalStoreManagement.Desktop/
-├── Data/                 # accesso SQLite e repository
+├── Data/                 # repository SQLite
 ├── Infrastructure/       # database, migrazioni e percorsi locali
 ├── Models/               # modelli applicativi
-├── Services/             # contratti hardware e servizi applicativi
+├── Services/             # servizi hardware/applicativi
 ├── App.axaml             # bootstrap Avalonia
 ├── MainWindow.axaml      # shell desktop
-└── LocalStoreManagement.Desktop.csproj
+├── ProductEditorWindow.* # editor anagrafica prodotto
+└── StockMovementWindow.* # carico/scarico/rettifica
 ```
 
 Il database viene creato al primo avvio nella cartella dati utente del sistema operativo. Il percorso viene mostrato nella schermata principale.
@@ -71,6 +56,6 @@ Gli stessi sorgenti vengono compilati su Windows e Linux.
 
 ## Hardware previsto
 
-Lo scanner di codici a barre viene trattato come dispositivo HID/tastiera: il codice scansionato termina con `Enter` e viene acquisito dal campo di scansione dell'applicazione.
+Lo scanner di codici a barre viene trattato come dispositivo HID/tastiera: il codice scansionato termina con `Enter` e viene acquisito dal gestionale.
 
 La stampa delle etichette è isolata dietro `ILabelPrinter`, in modo da poter implementare backend differenti (driver Windows, CUPS/Linux o protocollo diretto della stampante) senza cambiare il resto del gestionale.

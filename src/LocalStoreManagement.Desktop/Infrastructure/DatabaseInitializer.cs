@@ -63,6 +63,7 @@ public static class DatabaseInitializer
             CREATE INDEX IF NOT EXISTS ix_products_brand ON products(brand COLLATE NOCASE);
             CREATE INDEX IF NOT EXISTS ix_products_category ON products(category COLLATE NOCASE);
             CREATE INDEX IF NOT EXISTS ix_stock_movements_product_id ON stock_movements(product_id);
+            CREATE INDEX IF NOT EXISTS ix_stock_movements_created_at ON stock_movements(created_at_utc DESC, id DESC);
             """;
         indexCommand.ExecuteNonQuery();
     }

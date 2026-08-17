@@ -1,0 +1,54 @@
+<Window
+    x:Class="LocalStoreManagement.Desktop.StockMovementWindow"
+    xmlns="https://github.com/avaloniaui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    Title="Movimento di magazzino"
+    Width="520"
+    Height="500"
+    MinWidth="480"
+    MinHeight="450"
+    CanResize="False"
+    WindowStartupLocation="CenterOwner">
+
+    <Grid RowDefinitions="Auto,*,Auto" Margin="26">
+        <StackPanel Spacing="5">
+            <TextBlock x:Name="EditorTitle" FontSize="25" FontWeight="SemiBold" Text="Movimento di magazzino" />
+            <TextBlock x:Name="EditorSubtitle" Foreground="#66707A" Text="Registra una variazione di giacenza" />
+        </StackPanel>
+
+        <StackPanel Grid.Row="1" Margin="0,24,0,0" Spacing="14">
+            <Border Padding="15" CornerRadius="8" Background="#F5F7F9">
+                <Grid ColumnDefinitions="*,Auto">
+                    <StackPanel Spacing="3">
+                        <TextBlock x:Name="ProductNameText" FontSize="17" FontWeight="SemiBold" />
+                        <TextBlock x:Name="ProductCodeText" Foreground="#66707A" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="1" HorizontalAlignment="Right" Spacing="3">
+                        <TextBlock HorizontalAlignment="Right" Foreground="#66707A" Text="Giacenza attuale" />
+                        <TextBlock x:Name="CurrentStockText" HorizontalAlignment="Right" FontSize="22" FontWeight="Bold" />
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <StackPanel Spacing="6">
+                <TextBlock x:Name="QuantityLabel" FontWeight="SemiBold" Text="Quantità" />
+                <NumericUpDown x:Name="QuantityInput" Minimum="0" Maximum="1000000000" Increment="1" FormatString="0" />
+                <TextBlock x:Name="QuantityHelpText" FontSize="12" Foreground="#66707A" />
+            </StackPanel>
+
+            <StackPanel Spacing="6">
+                <TextBlock FontWeight="SemiBold" Text="Nota (opzionale)" />
+                <TextBox x:Name="NoteInput" AcceptsReturn="True" Height="82" TextWrapping="Wrap" Watermark="Es. consegna fornitore, merce danneggiata, correzione conteggio..." />
+            </StackPanel>
+
+            <Border x:Name="ErrorPanel" IsVisible="False" Padding="12" CornerRadius="7" Background="#FDECEC">
+                <TextBlock x:Name="ErrorText" Foreground="#A61B1B" TextWrapping="Wrap" />
+            </Border>
+        </StackPanel>
+
+        <Grid Grid.Row="2" Margin="0,20,0,0" ColumnDefinitions="*,Auto,Auto" ColumnSpacing="10">
+            <Button Grid.Column="1" Click="CancelButton_OnClick" Content="Annulla" />
+            <Button Grid.Column="2" Click="SaveButton_OnClick" Content="Registra movimento" />
+        </Grid>
+    </Grid>
+</Window>
