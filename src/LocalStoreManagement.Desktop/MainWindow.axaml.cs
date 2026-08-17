@@ -8,6 +8,10 @@ namespace LocalStoreManagement.Desktop;
 
 public partial class MainWindow : Window
 {
+    private const int ScannerModeOpenProduct = 0;
+    private const int ScannerModeIncoming = 1;
+    private const int ScannerModeOutgoing = 2;
+
     private readonly ProductRepository _productRepository = new();
     private readonly StockMovementRepository _stockMovementRepository = new();
 
@@ -104,30 +108,143 @@ public partial class MainWindow : Window
             return;
         }
 
-        ReloadWarehouseProducts();
-        ReloadProducts();
-        ReloadMovements();
-        RefreshDashboardCounters();
+        RefreshAllData();
     }
 
-    private void BarcodeInput_OnKeyDown(object? sender, KeyEventArgs e)
+    private async void BarcodeInput_OnKeyDown(object? sender, KeyEventArgs e)
     {
         if (e.Key != Key.Enter)
         {
             return;
         }
 
-        var barcode = BarcodeInput.Text?.Trim();
-        if (!string.IsNullOrWhiteSpace(barcode))
-        {
-            var product = _productRepository.FindByBarcode(barcode);
-            LastScanText.Text = product is null
-                ? $"Codice non presente: {barcode}"
-                : $"{product.Name} — giacenza {product.StockQuantity}";
-        }
-
+        var code = BarcodeInput.Text?.Trim();
         BarcodeInput.Clear();
         e.Handled = true;
+
+        if (string.IsNullOrWhiteSpace(code))
+        {
+            BarcodeInput.Focus();
+            return;
+        }
+
+        try
+        {
+            await HandleScannerCodeAsync(code);
+        }
+        finally
+        {
+            BarcodeInput.Focus();
+        }
+    }
+
+    private async Task HandleScannerCodeAsync(string code)
+    {
+        var product = _productRepository.FindByBarcode(code);
+        var scannerMode = ScannerModeInput.SelectedIndex;
+
+        if (product is null)
+        {
+            await HandleUnknownScannerCodeAsync(code, scannerMode);
+            return;
+        }
+
+        switch (scannerMode)
+        {
+            case ScannerModeIncoming:
+                ApplyQuickMovement(product, StockMovementKind.Incoming);
+                break;
+
+            case ScannerModeOutgoing:
+                ApplyQuickMovement(product, StockMovementKind.Outgoing);
+                break;
+
+            default:
+                await OpenProductFromScannerAsync(product);
+                break;
+        }
+    }
+
+    private async Task HandleUnknownScannerCodeAsync(string code, int scannerMode)
+    {
+        LastScanText.Text = $"Codice non presente: {code}. Compila la nuova scheda prodotto oppure annulla.";
+
+        var editor = new ProductEditorWindow(_productRepository, null, code);
+        var saved = await editor.ShowDialog<bool>(this);
+        if (!saved)
+        {
+            LastScanText.Text = $"Creazione annullata per il codice {code}.";
+            return;
+        }
+
+        RefreshAllData();
+
+        var createdProduct = _productRepository.FindByBarcode(code);
+        if (createdProduct is null)
+        {
+            LastScanText.Text = $"Prodotto salvato, ma il codice {code} non è più associato alla scheda.";
+            return;
+        }
+
+        if (scannerMode == ScannerModeIncoming)
+        {
+            ApplyQuickMovement(createdProduct, StockMovementKind.Incoming);
+            return;
+        }
+
+        if (scannerMode == ScannerModeOutgoing)
+        {
+            LastScanText.Text = $"Creato {createdProduct.Name}. Scarico rapido non eseguito: la giacenza iniziale è 0.";
+            return;
+        }
+
+        LastScanText.Text = $"Creato {createdProduct.Name} — codice {code}.";
+    }
+
+    private async Task OpenProductFromScannerAsync(Product product)
+    {
+        LastScanText.Text = $"Trovato {product.Name} — giacenza {product.StockQuantity}.";
+
+        var latest = _productRepository.GetById(product.Id);
+        if (latest is null)
+        {
+            LastScanText.Text = $"Il prodotto associato al codice non è più disponibile.";
+            return;
+        }
+
+        var editor = new ProductEditorWindow(_productRepository, latest);
+        var saved = await editor.ShowDialog<bool>(this);
+        if (saved)
+        {
+            RefreshAllData();
+            var updated = _productRepository.GetById(product.Id);
+            if (updated is not null)
+            {
+                LastScanText.Text = $"Scheda aggiornata: {updated.Name} — giacenza {updated.StockQuantity}.";
+            }
+        }
+    }
+
+    private void ApplyQuickMovement(Product product, StockMovementKind kind)
+    {
+        try
+        {
+            var note = kind == StockMovementKind.Incoming
+                ? "Carico rapido da scanner"
+                : "Scarico rapido da scanner";
+
+            _stockMovementRepository.AddMovement(product.Id, kind, 1, note);
+            RefreshAllData();
+
+            var updated = _productRepository.GetById(product.Id);
+            var stock = updated?.StockQuantity ?? _stockMovementRepository.GetCurrentStock(product.Id);
+            var prefix = kind == StockMovementKind.Incoming ? "+1 carico" : "-1 scarico";
+            LastScanText.Text = $"{prefix}: {product.Name} — giacenza {stock}.";
+        }
+        catch (Exception ex)
+        {
+            LastScanText.Text = $"Operazione non eseguita per {product.Name}: {ex.Message}";
+        }
     }
 
     private void ShowDashboard()
@@ -207,6 +324,14 @@ public partial class MainWindow : Window
         var movements = _stockMovementRepository.Search(MovementSearchInput.Text);
         MovementsList.ItemsSource = movements;
         EmptyMovementsText.IsVisible = movements.Count == 0;
+    }
+
+    private void RefreshAllData()
+    {
+        ReloadProducts();
+        ReloadWarehouseProducts();
+        ReloadMovements();
+        RefreshDashboardCounters();
     }
 
     private void RefreshDashboardCounters()
