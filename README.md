@@ -13,7 +13,7 @@ Gestionale desktop multipiattaforma per negozio, pensato per funzionare **offlin
 
 1. **Prodotti**: SKU, barcode/EAN, nome, marca, categoria, variante, taglia, prezzo di acquisto, prezzo di vendita, note e stato attivo/disattivato. Variante e taglia sono attributi distinti; non è prevista una scorta minima.
 2. **Magazzino**: carico, scarico, rettifica e storico completo dei movimenti. La giacenza è sempre derivata dalla somma dei movimenti e non è modificata direttamente nell'anagrafica prodotto.
-3. **Scanner**: ricerca tramite scanner USB/HID, riconoscimento immediato di SKU/barcode e flusso rapido di magazzino.
+3. **Scanner**: ricerca tramite scanner USB/HID, riconoscimento immediato di SKU/barcode, creazione guidata se il codice non esiste e modalità rapide di carico/scarico da 1 pezzo per scansione.
 4. **Etichette**: generazione barcode, anteprima, numero copie e stampa ApiX110 su Windows/Linux tramite backend di stampa separato.
 5. **Backup ed Excel**: backup locale del database; esportazione completa dell'inventario raggruppata per marca in ordine alfabetico oppure esportazione parziale filtrando una o più marche e/o una o più categorie.
 
@@ -23,7 +23,7 @@ Non è previsto un modulo separato di inventario fisico/conteggio sessioni.
 
 - anagrafica prodotti: implementata;
 - magazzino: carico, scarico, rettifica e storico movimenti implementati;
-- scanner: input HID di base attivo, flusso rapido da completare;
+- scanner: integrazione HID implementata con ricerca/apertura prodotto, creazione da codice sconosciuto, carico rapido +1 e scarico rapido -1;
 - etichette: da implementare;
 - backup/esportazione Excel: da implementare.
 
@@ -36,7 +36,7 @@ src/LocalStoreManagement.Desktop/
 ├── Models/               # modelli applicativi
 ├── Services/             # servizi hardware/applicativi
 ├── App.axaml             # bootstrap Avalonia
-├── MainWindow.axaml      # shell desktop
+├── MainWindow.axaml      # shell desktop e flusso scanner
 ├── ProductEditorWindow.* # editor anagrafica prodotto
 └── StockMovementWindow.* # carico/scarico/rettifica
 ```
@@ -56,6 +56,8 @@ Gli stessi sorgenti vengono compilati su Windows e Linux.
 
 ## Hardware previsto
 
-Lo scanner di codici a barre viene trattato come dispositivo HID/tastiera: il codice scansionato termina con `Enter` e viene acquisito dal gestionale.
+Lo scanner di codici a barre viene trattato come dispositivo HID/tastiera: il codice scansionato termina con `Enter` e viene acquisito dal gestionale. Dalla dashboard si può scegliere tra ricerca/apertura prodotto, carico rapido e scarico rapido. Nelle modalità rapide ogni scansione corrisponde a un singolo pezzo.
+
+Se un codice scansionato non è presente, viene aperta la scheda di creazione prodotto con il barcode già compilato; l'utente può completarla oppure annullare.
 
 La stampa delle etichette è isolata dietro `ILabelPrinter`, in modo da poter implementare backend differenti (driver Windows, CUPS/Linux o protocollo diretto della stampante) senza cambiare il resto del gestionale.
