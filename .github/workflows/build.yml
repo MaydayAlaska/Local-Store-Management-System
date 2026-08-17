@@ -3,10 +3,12 @@ name: Build desktop app
 on:
   push:
     branches:
+      - test
       - main
-      - "feature/**"
   pull_request:
-    branches: [main]
+    branches:
+      - test
+      - main
 
 jobs:
   build:
