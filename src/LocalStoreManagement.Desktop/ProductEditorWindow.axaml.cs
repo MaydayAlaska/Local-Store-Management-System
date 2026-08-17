@@ -11,23 +11,26 @@ public partial class ProductEditorWindow : Window
 {
     private readonly ProductRepository _repository;
     private readonly long? _productId;
+    private readonly string? _initialBarcode;
 
     public ProductEditorWindow()
         : this(new ProductRepository(), null)
     {
     }
 
-    public ProductEditorWindow(ProductRepository repository, Product? product)
+    public ProductEditorWindow(ProductRepository repository, Product? product, string? initialBarcode = null)
     {
         _repository = repository;
         _productId = product?.Id;
+        _initialBarcode = string.IsNullOrWhiteSpace(initialBarcode) ? null : initialBarcode.Trim();
 
         InitializeComponent();
 
         if (product is null)
         {
             SkuInput.Text = _repository.GenerateSku();
-            EditorTitle.Text = "Nuovo prodotto";
+            BarcodeInput.Text = _initialBarcode;
+            EditorTitle.Text = _initialBarcode is null ? "Nuovo prodotto" : "Nuovo prodotto da scansione";
         }
         else
         {
@@ -45,7 +48,16 @@ public partial class ProductEditorWindow : Window
             IsActiveInput.IsChecked = product.IsActive;
         }
 
-        Opened += (_, _) => SkuInput.Focus();
+        Opened += (_, _) =>
+        {
+            if (product is null && _initialBarcode is not null)
+            {
+                NameInput.Focus();
+                return;
+            }
+
+            SkuInput.Focus();
+        };
     }
 
     private void GenerateSkuButton_OnClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
