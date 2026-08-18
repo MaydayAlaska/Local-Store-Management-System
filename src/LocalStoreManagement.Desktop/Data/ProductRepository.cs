@@ -549,7 +549,7 @@ public sealed class ProductRepository
         INNER JOIN products p ON p.id = pv.product_id
         LEFT JOIN categories c ON c.id = p.category_id
         LEFT JOIN brands b ON b.id = p.brand_id
-        """;
+        """ + "\n";
 
     private const string ProductSummarySelectSql = """
         SELECT
@@ -572,5 +572,5 @@ public sealed class ProductRepository
         FROM products p
         LEFT JOIN categories c ON c.id = p.category_id
         LEFT JOIN brands b ON b.id = p.brand_id
-        """;
+        """ + "\n";
 }
