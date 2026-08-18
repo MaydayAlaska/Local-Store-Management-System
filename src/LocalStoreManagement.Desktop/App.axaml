@@ -8,59 +8,71 @@
         <ResourceDictionary>
             <ResourceDictionary.ThemeDictionaries>
                 <ResourceDictionary x:Key="Light">
-                    <SolidColorBrush x:Key="AppBackgroundBrush" Color="#F5F5F7" />
-                    <SolidColorBrush x:Key="AppChromeBrush" Color="#F2F2F7" />
-                    <SolidColorBrush x:Key="AppSidebarBrush" Color="#EBEBF0" />
-                    <SolidColorBrush x:Key="AppSurfaceBrush" Color="#FFFFFF" />
-                    <SolidColorBrush x:Key="AppSurfaceMutedBrush" Color="#F8F8FA" />
-                    <SolidColorBrush x:Key="AppBorderBrush" Color="#E1E1E8" />
-                    <SolidColorBrush x:Key="AppControlBorderBrush" Color="#D7D7DE" />
-                    <SolidColorBrush x:Key="AppHoverBrush" Color="#10000000" />
-                    <SolidColorBrush x:Key="AppTextBrush" Color="#1D1D1F" />
-                    <SolidColorBrush x:Key="AppSecondaryTextBrush" Color="#6E6E73" />
-                    <SolidColorBrush x:Key="AppAccentBrush" Color="#007AFF" />
-                    <SolidColorBrush x:Key="AppAccentHoverBrush" Color="#0A6FE8" />
-                    <SolidColorBrush x:Key="AppAccentSoftBrush" Color="#EAF3FF" />
-                    <SolidColorBrush x:Key="AppGreenBrush" Color="#34C759" />
-                    <SolidColorBrush x:Key="AppGreenSoftBrush" Color="#EAF8EE" />
-                    <SolidColorBrush x:Key="AppGreenTextBrush" Color="#187A36" />
-                    <SolidColorBrush x:Key="AppGreenBorderBrush" Color="#CBEFD4" />
-                    <SolidColorBrush x:Key="AppOrangeBrush" Color="#FF9500" />
-                    <SolidColorBrush x:Key="AppOrangeSoftBrush" Color="#FFF5E8" />
-                    <SolidColorBrush x:Key="AppOrangeTextBrush" Color="#A45C00" />
-                    <SolidColorBrush x:Key="AppOrangeBorderBrush" Color="#F2DAB8" />
-                    <SolidColorBrush x:Key="AppRedBrush" Color="#FF3B30" />
-                    <SolidColorBrush x:Key="AppRedSoftBrush" Color="#FFF0EF" />
-                    <SolidColorBrush x:Key="AppRedTextBrush" Color="#C12820" />
-                    <SolidColorBrush x:Key="AppRedBorderBrush" Color="#F3D0CD" />
+                    <!-- Glass backdrop and surfaces -->
+                    <SolidColorBrush x:Key="AppBackgroundBrush" Color="#12FFFFFF" />
+                    <SolidColorBrush x:Key="AppFallbackBackgroundBrush" Color="#EAF2FA" />
+                    <SolidColorBrush x:Key="AppChromeBrush" Color="#66FFFFFF" />
+                    <SolidColorBrush x:Key="AppSidebarBrush" Color="#90FFFFFF" />
+                    <SolidColorBrush x:Key="AppSurfaceBrush" Color="#C2FFFFFF" />
+                    <SolidColorBrush x:Key="AppSurfaceMutedBrush" Color="#84FFFFFF" />
+                    <SolidColorBrush x:Key="AppBorderBrush" Color="#A8FFFFFF" />
+                    <SolidColorBrush x:Key="AppControlBorderBrush" Color="#B8FFFFFF" />
+                    <SolidColorBrush x:Key="AppHoverBrush" Color="#180E6FFF" />
+                    <SolidColorBrush x:Key="AppTextBrush" Color="#172033" />
+                    <SolidColorBrush x:Key="AppSecondaryTextBrush" Color="#667085" />
+
+                    <SolidColorBrush x:Key="AppAccentBrush" Color="#3B82F6" />
+                    <SolidColorBrush x:Key="AppAccentHoverBrush" Color="#2563EB" />
+                    <SolidColorBrush x:Key="AppAccentSoftBrush" Color="#2A3B82F6" />
+
+                    <SolidColorBrush x:Key="AppGreenBrush" Color="#22C55E" />
+                    <SolidColorBrush x:Key="AppGreenSoftBrush" Color="#2922C55E" />
+                    <SolidColorBrush x:Key="AppGreenTextBrush" Color="#15803D" />
+                    <SolidColorBrush x:Key="AppGreenBorderBrush" Color="#5C22C55E" />
+
+                    <SolidColorBrush x:Key="AppOrangeBrush" Color="#F59E0B" />
+                    <SolidColorBrush x:Key="AppOrangeSoftBrush" Color="#2CF59E0B" />
+                    <SolidColorBrush x:Key="AppOrangeTextBrush" Color="#B45309" />
+                    <SolidColorBrush x:Key="AppOrangeBorderBrush" Color="#62F59E0B" />
+
+                    <SolidColorBrush x:Key="AppRedBrush" Color="#EF4444" />
+                    <SolidColorBrush x:Key="AppRedSoftBrush" Color="#2CEF4444" />
+                    <SolidColorBrush x:Key="AppRedTextBrush" Color="#B91C1C" />
+                    <SolidColorBrush x:Key="AppRedBorderBrush" Color="#62EF4444" />
                 </ResourceDictionary>
 
                 <ResourceDictionary x:Key="Dark">
-                    <SolidColorBrush x:Key="AppBackgroundBrush" Color="#1C1C1E" />
-                    <SolidColorBrush x:Key="AppChromeBrush" Color="#202022" />
-                    <SolidColorBrush x:Key="AppSidebarBrush" Color="#252528" />
-                    <SolidColorBrush x:Key="AppSurfaceBrush" Color="#2C2C2E" />
-                    <SolidColorBrush x:Key="AppSurfaceMutedBrush" Color="#242426" />
-                    <SolidColorBrush x:Key="AppBorderBrush" Color="#3A3A3C" />
-                    <SolidColorBrush x:Key="AppControlBorderBrush" Color="#48484A" />
-                    <SolidColorBrush x:Key="AppHoverBrush" Color="#16FFFFFF" />
-                    <SolidColorBrush x:Key="AppTextBrush" Color="#F5F5F7" />
-                    <SolidColorBrush x:Key="AppSecondaryTextBrush" Color="#A1A1A6" />
-                    <SolidColorBrush x:Key="AppAccentBrush" Color="#0A84FF" />
-                    <SolidColorBrush x:Key="AppAccentHoverBrush" Color="#409CFF" />
-                    <SolidColorBrush x:Key="AppAccentSoftBrush" Color="#173552" />
-                    <SolidColorBrush x:Key="AppGreenBrush" Color="#30D158" />
-                    <SolidColorBrush x:Key="AppGreenSoftBrush" Color="#173A24" />
-                    <SolidColorBrush x:Key="AppGreenTextBrush" Color="#72E58C" />
-                    <SolidColorBrush x:Key="AppGreenBorderBrush" Color="#285B34" />
-                    <SolidColorBrush x:Key="AppOrangeBrush" Color="#FF9F0A" />
-                    <SolidColorBrush x:Key="AppOrangeSoftBrush" Color="#4A3215" />
-                    <SolidColorBrush x:Key="AppOrangeTextBrush" Color="#FFC15C" />
-                    <SolidColorBrush x:Key="AppOrangeBorderBrush" Color="#6A4A20" />
-                    <SolidColorBrush x:Key="AppRedBrush" Color="#FF453A" />
-                    <SolidColorBrush x:Key="AppRedSoftBrush" Color="#4A211F" />
-                    <SolidColorBrush x:Key="AppRedTextBrush" Color="#FF8A82" />
-                    <SolidColorBrush x:Key="AppRedBorderBrush" Color="#6B3430" />
+                    <!-- Dark glass keeps the same transparency hierarchy with a deeper tint. -->
+                    <SolidColorBrush x:Key="AppBackgroundBrush" Color="#16070B12" />
+                    <SolidColorBrush x:Key="AppFallbackBackgroundBrush" Color="#0D1119" />
+                    <SolidColorBrush x:Key="AppChromeBrush" Color="#68202A38" />
+                    <SolidColorBrush x:Key="AppSidebarBrush" Color="#7A202A38" />
+                    <SolidColorBrush x:Key="AppSurfaceBrush" Color="#A52A3546" />
+                    <SolidColorBrush x:Key="AppSurfaceMutedBrush" Color="#74313D50" />
+                    <SolidColorBrush x:Key="AppBorderBrush" Color="#38FFFFFF" />
+                    <SolidColorBrush x:Key="AppControlBorderBrush" Color="#4AFFFFFF" />
+                    <SolidColorBrush x:Key="AppHoverBrush" Color="#22FFFFFF" />
+                    <SolidColorBrush x:Key="AppTextBrush" Color="#F3F7FF" />
+                    <SolidColorBrush x:Key="AppSecondaryTextBrush" Color="#A9B4C7" />
+
+                    <SolidColorBrush x:Key="AppAccentBrush" Color="#66A7FF" />
+                    <SolidColorBrush x:Key="AppAccentHoverBrush" Color="#84B8FF" />
+                    <SolidColorBrush x:Key="AppAccentSoftBrush" Color="#3466A7FF" />
+
+                    <SolidColorBrush x:Key="AppGreenBrush" Color="#4ADE80" />
+                    <SolidColorBrush x:Key="AppGreenSoftBrush" Color="#304ADE80" />
+                    <SolidColorBrush x:Key="AppGreenTextBrush" Color="#86EFAC" />
+                    <SolidColorBrush x:Key="AppGreenBorderBrush" Color="#514ADE80" />
+
+                    <SolidColorBrush x:Key="AppOrangeBrush" Color="#FBBF24" />
+                    <SolidColorBrush x:Key="AppOrangeSoftBrush" Color="#30FBBF24" />
+                    <SolidColorBrush x:Key="AppOrangeTextBrush" Color="#FCD34D" />
+                    <SolidColorBrush x:Key="AppOrangeBorderBrush" Color="#52FBBF24" />
+
+                    <SolidColorBrush x:Key="AppRedBrush" Color="#FB7185" />
+                    <SolidColorBrush x:Key="AppRedSoftBrush" Color="#31FB7185" />
+                    <SolidColorBrush x:Key="AppRedTextBrush" Color="#FDA4AF" />
+                    <SolidColorBrush x:Key="AppRedBorderBrush" Color="#55FB7185" />
                 </ResourceDictionary>
             </ResourceDictionary.ThemeDictionaries>
         </ResourceDictionary>
