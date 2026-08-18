@@ -25,7 +25,7 @@ class _StoreAppState extends State<StoreApp> {
   @override
   Widget build(BuildContext context) => MaterialApp(
         debugShowCheckedModeBanner: false,
-        title: _settings.shopName,
+        title: 'Local Store Management System',
         themeMode: ThemeMode.system,
         theme: GlassTheme.light(),
         darkTheme: GlassTheme.dark(),
