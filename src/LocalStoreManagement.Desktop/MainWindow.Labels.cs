@@ -32,7 +32,7 @@ public partial class MainWindow
             .ToList();
 
         var labelsButton = buttons.FirstOrDefault(button =>
-            string.Equals(button.Content as string, "Etichette", StringComparison.Ordinal));
+            string.Equals(GetButtonText(button), "Etichette", StringComparison.Ordinal));
         if (labelsButton is not null)
         {
             InsertCategoriesButton(labelsButton);
@@ -41,15 +41,15 @@ public partial class MainWindow
         }
 
         var exportButton = buttons.FirstOrDefault(button =>
-            string.Equals(button.Content as string, "Esportazione", StringComparison.Ordinal));
+            string.Equals(GetButtonText(button), "Esportazione", StringComparison.Ordinal));
         if (exportButton is not null)
         {
             exportButton.IsEnabled = true;
             exportButton.Click += ExportButton_OnClick;
         }
 
-        ApplySidebarPresentation();
         AttachEmbeddedViewHideToMainNavigation();
+        ApplySidebarPresentation();
         _secondaryNavigationAttached = true;
     }
 
@@ -62,7 +62,7 @@ public partial class MainWindow
 
         if (navigationPanel is null
             || navigationPanel.Children.OfType<Button>().Any(button =>
-                string.Equals(button.Content as string, "Categorie", StringComparison.Ordinal)))
+                string.Equals(GetButtonText(button), "Categorie", StringComparison.Ordinal)))
         {
             return;
         }
@@ -113,21 +113,39 @@ public partial class MainWindow
 
         foreach (var button in buttons)
         {
-            if (button.Content is string text && navigationLabels.Contains(text))
+            var text = GetButtonText(button);
+            if (text is null || !navigationLabels.Contains(text))
             {
-                button.Classes.Add("SidebarNav");
-                // Valore locale: impedisce al tema chiaro di rendere scuro il testo
-                // durante pointerover/pressed.
-                button.Foreground = Brushes.White;
+                continue;
             }
+
+            button.Classes.Add("SidebarNav");
+            button.Foreground = Brushes.White;
+
+            // Il FluentTheme può cambiare il Foreground del ContentPresenter in
+            // pointerover. Un TextBlock con Foreground locale evita che il testo
+            // erediti quel colore e lo mantiene leggibile in ogni stato/tema.
+            button.Content = new TextBlock
+            {
+                Text = text,
+                Foreground = Brushes.White,
+                VerticalAlignment = VerticalAlignment.Center
+            };
         }
 
         var settingsButton = buttons.FirstOrDefault(button =>
-            button.Content is string text
-            && text.Contains("Impostazioni", StringComparison.Ordinal));
+        {
+            var text = GetButtonText(button);
+            return text is not null && text.Contains("Impostazioni", StringComparison.Ordinal);
+        });
         if (settingsButton is not null)
         {
-            settingsButton.Content = "⚙";
+            settingsButton.Content = new TextBlock
+            {
+                Text = "⚙",
+                Foreground = Brushes.White,
+                VerticalAlignment = VerticalAlignment.Center
+            };
             settingsButton.Classes.Add("SidebarIcon");
             settingsButton.Foreground = Brushes.White;
             settingsButton.HorizontalAlignment = HorizontalAlignment.Right;
@@ -148,12 +166,21 @@ public partial class MainWindow
 
         foreach (var button in this.GetVisualDescendants().OfType<Button>())
         {
-            if (button.Content is string text && mainPages.Contains(text))
+            var text = GetButtonText(button);
+            if (text is not null && mainPages.Contains(text))
             {
                 button.Click += (_, _) => HideEmbeddedViews();
             }
         }
     }
+
+    private static string? GetButtonText(Button button)
+        => button.Content switch
+        {
+            string text => text,
+            TextBlock textBlock => textBlock.Text,
+            _ => null
+        };
 
     private void CategoriesButton_OnClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
