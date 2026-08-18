@@ -8,10 +8,19 @@ public static class DatabaseInitializer
     {
         Directory.CreateDirectory(AppPaths.DataDirectory);
 
-        using var connection = new SqliteConnection($"Data Source={AppPaths.DatabasePath}");
+        // Il database può essere stato eliminato e ricreato tra due avvii. Svuotiamo
+        // eventuali pool prima di aprirlo, così nessuna connessione mantiene riferimenti
+        // a una precedente istanza del file.
+        SqliteConnection.ClearAllPools();
+
+        using var connection = new SqliteConnection($"Data Source={AppPaths.DatabasePath};Pooling=False");
         connection.Open();
 
-        Execute(connection, "PRAGMA journal_mode = WAL;");
+        // Il gestionale usa connessioni brevi in un singolo processo e non necessita della
+        // concorrenza offerta dal WAL. Il journal standard evita i file persistenti -wal/-shm,
+        // rende più affidabile la ricreazione di store.db e funziona anche quando Documenti
+        // è reindirizzata verso un filesystem che non supporta la shared memory di WAL.
+        Execute(connection, "PRAGMA journal_mode = DELETE;");
         Execute(connection, "PRAGMA foreign_keys = ON;");
         CreateLookupTables(connection);
 
@@ -198,7 +207,7 @@ public static class DatabaseInitializer
             backupDirectory,
             $"store-pre-variants-{DateTime.Now:yyyyMMdd-HHmmss}.db");
 
-        using var destination = new SqliteConnection($"Data Source={backupPath}");
+        using var destination = new SqliteConnection($"Data Source={backupPath};Pooling=False");
         destination.Open();
         connection.BackupDatabase(destination);
     }
