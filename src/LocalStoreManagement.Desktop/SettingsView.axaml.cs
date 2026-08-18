@@ -78,12 +78,19 @@ public partial class SettingsView : UserControl
         HideError();
         try
         {
-            _settingsService.Save(
+            var savedSettings = _settingsService.Save(
                 ShopNameInput.Text ?? string.Empty,
                 ShowShopNameInMenuInput.IsChecked ?? false,
                 ShowLogoInMenuInput.IsChecked ?? false,
                 _pendingIcon,
                 _pendingLogo);
+
+            var iconPath = _settingsService.ResolveIconPath(savedSettings);
+            if (iconPath is not null && TopLevel.GetTopLevel(this) is Window window)
+            {
+                ApplicationIconIntegrationService.Apply(window, iconPath);
+            }
+
             _pendingIcon = null;
             _pendingLogo = null;
             StatusText.Text = "Impostazioni salvate.";
