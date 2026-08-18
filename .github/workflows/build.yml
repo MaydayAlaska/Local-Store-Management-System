@@ -24,7 +24,7 @@ jobs:
       - name: Linux desktop dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev
+          sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev libstdc++-12-dev
 
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
@@ -47,9 +47,23 @@ jobs:
         run: flutter test
 
   package-windows:
-    name: Windows installer
+    name: Windows installer (${{ matrix.arch }})
     needs: verify
-    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: windows-latest
+            arch: x64
+            flutter_arch: x64
+            build_arch: x64
+            allowed_architectures: x64compatible
+          - runner: windows-11-vs2026-arm
+            arch: arm64
+            flutter_arch: arm64
+            build_arch: arm64
+            allowed_architectures: arm64
+    runs-on: ${{ matrix.runner }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -58,6 +72,7 @@ jobs:
         uses: subosito/flutter-action@v2
         with:
           channel: stable
+          architecture: ${{ matrix.flutter_arch }}
           cache: true
 
       - name: Generate Windows runner
@@ -93,7 +108,7 @@ jobs:
           New-Item -ItemType Directory -Force -Path dist | Out-Null
           $rawVersion = ((Select-String -Path pubspec.yaml -Pattern '^version:\s*(\S+)' | Select-Object -First 1).Matches.Groups[1].Value)
           $version = $rawVersion -replace '\+', '.'
-          $publishDir = (Resolve-Path 'build/windows/x64/runner/Release').Path
+          $publishDir = (Resolve-Path 'build/windows/${{ matrix.build_arch }}/runner/Release').Path
           $outputDir = (Resolve-Path 'dist').Path
           $iconFile = (Resolve-Path 'windows/runner/resources/app_icon.ico').Path
           $iscc = (Get-Command ISCC.exe -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty Source)
@@ -101,20 +116,36 @@ jobs:
             $iscc = Get-ChildItem 'C:\Program Files*\Inno Setup *\ISCC.exe' -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty FullName
           }
           if (-not $iscc) { throw 'ISCC.exe (Inno Setup) non trovato nel runner Windows.' }
-          & $iscc "/DPublishDir=$publishDir" "/DOutputDir=$outputDir" "/DAppVersion=$version" "/DIconFile=$iconFile" 'packaging/windows/installer.iss'
+          & $iscc "/DPublishDir=$publishDir" "/DOutputDir=$outputDir" "/DAppVersion=$version" "/DIconFile=$iconFile" "/DAllowedArchitectures=${{ matrix.allowed_architectures }}" "/DOutputBaseFilename=LocalStoreManagement-Setup-win-${{ matrix.arch }}" 'packaging/windows/installer.iss'
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Upload Windows installer
         uses: actions/upload-artifact@v4
         with:
-          name: package-win-x64
-          path: dist/LocalStoreManagement-Setup-win-x64.exe
+          name: package-win-${{ matrix.arch }}
+          path: dist/LocalStoreManagement-Setup-win-${{ matrix.arch }}.exe
           if-no-files-found: error
 
   package-linux:
-    name: Linux AppImage
+    name: Linux packages (${{ matrix.arch }})
     needs: verify
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-latest
+            arch: x64
+            flutter_arch: x64
+            build_arch: x64
+            deb_arch: amd64
+            appimage_arch: x86_64
+          - runner: ubuntu-24.04-arm
+            arch: arm64
+            flutter_arch: arm64
+            build_arch: arm64
+            deb_arch: arm64
+            appimage_arch: aarch64
+    runs-on: ${{ matrix.runner }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -122,12 +153,13 @@ jobs:
       - name: Linux desktop dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev squashfs-tools
+          sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev libstdc++-12-dev squashfs-tools
 
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
           channel: stable
+          architecture: ${{ matrix.flutter_arch }}
           cache: true
 
       - name: Generate Linux runner
@@ -151,7 +183,7 @@ jobs:
           set -euo pipefail
           rm -rf AppDir dist
           mkdir -p AppDir/usr/bin AppDir/usr/share/icons/hicolor/64x64/apps dist
-          cp -a build/linux/x64/release/bundle/. AppDir/usr/bin/
+          cp -a build/linux/${{ matrix.build_arch }}/release/bundle/. AppDir/usr/bin/
           cp packaging/linux/AppRun AppDir/AppRun
           cp packaging/linux/local-store-management.desktop AppDir/local-store-management.desktop
           base64 --decode "${ICON_BASE64}" > AppDir/local-store-management.png
@@ -163,17 +195,55 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          curl --fail --location --retry 3 --output appimagetool-x86_64.AppImage \
-            https://github.com/AppImage/appimagetool/releases/download/1.9.1/appimagetool-x86_64.AppImage
-          chmod +x appimagetool-x86_64.AppImage
-          APPIMAGE_EXTRACT_AND_RUN=1 ARCH=x86_64 ./appimagetool-x86_64.AppImage AppDir dist/LocalStoreManagement-linux-x64.AppImage
-          chmod +x dist/LocalStoreManagement-linux-x64.AppImage
+          TOOL="appimagetool-${{ matrix.appimage_arch }}.AppImage"
+          curl --fail --location --retry 3 --output "$TOOL" \
+            "https://github.com/AppImage/appimagetool/releases/download/1.9.1/$TOOL"
+          chmod +x "$TOOL"
+          APPIMAGE_EXTRACT_AND_RUN=1 ARCH=${{ matrix.appimage_arch }} ./"$TOOL" AppDir dist/LocalStoreManagement-linux-${{ matrix.arch }}.AppImage
+          chmod +x dist/LocalStoreManagement-linux-${{ matrix.arch }}.AppImage
 
-      - name: Upload Linux AppImage
+      - name: Build Debian package
+        shell: bash
+        run: |
+          set -euo pipefail
+          RAW_VERSION="$(awk '/^version:/{print $2; exit}' pubspec.yaml)"
+          DEB_VERSION="${RAW_VERSION/+/.}"
+          rm -rf DebRoot
+          mkdir -p DebRoot/DEBIAN \
+                   DebRoot/usr/bin \
+                   DebRoot/usr/lib/local-store-management \
+                   DebRoot/usr/share/applications \
+                   DebRoot/usr/share/icons/hicolor/64x64/apps
+          cp -a build/linux/${{ matrix.build_arch }}/release/bundle/. DebRoot/usr/lib/local-store-management/
+          cp packaging/linux/local-store-management.desktop DebRoot/usr/share/applications/local-store-management.desktop
+          base64 --decode "${ICON_BASE64}" > DebRoot/usr/share/icons/hicolor/64x64/apps/local-store-management.png
+          cat > DebRoot/usr/bin/local_store_management <<'EOF'
+          #!/bin/sh
+          exec /usr/lib/local-store-management/local_store_management "$@"
+          EOF
+          chmod +x DebRoot/usr/bin/local_store_management DebRoot/usr/lib/local-store-management/local_store_management
+          INSTALLED_SIZE="$(du -sk DebRoot/usr | cut -f1)"
+          cat > DebRoot/DEBIAN/control <<EOF
+          Package: local-store-management-system
+          Version: ${DEB_VERSION}
+          Section: office
+          Priority: optional
+          Architecture: ${{ matrix.deb_arch }}
+          Maintainer: MaydayAlaska
+          Depends: libgtk-3-0, libblkid1, liblzma5
+          Installed-Size: ${INSTALLED_SIZE}
+          Description: Local Store Management System
+           Gestionale desktop offline per negozio.
+          EOF
+          dpkg-deb --build --root-owner-group DebRoot dist/LocalStoreManagement-linux-${{ matrix.arch }}.deb
+
+      - name: Upload Linux packages
         uses: actions/upload-artifact@v4
         with:
-          name: package-linux-x64
-          path: dist/LocalStoreManagement-linux-x64.AppImage
+          name: package-linux-${{ matrix.arch }}
+          path: |
+            dist/LocalStoreManagement-linux-${{ matrix.arch }}.AppImage
+            dist/LocalStoreManagement-linux-${{ matrix.arch }}.deb
           if-no-files-found: error
 
   release-test:
@@ -200,11 +270,15 @@ jobs:
           VERSION="${RAW_VERSION/+/.}"
           TAG='test-latest'
           mv dist/LocalStoreManagement-Setup-win-x64.exe "dist/LocalStoreManagement-${VERSION}-BETA-Setup-win-x64.exe"
+          mv dist/LocalStoreManagement-Setup-win-arm64.exe "dist/LocalStoreManagement-${VERSION}-BETA-Setup-win-arm64.exe"
           mv dist/LocalStoreManagement-linux-x64.AppImage "dist/LocalStoreManagement-${VERSION}-BETA-linux-x64.AppImage"
+          mv dist/LocalStoreManagement-linux-x64.deb "dist/LocalStoreManagement-${VERSION}-BETA-linux-x64.deb"
+          mv dist/LocalStoreManagement-linux-arm64.AppImage "dist/LocalStoreManagement-${VERSION}-BETA-linux-arm64.AppImage"
+          mv dist/LocalStoreManagement-linux-arm64.deb "dist/LocalStoreManagement-${VERSION}-BETA-linux-arm64.deb"
           if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then gh release delete "$TAG" --repo "$GITHUB_REPOSITORY" --cleanup-tag --yes; fi
           gh release create "$TAG" dist/* --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --prerelease --latest=false \
             --title "Local Store Management v${VERSION} BETA / TEST (${GITHUB_SHA::7})" \
-            --notes 'Versione BETA/TEST generata automaticamente dal branch test. Non è una release stabile.'
+            --notes 'Versione BETA/TEST generata automaticamente dal branch test. Include Windows x64/ARM64 e Linux x64/ARM64 in formato AppImage e DEB.'
 
   release-main:
     name: Publish main release assets
@@ -240,6 +314,10 @@ jobs:
             --title "Legacy OTA bridge v${VERSION}" --notes 'Release tecnica per gli aggiornamenti automatici.'
           mkdir stable-dist
           cp dist/LocalStoreManagement-Setup-win-x64.exe "stable-dist/LocalStoreManagement-${VERSION}-Setup-win-x64.exe"
+          cp dist/LocalStoreManagement-Setup-win-arm64.exe "stable-dist/LocalStoreManagement-${VERSION}-Setup-win-arm64.exe"
           cp dist/LocalStoreManagement-linux-x64.AppImage "stable-dist/LocalStoreManagement-${VERSION}-linux-x64.AppImage"
+          cp dist/LocalStoreManagement-linux-x64.deb "stable-dist/LocalStoreManagement-${VERSION}-linux-x64.deb"
+          cp dist/LocalStoreManagement-linux-arm64.AppImage "stable-dist/LocalStoreManagement-${VERSION}-linux-arm64.AppImage"
+          cp dist/LocalStoreManagement-linux-arm64.deb "stable-dist/LocalStoreManagement-${VERSION}-linux-arm64.deb"
           gh release create "$STABLE_TAG" stable-dist/* --repo "$GITHUB_REPOSITORY" --latest=true \
-            --title "Local Store Management v${VERSION}" --notes "Release stabile v${VERSION}. Pacchetti Flutter Windows e Linux."
+            --title "Local Store Management v${VERSION}" --notes "Release stabile v${VERSION}. Windows x64/ARM64 e Linux x64/ARM64 (AppImage + DEB)."
