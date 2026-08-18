@@ -1,4 +1,7 @@
+using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Layout;
+using Avalonia.Media;
 using Avalonia.VisualTree;
 using LocalStoreManagement.Desktop.Data;
 
@@ -7,6 +10,7 @@ namespace LocalStoreManagement.Desktop;
 public partial class MainWindow
 {
     private bool _secondaryNavigationAttached;
+    private CategoriesView? _categoriesView;
 
     protected override void OnOpened(EventArgs e)
     {
@@ -44,7 +48,7 @@ public partial class MainWindow
         }
 
         ApplySidebarPresentation();
-        AttachSettingsHideToMainNavigation();
+        AttachEmbeddedViewHideToMainNavigation();
         _secondaryNavigationAttached = true;
     }
 
@@ -74,6 +78,22 @@ public partial class MainWindow
 
     private void ApplySidebarPresentation()
     {
+        // Il pannello laterale mantiene il titolo con margine, mentre le voci di
+        // navigazione possono usare tutta la larghezza disponibile per l'highlight.
+        var sidebarBorder = ShopNameText
+            .GetVisualAncestors()
+            .OfType<Border>()
+            .FirstOrDefault();
+        if (sidebarBorder is not null)
+        {
+            sidebarBorder.Padding = new Thickness(0, 20);
+        }
+
+        if (ShopNameText.Parent is StackPanel shopHeader)
+        {
+            shopHeader.Margin = new Thickness(20, 0, 20, 0);
+        }
+
         var navigationLabels = new HashSet<string>(StringComparer.Ordinal)
         {
             "Dashboard",
@@ -95,6 +115,9 @@ public partial class MainWindow
             if (button.Content is string text && navigationLabels.Contains(text))
             {
                 button.Classes.Add("SidebarNav");
+                // Valore locale: impedisce al tema chiaro di rendere scuro il testo
+                // durante pointerover/pressed.
+                button.Foreground = Brushes.White;
             }
         }
 
@@ -105,11 +128,14 @@ public partial class MainWindow
         {
             settingsButton.Content = "⚙";
             settingsButton.Classes.Add("SidebarIcon");
+            settingsButton.Foreground = Brushes.White;
+            settingsButton.HorizontalAlignment = HorizontalAlignment.Right;
+            settingsButton.Margin = new Thickness(0, 0, 20, 0);
             ToolTip.SetTip(settingsButton, "Impostazioni");
         }
     }
 
-    private void AttachSettingsHideToMainNavigation()
+    private void AttachEmbeddedViewHideToMainNavigation()
     {
         var mainPages = new HashSet<string>(StringComparer.Ordinal)
         {
@@ -123,16 +149,55 @@ public partial class MainWindow
         {
             if (button.Content is string text && mainPages.Contains(text))
             {
-                button.Click += (_, _) => HideSettingsView();
+                button.Click += (_, _) => HideEmbeddedViews();
             }
         }
     }
 
-    private async void CategoriesButton_OnClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    private void CategoriesButton_OnClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
-        var window = new CategoriesWindow(new CategoryRepository());
-        await window.ShowDialog(this);
-        RefreshAllData();
+        ShowCategories();
+    }
+
+    private void ShowCategories()
+    {
+        HideEmbeddedViews();
+        HideAllPanels();
+        EnsureCategoriesView();
+
+        _categoriesView!.Reload();
+        _categoriesView.IsVisible = true;
+        PageTitle.Text = "Categorie";
+        PageSubtitle.Text = "Crea, rinomina ed elimina le categorie usate dai prodotti";
+        _categoriesView.FocusPrimaryField();
+    }
+
+    private void EnsureCategoriesView()
+    {
+        if (_categoriesView is not null)
+        {
+            return;
+        }
+
+        if (DashboardPanel.Parent is not Grid contentGrid)
+        {
+            throw new InvalidOperationException("Impossibile inizializzare il pannello Categorie.");
+        }
+
+        _categoriesView = new CategoriesView(new CategoryRepository())
+        {
+            IsVisible = false
+        };
+        _categoriesView.CategoriesChanged += (_, _) => RefreshAllData();
+        contentGrid.Children.Add(_categoriesView);
+    }
+
+    private void HideCategoriesView()
+    {
+        if (_categoriesView is not null)
+        {
+            _categoriesView.IsVisible = false;
+        }
     }
 
     private async void LabelsButton_OnClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
