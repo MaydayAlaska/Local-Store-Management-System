@@ -1,3 +1,5 @@
+import 'dart:ui' as ui;
+
 import 'package:barcode_widget/barcode_widget.dart';
 import 'package:flutter/material.dart';
 import 'package:printing/printing.dart';
@@ -55,25 +57,56 @@ class _LabelsPageState extends State<LabelsPage> {
     try {
       final printers = await widget.services.labels.getPrinters();
       if (!mounted) return;
-      final previousUrl = _printer?.url;
+
+      final persisted = widget.services.settings.load();
+      final preferredUrl = _printer?.url ?? persisted.lastLabelPrinterUrl;
+      final preferredName = _printer?.name ?? persisted.lastLabelPrinterName;
       Printer? selected;
-      for (final printer in printers) {
-        if (printer.url == previousUrl) {
-          selected = printer;
-          break;
+
+      if (preferredUrl?.trim().isNotEmpty == true) {
+        for (final printer in printers) {
+          if (printer.url == preferredUrl) {
+            selected = printer;
+            break;
+          }
         }
       }
+      if (selected == null && preferredName?.trim().isNotEmpty == true) {
+        for (final printer in printers) {
+          if (printer.name.toLowerCase() == preferredName!.toLowerCase()) {
+            selected = printer;
+            break;
+          }
+        }
+      }
+
       setState(() {
         _printers = printers;
         _printer = selected ?? (printers.isEmpty ? null : printers.first);
         _status = printers.isEmpty
             ? 'Nessuna stampante rilevata. Verifica che il driver della stampante etichette sia installato.'
-            : 'Stampante pronta: ${_printer!.name}.';
+            : selected != null
+                ? 'Ultima stampante ripristinata: ${selected.name}.'
+                : 'Stampante pronta: ${_printer!.name}.';
       });
     } catch (error) {
       if (mounted) setState(() => _status = 'Impossibile leggere le stampanti: $error');
     } finally {
       if (mounted) setState(() => _loadingPrinters = false);
+    }
+  }
+
+  void _selectPrinter(Printer printer) {
+    setState(() {
+      _printer = printer;
+      _status = 'Stampante selezionata: ${printer.name}.';
+    });
+    try {
+      widget.services.settings.saveLastLabelPrinter(url: printer.url, name: printer.name);
+    } catch (error) {
+      if (mounted) {
+        setState(() => _status = 'Stampante selezionata, ma non è stato possibile salvarla: $error');
+      }
     }
   }
 
@@ -196,13 +229,11 @@ class _LabelsPageState extends State<LabelsPage> {
                         ),
                       ]),
                       const SizedBox(height: 10),
-                      DropdownButtonFormField<Printer>(
-                        value: _printer,
-                        decoration: const InputDecoration(labelText: 'Stampante'),
-                        items: _printers
-                            .map((printer) => DropdownMenuItem(value: printer, child: Text(printer.name, overflow: TextOverflow.ellipsis)))
-                            .toList(),
-                        onChanged: _printing ? null : (value) => setState(() => _printer = value),
+                      _PrinterPicker(
+                        printers: _printers,
+                        selected: _printer,
+                        enabled: !_printing && !_loadingPrinters && _printers.isNotEmpty,
+                        onChanged: _selectPrinter,
                       ),
                       const SizedBox(height: 12),
                       Expanded(
@@ -256,6 +287,183 @@ class _LabelsPageState extends State<LabelsPage> {
       ),
     );
   }
+}
+
+class _PrinterPicker extends StatefulWidget {
+  const _PrinterPicker({
+    required this.printers,
+    required this.selected,
+    required this.enabled,
+    required this.onChanged,
+  });
+
+  final List<Printer> printers;
+  final Printer? selected;
+  final bool enabled;
+  final ValueChanged<Printer> onChanged;
+
+  @override
+  State<_PrinterPicker> createState() => _PrinterPickerState();
+}
+
+class _PrinterPickerState extends State<_PrinterPicker> {
+  final LayerLink _layerLink = LayerLink();
+  final GlobalKey _targetKey = GlobalKey();
+  OverlayEntry? _entry;
+
+  @override
+  void dispose() {
+    _close();
+    super.dispose();
+  }
+
+  void _toggle() {
+    if (!widget.enabled) return;
+    if (_entry != null) {
+      _close();
+    } else {
+      _open();
+    }
+  }
+
+  void _open() {
+    final overlay = Overlay.of(context);
+    final targetBox = _targetKey.currentContext?.findRenderObject() as RenderBox?;
+    if (targetBox == null) return;
+    final targetSize = targetBox.size;
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
+    _entry = OverlayEntry(
+      builder: (_) => Stack(
+        children: [
+          Positioned.fill(
+            child: GestureDetector(
+              behavior: HitTestBehavior.translucent,
+              onTap: _close,
+              child: const SizedBox.expand(),
+            ),
+          ),
+          CompositedTransformFollower(
+            link: _layerLink,
+            showWhenUnlinked: false,
+            targetAnchor: Alignment.bottomLeft,
+            followerAnchor: Alignment.topLeft,
+            offset: const Offset(0, 6),
+            child: Material(
+              type: MaterialType.transparency,
+              child: SizedBox(
+                width: targetSize.width,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(16),
+                  child: BackdropFilter(
+                    filter: ui.ImageFilter.blur(sigmaX: 30, sigmaY: 30),
+                    child: Container(
+                      constraints: const BoxConstraints(maxHeight: 280),
+                      decoration: BoxDecoration(
+                        color: isDark ? const Color(0xE0212836) : const Color(0xE8FFFFFF),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: isDark ? const Color(0x55FFFFFF) : const Color(0xB8FFFFFF),
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: isDark ? 0.38 : 0.16),
+                            blurRadius: 28,
+                            offset: const Offset(0, 12),
+                          ),
+                        ],
+                      ),
+                      child: ListView(
+                        shrinkWrap: true,
+                        padding: const EdgeInsets.all(6),
+                        children: widget.printers.map((printer) {
+                          final selected = widget.selected?.url == printer.url;
+                          return Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 2),
+                            child: Material(
+                              color: selected
+                                  ? theme.colorScheme.primary.withValues(alpha: isDark ? 0.25 : 0.14)
+                                  : Colors.transparent,
+                              borderRadius: BorderRadius.circular(12),
+                              child: InkWell(
+                                borderRadius: BorderRadius.circular(12),
+                                onTap: () {
+                                  widget.onChanged(printer);
+                                  _close();
+                                },
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                                  child: Row(
+                                    children: [
+                                      Icon(
+                                        selected ? Icons.print : Icons.print_outlined,
+                                        size: 18,
+                                        color: selected ? theme.colorScheme.primary : theme.colorScheme.onSurfaceVariant,
+                                      ),
+                                      const SizedBox(width: 10),
+                                      Expanded(
+                                        child: Text(
+                                          printer.name,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: TextStyle(fontWeight: selected ? FontWeight.w700 : FontWeight.w500),
+                                        ),
+                                      ),
+                                      if (selected) ...[
+                                        const SizedBox(width: 8),
+                                        Icon(Icons.check_rounded, size: 18, color: theme.colorScheme.primary),
+                                      ],
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+    overlay.insert(_entry!);
+    setState(() {});
+  }
+
+  void _close() {
+    final entry = _entry;
+    if (entry == null) return;
+    _entry = null;
+    entry.remove();
+    if (mounted) setState(() {});
+  }
+
+  @override
+  Widget build(BuildContext context) => CompositedTransformTarget(
+        key: _targetKey,
+        link: _layerLink,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(16),
+          onTap: widget.enabled ? _toggle : null,
+          child: InputDecorator(
+            isEmpty: widget.selected == null,
+            decoration: InputDecoration(
+              labelText: 'Stampante',
+              suffixIcon: Icon(_entry == null ? Icons.keyboard_arrow_down_rounded : Icons.keyboard_arrow_up_rounded),
+            ),
+            child: Text(
+              widget.selected?.name ?? (widget.printers.isEmpty ? 'Nessuna stampante disponibile' : 'Seleziona stampante'),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ),
+      );
 }
 
 class _LabelPreview extends StatelessWidget {
