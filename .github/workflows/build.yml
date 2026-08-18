@@ -12,6 +12,8 @@ on:
 
 env:
   PROJECT: src/LocalStoreManagement.Desktop/LocalStoreManagement.Desktop.csproj
+  ICON_BASE64: src/LocalStoreManagement.Desktop/Assets/app-icon.base64
+  ICON_ICO: src/LocalStoreManagement.Desktop/Assets/app-icon.ico
 
 jobs:
   build:
@@ -23,6 +25,33 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Prepare Windows application icon
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $png = [Convert]::FromBase64String((Get-Content -Raw "${{ env.ICON_BASE64 }}").Trim())
+          $iconPath = "${{ env.ICON_ICO }}"
+          $stream = [IO.File]::Open($iconPath, [IO.FileMode]::Create, [IO.FileAccess]::Write)
+          try {
+            $writer = [IO.BinaryWriter]::new($stream)
+            $writer.Write([UInt16]0)
+            $writer.Write([UInt16]1)
+            $writer.Write([UInt16]1)
+            $writer.Write([Byte]64)
+            $writer.Write([Byte]64)
+            $writer.Write([Byte]0)
+            $writer.Write([Byte]0)
+            $writer.Write([UInt16]1)
+            $writer.Write([UInt16]32)
+            $writer.Write([UInt32]$png.Length)
+            $writer.Write([UInt32]22)
+            $writer.Write($png)
+            $writer.Flush()
+          }
+          finally {
+            $stream.Dispose()
+          }
 
       - name: Setup .NET 10
         uses: actions/setup-dotnet@v4
@@ -43,6 +72,32 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Prepare Windows application icon
+        shell: pwsh
+        run: |
+          $png = [Convert]::FromBase64String((Get-Content -Raw "${{ env.ICON_BASE64 }}").Trim())
+          $iconPath = "${{ env.ICON_ICO }}"
+          $stream = [IO.File]::Open($iconPath, [IO.FileMode]::Create, [IO.FileAccess]::Write)
+          try {
+            $writer = [IO.BinaryWriter]::new($stream)
+            $writer.Write([UInt16]0)
+            $writer.Write([UInt16]1)
+            $writer.Write([UInt16]1)
+            $writer.Write([Byte]64)
+            $writer.Write([Byte]64)
+            $writer.Write([Byte]0)
+            $writer.Write([Byte]0)
+            $writer.Write([UInt16]1)
+            $writer.Write([UInt16]32)
+            $writer.Write([UInt32]$png.Length)
+            $writer.Write([UInt32]22)
+            $writer.Write($png)
+            $writer.Flush()
+          }
+          finally {
+            $stream.Dispose()
+          }
 
       - name: Setup .NET 10
         uses: actions/setup-dotnet@v4
@@ -74,7 +129,7 @@ jobs:
           $version = $project.Project.PropertyGroup.Version | Select-Object -First 1
           $publishDir = (Resolve-Path "publish/win-x64").Path
           $outputDir = (Resolve-Path "dist").Path
-          $iconFile = (Resolve-Path "src/LocalStoreManagement.Desktop/Assets/app-icon.ico").Path
+          $iconFile = (Resolve-Path "${{ env.ICON_ICO }}").Path
 
           $iscc = (Get-Command ISCC.exe -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty Source)
           if (-not $iscc) {
@@ -133,12 +188,12 @@ jobs:
         run: |
           set -euo pipefail
           rm -rf AppDir dist
-          mkdir -p AppDir/usr/bin AppDir/usr/share/icons/hicolor/512x512/apps dist
+          mkdir -p AppDir/usr/bin AppDir/usr/share/icons/hicolor/64x64/apps dist
           cp -a publish/linux-x64/. AppDir/usr/bin/
           cp packaging/linux/AppRun AppDir/AppRun
           cp packaging/linux/local-store-management.desktop AppDir/local-store-management.desktop
-          cp src/LocalStoreManagement.Desktop/Assets/app-icon.png AppDir/local-store-management.png
-          cp src/LocalStoreManagement.Desktop/Assets/app-icon.png AppDir/usr/share/icons/hicolor/512x512/apps/local-store-management.png
+          base64 --decode "${ICON_BASE64}" > AppDir/local-store-management.png
+          cp AppDir/local-store-management.png AppDir/usr/share/icons/hicolor/64x64/apps/local-store-management.png
           ln -s local-store-management.png AppDir/.DirIcon
           chmod +x AppDir/AppRun AppDir/usr/bin/LocalStoreManagement.Desktop
 

@@ -20,25 +20,38 @@ public partial class App : Application
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
             var mainWindow = new MainWindow();
-            if (mainWindow.Icon is null)
-            {
-                var defaultIconPath = Path.Combine(AppContext.BaseDirectory, "Assets", "app-icon.png");
-                if (File.Exists(defaultIconPath))
-                {
-                    try
-                    {
-                        mainWindow.Icon = new WindowIcon(defaultIconPath);
-                    }
-                    catch
-                    {
-                        // L'icona non deve impedire l'avvio dell'applicazione.
-                    }
-                }
-            }
-
+            ApplyDefaultWindowIcon(mainWindow);
             desktop.MainWindow = mainWindow;
         }
 
         base.OnFrameworkInitializationCompleted();
+    }
+
+    private static void ApplyDefaultWindowIcon(Window window)
+    {
+        if (window.Icon is not null)
+        {
+            return;
+        }
+
+        try
+        {
+            var sourcePath = Path.Combine(AppContext.BaseDirectory, "Assets", "app-icon.base64");
+            if (!File.Exists(sourcePath))
+            {
+                return;
+            }
+
+            var iconBytes = Convert.FromBase64String(File.ReadAllText(sourcePath).Trim());
+            var cacheDirectory = Path.Combine(Path.GetTempPath(), "LocalStoreManagementSystem");
+            Directory.CreateDirectory(cacheDirectory);
+            var iconPath = Path.Combine(cacheDirectory, "default-app-icon.png");
+            File.WriteAllBytes(iconPath, iconBytes);
+            window.Icon = new WindowIcon(iconPath);
+        }
+        catch
+        {
+            // L'icona predefinita non deve mai impedire l'avvio dell'applicazione.
+        }
     }
 }
