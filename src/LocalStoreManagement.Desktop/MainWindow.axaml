@@ -11,17 +11,23 @@
 
     <Grid ColumnDefinitions="220,*" RowDefinitions="Auto,*">
         <Border Grid.RowSpan="2" Padding="20" Background="#17191C">
-            <StackPanel Spacing="12">
-                <TextBlock FontSize="21" FontWeight="Bold" Foreground="White" Text="Negozio" />
-                <TextBlock Margin="0,0,0,16" Foreground="#AEB4BC" Text="Gestione locale" />
+            <Grid RowDefinitions="Auto,*,Auto">
+                <StackPanel Spacing="4">
+                    <TextBlock x:Name="ShopNameText" FontSize="21" FontWeight="Bold" Foreground="White" Text="Negozio" TextWrapping="Wrap" />
+                    <TextBlock Foreground="#AEB4BC" Text="Gestione locale" />
+                </StackPanel>
 
-                <Button HorizontalAlignment="Stretch" Click="DashboardButton_OnClick" Content="Dashboard" />
-                <Button HorizontalAlignment="Stretch" Click="ProductsButton_OnClick" Content="Prodotti" />
-                <Button HorizontalAlignment="Stretch" Click="WarehouseButton_OnClick" Content="Magazzino" />
-                <Button HorizontalAlignment="Stretch" Content="Etichette" IsEnabled="False" />
-                <Button HorizontalAlignment="Stretch" Click="MovementsButton_OnClick" Content="Movimenti" />
-                <Button HorizontalAlignment="Stretch" Content="Esportazione" IsEnabled="False" />
-            </StackPanel>
+                <StackPanel Grid.Row="1" Margin="0,28,0,0" Spacing="12">
+                    <Button HorizontalAlignment="Stretch" Click="DashboardButton_OnClick" Content="Dashboard" />
+                    <Button HorizontalAlignment="Stretch" Click="ProductsButton_OnClick" Content="Prodotti" />
+                    <Button HorizontalAlignment="Stretch" Click="WarehouseButton_OnClick" Content="Magazzino" />
+                    <Button HorizontalAlignment="Stretch" Content="Etichette" IsEnabled="False" />
+                    <Button HorizontalAlignment="Stretch" Click="MovementsButton_OnClick" Content="Movimenti" />
+                    <Button HorizontalAlignment="Stretch" Content="Esportazione" IsEnabled="False" />
+                </StackPanel>
+
+                <Button Grid.Row="2" HorizontalAlignment="Stretch" Click="SettingsButton_OnClick" Content="⚙  Impostazioni" />
+            </Grid>
         </Border>
 
         <Border Grid.Column="1" Padding="28,22" BorderBrush="#D8DDE3" BorderThickness="0,0,0,1">
@@ -69,6 +75,46 @@
                             <Border Padding="12" CornerRadius="8" Background="#F5F7F9">
                                 <TextBlock x:Name="LastScanText" TextWrapping="Wrap" Foreground="#44515E" Text="Nessun codice scansionato." />
                             </Border>
+                        </StackPanel>
+                    </Border>
+
+                    <Border Padding="22" CornerRadius="10" BorderBrush="#D8DDE3" BorderThickness="1">
+                        <StackPanel Spacing="12">
+                            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
+                                <StackPanel Spacing="4">
+                                    <TextBlock FontSize="18" FontWeight="SemiBold" Text="Cerca prodotto" />
+                                    <TextBlock Foreground="#66707A" Text="Ricerca manuale anche per nome, oltre a SKU e barcode." />
+                                </StackPanel>
+                                <Button Grid.Column="1" VerticalAlignment="Bottom" Click="DashboardOpenProductButton_OnClick" Content="Apri selezionato" />
+                            </Grid>
+
+                            <TextBox
+                                x:Name="DashboardProductSearchInput"
+                                TextChanged="DashboardProductSearchInput_OnTextChanged"
+                                PlaceholderText="Digita nome prodotto, SKU o barcode..." />
+
+                            <ListBox
+                                x:Name="DashboardProductsList"
+                                Height="180"
+                                DoubleTapped="DashboardProductsList_OnDoubleTapped">
+                                <ListBox.ItemTemplate>
+                                    <DataTemplate>
+                                        <Grid Margin="10,7" ColumnDefinitions="*,150,90">
+                                            <StackPanel>
+                                                <TextBlock FontWeight="SemiBold" Text="{Binding Name}" />
+                                                <TextBlock FontSize="11" Foreground="#66707A" Text="{Binding DetailsDisplay}" />
+                                            </StackPanel>
+                                            <StackPanel Grid.Column="1">
+                                                <TextBlock HorizontalAlignment="Right" Text="{Binding Sku}" />
+                                                <TextBlock HorizontalAlignment="Right" FontSize="11" Foreground="#66707A" Text="{Binding Barcode}" />
+                                            </StackPanel>
+                                            <TextBlock Grid.Column="2" VerticalAlignment="Center" HorizontalAlignment="Right" FontWeight="Bold" Text="{Binding StockQuantity}" />
+                                        </Grid>
+                                    </DataTemplate>
+                                </ListBox.ItemTemplate>
+                            </ListBox>
+
+                            <TextBlock x:Name="DashboardSearchStatusText" FontSize="12" Foreground="#66707A" Text="Cerca un prodotto per nome, SKU o barcode." />
                         </StackPanel>
                     </Border>
 
