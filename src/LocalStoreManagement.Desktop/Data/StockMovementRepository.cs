@@ -118,7 +118,7 @@ public sealed class StockMovementRepository
                     p.barcode,
                     p.name,
                     p.brand,
-                    p.category,
+                    c.name AS category,
                     sm.movement_type,
                     sm.quantity_delta,
                     sm.note,
@@ -130,6 +130,7 @@ public sealed class StockMovementRepository
                     ) AS stock_after
                 FROM stock_movements sm
                 INNER JOIN products p ON p.id = sm.product_id
+                LEFT JOIN categories c ON c.id = p.category_id
             )
             SELECT
                 id,
