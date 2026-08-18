@@ -4,10 +4,10 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     x:CompileBindings="False"
     Title="Prodotto"
-    Width="720"
-    Height="800"
-    MinWidth="620"
-    MinHeight="680"
+    Width="860"
+    Height="820"
+    MinWidth="760"
+    MinHeight="700"
     Background="{DynamicResource AppBackgroundBrush}"
     WindowStartupLocation="CenterOwner">
 
@@ -15,7 +15,7 @@
         <Border Padding="26,22,26,14">
             <StackPanel Spacing="3">
                 <TextBlock x:Name="EditorTitle" FontSize="28" FontWeight="SemiBold" Text="Nuovo prodotto" />
-                <TextBlock Classes="Muted" FontSize="12" Text="Anagrafica articolo" />
+                <TextBlock Classes="Muted" FontSize="12" Text="Il prodotto identifica il modello; SKU, barcode, colore e taglia appartengono alle varianti." />
             </StackPanel>
         </Border>
 
@@ -23,31 +23,13 @@
             <StackPanel Margin="24,4,24,20" Spacing="14">
                 <Border Classes="Card" Padding="18">
                     <StackPanel Spacing="14">
-                        <TextBlock Classes="SectionTitle" Text="Identificazione" />
-
-                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
-                            <StackPanel Spacing="6">
-                                <TextBlock Classes="FieldLabel" Text="CODICE INTERNO / SKU *" />
-                                <TextBox x:Name="SkuInput" PlaceholderText="ART000001" />
-                            </StackPanel>
-                            <Button Grid.Column="1" VerticalAlignment="Bottom" Click="GenerateSkuButton_OnClick" Content="Genera" />
-                        </Grid>
+                        <TextBlock Classes="SectionTitle" Text="Modello prodotto" />
 
                         <StackPanel Spacing="6">
-                            <TextBlock Classes="FieldLabel" Text="BARCODE / EAN" />
-                            <TextBox x:Name="BarcodeInput" KeyDown="BarcodeInput_OnKeyDown" PlaceholderText="Scansiona o inserisci il codice" />
+                            <TextBlock Classes="FieldLabel" Text="NOME PRODOTTO / MODELLO *" />
+                            <TextBox x:Name="NameInput" PlaceholderText="es. Alpinestars SMX-6 V3" />
                         </StackPanel>
 
-                        <StackPanel Spacing="6">
-                            <TextBlock Classes="FieldLabel" Text="NOME PRODOTTO *" />
-                            <TextBox x:Name="NameInput" PlaceholderText="Nome articolo" />
-                        </StackPanel>
-                    </StackPanel>
-                </Border>
-
-                <Border Classes="Card" Padding="18">
-                    <StackPanel Spacing="14">
-                        <TextBlock Classes="SectionTitle" Text="Classificazione" />
                         <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
                             <StackPanel Spacing="6">
                                 <TextBlock Classes="FieldLabel" Text="MARCA" />
@@ -67,44 +49,62 @@
                             </StackPanel>
                         </Grid>
 
-                        <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
-                            <StackPanel Spacing="6">
-                                <TextBlock Classes="FieldLabel" Text="VARIANTE" />
-                                <TextBox x:Name="VariantInput" PlaceholderText="es. Nero, Classic, Limited" />
-                            </StackPanel>
-                            <StackPanel Grid.Column="1" Spacing="6">
-                                <TextBlock Classes="FieldLabel" Text="TAGLIA" />
-                                <TextBox x:Name="SizeInput" PlaceholderText="es. M, 42, 10 anni" />
-                            </StackPanel>
-                        </Grid>
-                    </StackPanel>
-                </Border>
-
-                <Border Classes="Card" Padding="18">
-                    <StackPanel Spacing="14">
-                        <TextBlock Classes="SectionTitle" Text="Prezzi e note" />
-                        <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
-                            <StackPanel Spacing="6">
-                                <TextBlock Classes="FieldLabel" Text="PREZZO ACQUISTO (€)" />
-                                <TextBox x:Name="PurchasePriceInput" PlaceholderText="0,00" />
-                            </StackPanel>
-                            <StackPanel Grid.Column="1" Spacing="6">
-                                <TextBlock Classes="FieldLabel" Text="PREZZO VENDITA (€)" />
-                                <TextBox x:Name="SalePriceInput" PlaceholderText="0,00" />
-                            </StackPanel>
-                        </Grid>
-
                         <StackPanel Spacing="6">
-                            <TextBlock Classes="FieldLabel" Text="NOTE" />
-                            <TextBox x:Name="NotesInput" Height="90" AcceptsReturn="True" TextWrapping="Wrap" PlaceholderText="Informazioni aggiuntive..." />
+                            <TextBlock Classes="FieldLabel" Text="NOTE MODELLO" />
+                            <TextBox x:Name="NotesInput" Height="76" AcceptsReturn="True" TextWrapping="Wrap" PlaceholderText="Informazioni comuni a tutte le varianti..." />
                         </StackPanel>
 
                         <CheckBox x:Name="IsActiveInput" IsChecked="True" Content="Prodotto attivo" />
                     </StackPanel>
                 </Border>
 
+                <Border Classes="Card" Padding="18">
+                    <StackPanel Spacing="14">
+                        <Grid ColumnDefinitions="*,Auto,Auto,Auto" ColumnSpacing="8">
+                            <StackPanel Spacing="3">
+                                <TextBlock Classes="SectionTitle" Text="Varianti" />
+                                <TextBlock Classes="Muted" FontSize="11" Text="Ogni combinazione colore/taglia ha il proprio SKU e uno o più barcode univoci." />
+                            </StackPanel>
+                            <Button Grid.Column="1" Click="AddVariantButton_OnClick" Content="+ Aggiungi" />
+                            <Button Grid.Column="2" Click="EditVariantButton_OnClick" Content="Modifica" />
+                            <Button Grid.Column="3" Click="RemoveVariantButton_OnClick" Content="Rimuovi" />
+                        </Grid>
+
+                        <Border Classes="InsetCard" Padding="4">
+                            <ListBox x:Name="VariantsList" Height="310" DoubleTapped="VariantsList_OnDoubleTapped">
+                                <ListBox.ItemTemplate>
+                                    <DataTemplate>
+                                        <Grid Margin="12,9" ColumnDefinitions="170,125,*,90,85" ColumnSpacing="12">
+                                            <StackPanel Spacing="2">
+                                                <TextBlock FontWeight="SemiBold" Text="{Binding VariantDisplay}" />
+                                                <TextBlock Classes="Muted" FontSize="11" Text="{Binding Sku}" />
+                                            </StackPanel>
+                                            <StackPanel Grid.Column="1" Spacing="2">
+                                                <TextBlock Classes="FieldLabel" Text="PREZZO" />
+                                                <TextBlock Text="{Binding SalePriceDisplay}" />
+                                            </StackPanel>
+                                            <StackPanel Grid.Column="2" Spacing="2">
+                                                <TextBlock Classes="FieldLabel" Text="BARCODE" />
+                                                <TextBlock Text="{Binding BarcodesDisplay}" TextTrimming="CharacterEllipsis" />
+                                            </StackPanel>
+                                            <StackPanel Grid.Column="3" Spacing="2">
+                                                <TextBlock Classes="FieldLabel" Text="GIACENZA" />
+                                                <TextBlock FontWeight="SemiBold" Text="{Binding StockQuantity}" />
+                                            </StackPanel>
+                                            <TextBlock Grid.Column="4" VerticalAlignment="Center" HorizontalAlignment="Right" Text="{Binding StatusDisplay}" />
+                                        </Grid>
+                                    </DataTemplate>
+                                </ListBox.ItemTemplate>
+                            </ListBox>
+                        </Border>
+
+                        <TextBlock x:Name="VariantsHintText" Classes="Muted" FontSize="11" TextWrapping="Wrap"
+                                   Text="Aggiungi almeno una variante. Le varianti già salvate non vengono eliminate per preservare lo storico di magazzino: puoi disattivarle dalla modifica variante." />
+                    </StackPanel>
+                </Border>
+
                 <Border x:Name="ErrorPanel" Classes="InsetCard" Padding="12" Background="{DynamicResource AppOrangeSoftBrush}" IsVisible="False">
-                    <TextBlock x:Name="ErrorText" Foreground="#A45C00" FontWeight="SemiBold" TextWrapping="Wrap" />
+                    <TextBlock x:Name="ErrorText" Foreground="{DynamicResource AppOrangeTextBrush}" FontWeight="SemiBold" TextWrapping="Wrap" />
                 </Border>
             </StackPanel>
         </ScrollViewer>

@@ -41,20 +41,14 @@ public partial class MainWindow : Window
         {
             foreach (var child in footer.Children)
             {
-                if (!ReferenceEquals(child, SettingsNavButton))
-                {
-                    child.IsVisible = false;
-                }
+                if (!ReferenceEquals(child, SettingsNavButton)) child.IsVisible = false;
             }
         }
     }
 
     private void DashboardButton_OnClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e) => ShowDashboard();
-
     private void ProductsButton_OnClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e) => ShowProducts();
-
     private void WarehouseButton_OnClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e) => ShowWarehouse();
-
     private void MovementsButton_OnClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e) => ShowMovements();
 
     private async void NewProductButton_OnClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
@@ -64,6 +58,7 @@ public partial class MainWindow : Window
         if (saved)
         {
             ReloadProducts();
+            ReloadWarehouseProducts();
             RefreshDashboardCounters();
             ReloadDashboardSearch();
         }
@@ -71,32 +66,22 @@ public partial class MainWindow : Window
 
     private async void EditProductButton_OnClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
-        if (ProductsList.SelectedItem is not Product product)
-        {
-            return;
-        }
+        if (ProductsList.SelectedItem is not ProductSummary product) return;
 
-        var latest = _productRepository.GetById(product.Id);
+        var latest = _productRepository.GetProduct(product.Id);
         if (latest is null)
         {
             ReloadProducts();
             return;
         }
 
-        var editor = new ProductEditorWindow(_productRepository, latest);
+        var editor = new ProductEditorWindow(_productRepository, latest.Id);
         var saved = await editor.ShowDialog<bool>(this);
-        if (saved)
-        {
-            ReloadProducts();
-            RefreshDashboardCounters();
-            ReloadDashboardSearch();
-        }
+        if (saved) RefreshAllData();
     }
 
     private void ProductSearchInput_OnTextChanged(object? sender, TextChangedEventArgs e) => ReloadProducts();
-
     private void WarehouseSearchInput_OnTextChanged(object? sender, TextChangedEventArgs e) => ReloadWarehouseProducts();
-
     private void MovementSearchInput_OnTextChanged(object? sender, TextChangedEventArgs e) => ReloadMovements();
 
     private async void IncomingButton_OnClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
@@ -113,10 +98,7 @@ public partial class MainWindow : Window
 
     private async Task OpenMovementEditorAsync(StockMovementKind kind)
     {
-        if (WarehouseProductsList.SelectedItem is not Product product)
-        {
-            return;
-        }
+        if (WarehouseProductsList.SelectedItem is not Product product) return;
 
         var latest = _productRepository.GetById(product.Id);
         if (latest is null)
@@ -127,12 +109,7 @@ public partial class MainWindow : Window
 
         var editor = new StockMovementWindow(_stockMovementRepository, latest, kind);
         var saved = await editor.ShowDialog<bool>(this);
-        if (!saved)
-        {
-            return;
-        }
-
-        RefreshAllData();
+        if (saved) RefreshAllData();
     }
 
     private void ShowDashboard()
@@ -155,7 +132,7 @@ public partial class MainWindow : Window
         SetActiveNavigation(ProductsNavButton);
         ProductsPanel.IsVisible = true;
         PageTitle.Text = "Prodotti";
-        PageSubtitle.Text = "Anagrafica articoli, prezzi e attributi";
+        PageSubtitle.Text = "Modelli prodotto e relative varianti colore/taglia";
         ReloadProducts();
         ProductSearchInput.Focus();
     }
@@ -167,7 +144,7 @@ public partial class MainWindow : Window
         SetActiveNavigation(WarehouseNavButton);
         WarehousePanel.IsVisible = true;
         PageTitle.Text = "Magazzino";
-        PageSubtitle.Text = "Carico, scarico e rettifica delle giacenze";
+        PageSubtitle.Text = "Giacenze per singola variante, SKU e barcode";
         ReloadWarehouseProducts();
         WarehouseSearchInput.Focus();
     }
@@ -179,7 +156,7 @@ public partial class MainWindow : Window
         SetActiveNavigation(MovementsNavButton);
         MovementsPanel.IsVisible = true;
         PageTitle.Text = "Movimenti";
-        PageSubtitle.Text = "Storico cronologico di tutte le variazioni di magazzino";
+        PageSubtitle.Text = "Storico cronologico delle variazioni per variante";
         ReloadMovements();
         MovementSearchInput.Focus();
     }
@@ -199,15 +176,8 @@ public partial class MainWindow : Window
             SettingsNavButton
         };
 
-        foreach (var button in navigationButtons)
-        {
-            button.Classes.Remove("Selected");
-        }
-
-        if (!activeButton.Classes.Contains("Selected"))
-        {
-            activeButton.Classes.Add("Selected");
-        }
+        foreach (var button in navigationButtons) button.Classes.Remove("Selected");
+        if (!activeButton.Classes.Contains("Selected")) activeButton.Classes.Add("Selected");
     }
 
     private void HideAllPanels()
@@ -220,7 +190,7 @@ public partial class MainWindow : Window
 
     private void ReloadProducts()
     {
-        var products = _productRepository.Search(ProductSearchInput.Text);
+        var products = _productRepository.SearchProducts(ProductSearchInput.Text);
         ProductsList.ItemsSource = products;
         EmptyProductsPanel.IsVisible = products.Count == 0;
     }
