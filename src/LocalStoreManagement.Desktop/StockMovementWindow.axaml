@@ -5,55 +5,33 @@
     Title="Movimento di magazzino"
     Width="560"
     Height="530"
-    MinWidth="500"
-    MinHeight="470"
-    CanResize="False"
+    MinWidth="400"
+    MinHeight="450"
+    CanResize="True"
     Background="{DynamicResource AppBackgroundBrush}"
     WindowStartupLocation="CenterOwner">
 
-    <Grid RowDefinitions="Auto,*,Auto" Margin="24">
-        <StackPanel Spacing="4">
-            <TextBlock x:Name="EditorTitle" FontSize="27" FontWeight="SemiBold" Text="Movimento di magazzino" />
-            <TextBlock x:Name="EditorSubtitle" Classes="Muted" FontSize="12" Text="Registra una variazione di giacenza" />
-        </StackPanel>
+    <Grid RowDefinitions="Auto,*,Auto" Margin="18">
+        <StackPanel Spacing="4"><TextBlock x:Name="EditorTitle" FontSize="27" FontWeight="SemiBold" Text="Movimento di magazzino" TextWrapping="Wrap" /><TextBlock x:Name="EditorSubtitle" Classes="Muted" FontSize="12" Text="Registra una variazione di giacenza" TextWrapping="Wrap" /></StackPanel>
 
-        <StackPanel Grid.Row="1" Margin="0,18,0,0" Spacing="14">
-            <Border Classes="Card" Padding="16">
-                <Grid ColumnDefinitions="*,Auto">
-                    <StackPanel Spacing="3">
-                        <TextBlock x:Name="ProductNameText" FontSize="17" FontWeight="SemiBold" />
-                        <TextBlock x:Name="ProductCodeText" Classes="Muted" FontSize="12" />
+        <ScrollViewer Grid.Row="1" HorizontalScrollBarVisibility="Auto">
+            <StackPanel Margin="0,16,0,0" Spacing="14">
+                <Border Classes="Card" Padding="16">
+                    <Grid ColumnDefinitions="2*,*" ColumnSpacing="12">
+                        <StackPanel Spacing="3"><TextBlock x:Name="ProductNameText" FontSize="17" FontWeight="SemiBold" TextWrapping="Wrap" /><TextBlock x:Name="ProductCodeText" Classes="Muted" FontSize="12" TextWrapping="Wrap" /></StackPanel>
+                        <StackPanel Grid.Column="1" HorizontalAlignment="Right" Spacing="3"><TextBlock HorizontalAlignment="Right" Classes="FieldLabel" Text="GIACENZA ATTUALE" TextWrapping="Wrap" /><TextBlock x:Name="CurrentStockText" HorizontalAlignment="Right" FontSize="25" FontWeight="SemiBold" /></StackPanel>
+                    </Grid>
+                </Border>
+                <Border Classes="Card" Padding="16">
+                    <StackPanel Spacing="13">
+                        <StackPanel Spacing="6"><TextBlock x:Name="QuantityLabel" Classes="FieldLabel" Text="QUANTITÀ" /><NumericUpDown x:Name="QuantityInput" Minimum="0" Maximum="1000000000" Increment="1" FormatString="0" /><TextBlock x:Name="QuantityHelpText" Classes="Muted" FontSize="11" TextWrapping="Wrap" /></StackPanel>
+                        <StackPanel Spacing="6"><TextBlock Classes="FieldLabel" Text="NOTA (OPZIONALE)" /><TextBox x:Name="NoteInput" AcceptsReturn="True" Height="82" TextWrapping="Wrap" PlaceholderText="Es. consegna fornitore, merce danneggiata, correzione conteggio..." /></StackPanel>
                     </StackPanel>
-                    <StackPanel Grid.Column="1" HorizontalAlignment="Right" Spacing="3">
-                        <TextBlock HorizontalAlignment="Right" Classes="FieldLabel" Text="GIACENZA ATTUALE" />
-                        <TextBlock x:Name="CurrentStockText" HorizontalAlignment="Right" FontSize="25" FontWeight="SemiBold" />
-                    </StackPanel>
-                </Grid>
-            </Border>
+                </Border>
+                <Border x:Name="ErrorPanel" Classes="InsetCard" IsVisible="False" Padding="12" Background="{DynamicResource AppRedSoftBrush}"><TextBlock x:Name="ErrorText" Foreground="#C12820" FontWeight="SemiBold" TextWrapping="Wrap" /></Border>
+            </StackPanel>
+        </ScrollViewer>
 
-            <Border Classes="Card" Padding="16">
-                <StackPanel Spacing="13">
-                    <StackPanel Spacing="6">
-                        <TextBlock x:Name="QuantityLabel" Classes="FieldLabel" Text="QUANTITÀ" />
-                        <NumericUpDown x:Name="QuantityInput" Minimum="0" Maximum="1000000000" Increment="1" FormatString="0" />
-                        <TextBlock x:Name="QuantityHelpText" Classes="Muted" FontSize="11" />
-                    </StackPanel>
-
-                    <StackPanel Spacing="6">
-                        <TextBlock Classes="FieldLabel" Text="NOTA (OPZIONALE)" />
-                        <TextBox x:Name="NoteInput" AcceptsReturn="True" Height="82" TextWrapping="Wrap" PlaceholderText="Es. consegna fornitore, merce danneggiata, correzione conteggio..." />
-                    </StackPanel>
-                </StackPanel>
-            </Border>
-
-            <Border x:Name="ErrorPanel" Classes="InsetCard" IsVisible="False" Padding="12" Background="{DynamicResource AppRedSoftBrush}">
-                <TextBlock x:Name="ErrorText" Foreground="#C12820" FontWeight="SemiBold" TextWrapping="Wrap" />
-            </Border>
-        </StackPanel>
-
-        <Grid Grid.Row="2" Margin="0,18,0,0" ColumnDefinitions="*,Auto,Auto" ColumnSpacing="10">
-            <Button Grid.Column="1" Click="CancelButton_OnClick" Content="Annulla" />
-            <Button Grid.Column="2" Classes="Primary" Click="SaveButton_OnClick" Content="Registra movimento" />
-        </Grid>
+        <StackPanel Grid.Row="2" Margin="0,14,0,0" Orientation="Horizontal" HorizontalAlignment="Right" Spacing="10"><Button Click="CancelButton_OnClick" Content="Annulla" /><Button Classes="Primary" Click="SaveButton_OnClick" Content="Registra movimento" /></StackPanel>
     </Grid>
 </Window>

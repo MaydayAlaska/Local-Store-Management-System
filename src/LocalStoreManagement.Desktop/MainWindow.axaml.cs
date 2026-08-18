@@ -17,6 +17,7 @@ public partial class MainWindow : Window
         ApplySidebarPresentationTweaks();
         InitializeCustomTitleBar();
         ApplySavedSettings();
+        InitializeResponsiveLayout();
 
         DatabasePathText.Text = $"Database: {AppPaths.DatabasePath}";
         Opened += (_, _) =>
