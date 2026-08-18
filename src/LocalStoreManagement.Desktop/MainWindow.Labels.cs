@@ -1,5 +1,6 @@
 using Avalonia.Controls;
 using Avalonia.VisualTree;
+using LocalStoreManagement.Desktop.Data;
 
 namespace LocalStoreManagement.Desktop;
 
@@ -29,6 +30,7 @@ public partial class MainWindow
             string.Equals(button.Content as string, "Etichette", StringComparison.Ordinal));
         if (labelsButton is not null)
         {
+            InsertCategoriesButton(labelsButton);
             labelsButton.IsEnabled = true;
             labelsButton.Click += LabelsButton_OnClick;
         }
@@ -42,6 +44,36 @@ public partial class MainWindow
         }
 
         _secondaryNavigationAttached = true;
+    }
+
+    private void InsertCategoriesButton(Button labelsButton)
+    {
+        var navigationPanel = this
+            .GetVisualDescendants()
+            .OfType<StackPanel>()
+            .FirstOrDefault(panel => panel.Children.Contains(labelsButton));
+
+        if (navigationPanel is null
+            || navigationPanel.Children.OfType<Button>().Any(button =>
+                string.Equals(button.Content as string, "Categorie", StringComparison.Ordinal)))
+        {
+            return;
+        }
+
+        var index = navigationPanel.Children.IndexOf(labelsButton);
+        var categoriesButton = new Button
+        {
+            Content = "Categorie"
+        };
+        categoriesButton.Click += CategoriesButton_OnClick;
+        navigationPanel.Children.Insert(index, categoriesButton);
+    }
+
+    private async void CategoriesButton_OnClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        var window = new CategoriesWindow(new CategoryRepository());
+        await window.ShowDialog(this);
+        RefreshAllData();
     }
 
     private async void LabelsButton_OnClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
