@@ -5,6 +5,7 @@ import 'package:window_manager/window_manager.dart';
 
 import '../models/app_settings.dart';
 import '../services/settings_service.dart';
+import 'glass.dart';
 
 class AppTitleBar extends StatelessWidget {
   const AppTitleBar({super.key, required this.settings, required this.settingsService});
@@ -14,18 +15,18 @@ class AppTitleBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
     final iconPath = settingsService.resolveIconPreviewPath(settings);
-    return ColoredBox(
-      color: colors.surfaceContainer,
+    return GlassSurface(
+      blur: 24,
+      borderRadius: BorderRadius.circular(18),
       child: SizedBox(
-        height: 42,
+        height: 44,
         child: Row(
           children: [
             Expanded(
               child: DragToMoveArea(
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  padding: const EdgeInsets.symmetric(horizontal: 13),
                   child: Row(
                     children: [
                       _AppIcon(path: iconPath),
@@ -35,7 +36,7 @@ class AppTitleBar extends StatelessWidget {
                           settings.shopName,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: Theme.of(context).textTheme.titleSmall,
+                          style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
                         ),
                       ),
                     ],
@@ -80,8 +81,8 @@ class _AppIcon extends StatelessWidget {
   Widget build(BuildContext context) {
     if (path != null) {
       return ClipRRect(
-        borderRadius: BorderRadius.circular(6),
-        child: Image.file(File(path!), width: 24, height: 24, fit: BoxFit.cover),
+        borderRadius: BorderRadius.circular(7),
+        child: Image.file(File(path!), width: 25, height: 25, fit: BoxFit.cover),
       );
     }
     return Icon(Icons.storefront_rounded, size: 22, color: Theme.of(context).colorScheme.primary);
@@ -96,14 +97,22 @@ class _CaptionButton extends StatelessWidget {
   final bool danger;
 
   @override
-  Widget build(BuildContext context) => SizedBox(
-        width: 46,
-        height: 42,
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 5),
+      child: SizedBox(
+        width: 40,
+        height: 34,
         child: IconButton(
           tooltip: tooltip,
           onPressed: onPressed,
-          hoverColor: danger ? Theme.of(context).colorScheme.errorContainer : null,
+          hoverColor: danger
+              ? theme.colorScheme.errorContainer.withValues(alpha: 0.78)
+              : Colors.white.withValues(alpha: theme.brightness == Brightness.dark ? 0.10 : 0.38),
           icon: Icon(icon, size: 18),
         ),
-      );
+      ),
+    );
+  }
 }

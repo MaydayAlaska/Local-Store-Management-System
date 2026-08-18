@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../models/app_settings.dart';
 import '../services/app_services.dart';
 import '../widgets/app_title_bar.dart';
+import '../widgets/glass.dart';
 import 'cash_page.dart';
 import 'dashboard_page.dart';
 import 'export_page.dart';
@@ -51,34 +52,53 @@ class _ShellPageState extends State<ShellPage> {
     ];
 
     return Scaffold(
-      body: Column(
-        children: [
-          AppTitleBar(settings: widget.settings, settingsService: widget.services.settings),
-          Expanded(
-            child: Row(
-              children: [
-                NavigationRail(
-                  selectedIndex: _index,
-                  onDestinationSelected: (value) => setState(() => _index = value),
-                  labelType: NavigationRailLabelType.all,
-                  leading: _MenuBrand(settings: widget.settings, services: widget.services),
-                  destinations: const [
-                    NavigationRailDestination(icon: Icon(Icons.dashboard_outlined), selectedIcon: Icon(Icons.dashboard), label: Text('Dashboard')),
-                    NavigationRailDestination(icon: Icon(Icons.inventory_2_outlined), selectedIcon: Icon(Icons.inventory_2), label: Text('Prodotti')),
-                    NavigationRailDestination(icon: Icon(Icons.warehouse_outlined), selectedIcon: Icon(Icons.warehouse), label: Text('Magazzino')),
-                    NavigationRailDestination(icon: Icon(Icons.point_of_sale_outlined), selectedIcon: Icon(Icons.point_of_sale), label: Text('Cassa')),
-                    NavigationRailDestination(icon: Icon(Icons.label_outline), selectedIcon: Icon(Icons.label), label: Text('Etichette')),
-                    NavigationRailDestination(icon: Icon(Icons.archive_outlined), selectedIcon: Icon(Icons.archive), label: Text('Export')),
-                    NavigationRailDestination(icon: Icon(Icons.category_outlined), selectedIcon: Icon(Icons.category), label: Text('Anagrafiche')),
-                    NavigationRailDestination(icon: Icon(Icons.settings_outlined), selectedIcon: Icon(Icons.settings), label: Text('Impostazioni')),
+      backgroundColor: Colors.transparent,
+      body: GlassBackground(
+        child: Padding(
+          padding: const EdgeInsets.all(10),
+          child: Column(
+            children: [
+              AppTitleBar(settings: widget.settings, settingsService: widget.services.settings),
+              const SizedBox(height: 10),
+              Expanded(
+                child: Row(
+                  children: [
+                    GlassSurface(
+                      borderRadius: BorderRadius.circular(24),
+                      child: NavigationRail(
+                        selectedIndex: _index,
+                        onDestinationSelected: (value) => setState(() => _index = value),
+                        labelType: NavigationRailLabelType.all,
+                        leading: _MenuBrand(settings: widget.settings, services: widget.services),
+                        destinations: const [
+                          NavigationRailDestination(icon: Icon(Icons.dashboard_outlined), selectedIcon: Icon(Icons.dashboard), label: Text('Dashboard')),
+                          NavigationRailDestination(icon: Icon(Icons.inventory_2_outlined), selectedIcon: Icon(Icons.inventory_2), label: Text('Prodotti')),
+                          NavigationRailDestination(icon: Icon(Icons.warehouse_outlined), selectedIcon: Icon(Icons.warehouse), label: Text('Magazzino')),
+                          NavigationRailDestination(icon: Icon(Icons.point_of_sale_outlined), selectedIcon: Icon(Icons.point_of_sale), label: Text('Cassa')),
+                          NavigationRailDestination(icon: Icon(Icons.label_outline), selectedIcon: Icon(Icons.label), label: Text('Etichette')),
+                          NavigationRailDestination(icon: Icon(Icons.archive_outlined), selectedIcon: Icon(Icons.archive), label: Text('Export')),
+                          NavigationRailDestination(icon: Icon(Icons.category_outlined), selectedIcon: Icon(Icons.category), label: Text('Anagrafiche')),
+                          NavigationRailDestination(icon: Icon(Icons.settings_outlined), selectedIcon: Icon(Icons.settings), label: Text('Impostazioni')),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: GlassSurface(
+                        opacity: Theme.of(context).brightness == Brightness.dark ? 0.055 : 0.24,
+                        borderRadius: BorderRadius.circular(24),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(24),
+                          child: IndexedStack(index: _index, children: pages),
+                        ),
+                      ),
+                    ),
                   ],
                 ),
-                const VerticalDivider(width: 1),
-                Expanded(child: IndexedStack(index: _index, children: pages)),
-              ],
-            ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
@@ -96,14 +116,33 @@ class _MenuBrand extends StatelessWidget {
     final showName = settings.showShopNameInMenu;
     if (!showLogo && !showName) return const SizedBox(height: 12);
     return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.only(bottom: 12, top: 10),
       child: SizedBox(
         width: 116,
         child: Column(
           children: [
-            if (showLogo) ClipRRect(borderRadius: BorderRadius.circular(10), child: Image.file(File(logo), width: 48, height: 48, fit: BoxFit.contain)),
-            if (showLogo && showName) const SizedBox(height: 6),
-            if (showName) Text(settings.shopName, textAlign: TextAlign.center, maxLines: 2, overflow: TextOverflow.ellipsis),
+            if (showLogo)
+              Container(
+                padding: const EdgeInsets.all(5),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: Theme.of(context).brightness == Brightness.dark ? 0.08 : 0.45),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: Colors.white.withValues(alpha: 0.28)),
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(10),
+                  child: Image.file(File(logo), width: 44, height: 44, fit: BoxFit.contain),
+                ),
+              ),
+            if (showLogo && showName) const SizedBox(height: 7),
+            if (showName)
+              Text(
+                settings.shopName,
+                textAlign: TextAlign.center,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontWeight: FontWeight.w700),
+              ),
           ],
         ),
       ),
