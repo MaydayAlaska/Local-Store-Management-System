@@ -9,6 +9,7 @@ public partial class CashView : UserControl
 {
     private readonly ProductRepository _productRepository;
     private readonly List<CashCartLine> _cart = new();
+    private bool _resettingSaleDiscounts;
 
     public CashView()
         : this(new ProductRepository())
@@ -86,6 +87,55 @@ public partial class CashView : UserControl
     private void CashIncreaseButton_OnClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
         => ChangeSelectedQuantity(1);
 
+    private void CashLineDiscountInput_OnValueChanged(object? sender, NumericUpDownValueChangedEventArgs e)
+    {
+        if (sender is not NumericUpDown input || input.DataContext is not CashCartLine line) return;
+
+        var discountPercent = ClampPercent(input.Value ?? 0m);
+        if (line.DiscountPercent == discountPercent) return;
+
+        line.DiscountPercent = discountPercent;
+        UpdateCartView(line.VariantId);
+        CashCartStatusText.Text = discountPercent == 0m
+            ? $"Sconto rimosso da {line.Name}."
+            : $"Sconto del {discountPercent:0.##}% applicato a {line.Name}.";
+    }
+
+    private void CashTotalDiscountPercentInput_OnValueChanged(object? sender, NumericUpDownValueChangedEventArgs e)
+    {
+        if (_resettingSaleDiscounts) return;
+
+        var discountPercent = ClampPercent(CashTotalDiscountPercentInput.Value ?? 0m);
+        if (CashTotalDiscountPercentInput.Value != discountPercent)
+        {
+            CashTotalDiscountPercentInput.Value = discountPercent;
+            return;
+        }
+
+        UpdateCartTotals();
+        CashCartStatusText.Text = discountPercent == 0m
+            ? "Sconto percentuale sul totale rimosso."
+            : $"Sconto del {discountPercent:0.##}% applicato al totale del carrello.";
+    }
+
+    private void CashFixedDiscountInput_OnValueChanged(object? sender, NumericUpDownValueChangedEventArgs e)
+    {
+        if (_resettingSaleDiscounts) return;
+
+        var value = CashFixedDiscountInput.Value ?? 0m;
+        if (value > 0m)
+        {
+            CashFixedDiscountInput.Value = -value;
+            return;
+        }
+
+        UpdateCartTotals();
+        var amount = Math.Abs(value);
+        CashCartStatusText.Text = amount == 0m
+            ? "Sconto fisso in euro rimosso."
+            : $"Sconto fisso di {amount:0.00} € applicato al carrello.";
+    }
+
     private void CashRemoveButton_OnClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
         if (CashCartList.SelectedItem is not CashCartLine line) return;
@@ -101,6 +151,7 @@ public partial class CashView : UserControl
         if (_cart.Count == 0) return;
 
         _cart.Clear();
+        ResetSaleDiscounts();
         UpdateCartView();
         CashCartStatusText.Text = "Carrello svuotato. Nessun movimento di magazzino è stato registrato.";
         CashSearchInput.Focus();
@@ -124,13 +175,14 @@ public partial class CashView : UserControl
         if (latest.StockQuantity <= 0) return $"{latest.Name}: nessun pezzo disponibile in magazzino.";
 
         var index = _cart.FindIndex(line => line.VariantId == latest.Id);
-        var currentQuantity = index >= 0 ? _cart[index].Quantity : 0;
+        var currentLine = index >= 0 ? _cart[index] : null;
+        var currentQuantity = currentLine?.Quantity ?? 0;
         if (currentQuantity >= latest.StockQuantity)
         {
             return $"{latest.Name}: nel carrello ci sono già tutti i {latest.StockQuantity} pezzi disponibili.";
         }
 
-        var updatedLine = new CashCartLine(latest, currentQuantity + 1);
+        var updatedLine = new CashCartLine(latest, currentQuantity + 1, currentLine?.DiscountPercent ?? 0m);
         if (index >= 0)
         {
             _cart[index] = updatedLine;
@@ -179,7 +231,7 @@ public partial class CashView : UserControl
             return;
         }
 
-        _cart[index] = new CashCartLine(latest, newQuantity);
+        _cart[index] = new CashCartLine(latest, newQuantity, _cart[index].DiscountPercent);
         UpdateCartView(latest.Id);
         CashCartStatusText.Text = $"{latest.Name}: quantità aggiornata a {newQuantity}.";
         CashSearchInput.Focus();
@@ -249,11 +301,13 @@ public partial class CashView : UserControl
             var maximumQuantity = Math.Min(latest.StockQuantity, int.MaxValue);
             var quantity = (int)Math.Min(line.Quantity, maximumQuantity);
             if (quantity != line.Quantity || latest != line.Product) changed = true;
-            refreshed.Add(new CashCartLine(latest, quantity));
+            refreshed.Add(new CashCartLine(latest, quantity, line.DiscountPercent));
         }
 
         _cart.Clear();
         _cart.AddRange(refreshed);
+
+        if (_cart.Count == 0) ResetSaleDiscounts();
 
         if (changed)
         {
@@ -269,17 +323,59 @@ public partial class CashView : UserControl
         CashCartList.ItemsSource = items;
         CashEmptyCartText.IsVisible = items.Count == 0;
         CashClearButton.IsEnabled = items.Count > 0;
+        CashTotalDiscountPercentInput.IsEnabled = items.Count > 0;
+        CashFixedDiscountInput.IsEnabled = items.Count > 0;
 
-        var totalItems = items.Sum(line => line.Quantity);
-        var totalCents = items.Sum(line => line.LineTotalCents);
-        CashItemsCountText.Text = totalItems == 1 ? "1 articolo" : $"{totalItems} articoli";
-        CashTotalText.Text = MoneyFormatter.Format(totalCents);
+        if (items.Count == 0) ResetSaleDiscounts();
 
         CashCartList.SelectedItem = selectedVariantId.HasValue
             ? items.FirstOrDefault(line => line.VariantId == selectedVariantId.Value)
             : null;
 
+        UpdateCartTotals();
         UpdateSelectedLineButtons();
+    }
+
+    private void UpdateCartTotals()
+    {
+        var totalItems = _cart.Sum(line => line.Quantity);
+        var grossCents = _cart.Sum(line => line.GrossLineTotalCents);
+        var subtotalCents = _cart.Sum(line => line.LineTotalCents);
+        var itemDiscountCents = Math.Max(0L, grossCents - subtotalCents);
+
+        var totalDiscountPercent = ClampPercent(CashTotalDiscountPercentInput.Value ?? 0m);
+        var afterPercentCents = ApplyPercentDiscount(subtotalCents, totalDiscountPercent);
+        var totalPercentDiscountCents = Math.Max(0L, subtotalCents - afterPercentCents);
+
+        var requestedFixedDiscountCents = EuroAmountToCents(Math.Abs(CashFixedDiscountInput.Value ?? 0m));
+        var fixedDiscountCents = Math.Min(requestedFixedDiscountCents, afterPercentCents);
+        var finalTotalCents = Math.Max(0L, afterPercentCents - fixedDiscountCents);
+
+        CashItemsCountText.Text = totalItems == 1 ? "1 articolo" : $"{totalItems} articoli";
+        CashTotalText.Text = MoneyFormatter.Format(finalTotalCents);
+        CashSubtotalText.Text = itemDiscountCents > 0
+            ? $"Subtotale dopo sconti articolo: {MoneyFormatter.Format(subtotalCents)}"
+            : $"Subtotale: {MoneyFormatter.Format(subtotalCents)}";
+
+        var discounts = new List<string>();
+        if (itemDiscountCents > 0)
+        {
+            discounts.Add($"articoli −{MoneyFormatter.Format(itemDiscountCents)}");
+        }
+
+        if (totalPercentDiscountCents > 0)
+        {
+            discounts.Add($"totale {totalDiscountPercent:0.##}% −{MoneyFormatter.Format(totalPercentDiscountCents)}");
+        }
+
+        if (fixedDiscountCents > 0)
+        {
+            discounts.Add($"fisso −{MoneyFormatter.Format(fixedDiscountCents)}");
+        }
+
+        CashDiscountSummaryText.Text = discounts.Count == 0
+            ? "Nessuno sconto applicato"
+            : $"Sconti: {string.Join(" · ", discounts)}";
     }
 
     private void UpdateSelectedLineButtons()
@@ -297,18 +393,58 @@ public partial class CashView : UserControl
         CashRemoveButton.IsEnabled = true;
     }
 
+    private void ResetSaleDiscounts()
+    {
+        _resettingSaleDiscounts = true;
+        try
+        {
+            CashTotalDiscountPercentInput.Value = 0m;
+            CashFixedDiscountInput.Value = 0m;
+        }
+        finally
+        {
+            _resettingSaleDiscounts = false;
+        }
+    }
+
     private void PrepareForNextScan()
     {
         CashSearchInput.Clear();
         CashSearchInput.Focus();
     }
 
-    private sealed record CashCartLine(Product Product, int Quantity)
+    private static decimal ClampPercent(decimal value)
+        => Math.Clamp(value, 0m, 100m);
+
+    private static long ApplyPercentDiscount(long cents, decimal discountPercent)
     {
+        if (cents <= 0 || discountPercent <= 0m) return Math.Max(0L, cents);
+        if (discountPercent >= 100m) return 0L;
+
+        var discounted = cents * (100m - discountPercent) / 100m;
+        return decimal.ToInt64(decimal.Round(discounted, 0, MidpointRounding.AwayFromZero));
+    }
+
+    private static long EuroAmountToCents(decimal amount)
+        => decimal.ToInt64(decimal.Round(amount * 100m, 0, MidpointRounding.AwayFromZero));
+
+    private sealed class CashCartLine
+    {
+        public CashCartLine(Product product, int quantity, decimal discountPercent = 0m)
+        {
+            Product = product;
+            Quantity = quantity;
+            DiscountPercent = ClampPercent(discountPercent);
+        }
+
+        public Product Product { get; }
+        public int Quantity { get; }
+        public decimal DiscountPercent { get; set; }
         public long VariantId => Product.Id;
         public string Name => Product.Name;
         public string QuantityDisplay => Quantity.ToString();
-        public long LineTotalCents => (Product.SalePriceCents ?? 0L) * Quantity;
+        public long GrossLineTotalCents => (Product.SalePriceCents ?? 0L) * Quantity;
+        public long LineTotalCents => ApplyPercentDiscount(GrossLineTotalCents, DiscountPercent);
         public string UnitPriceDisplay => MoneyFormatter.Format(Product.SalePriceCents);
         public string LineTotalDisplay => MoneyFormatter.Format(LineTotalCents);
 

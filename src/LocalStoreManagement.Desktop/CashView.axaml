@@ -82,11 +82,12 @@
             <Border Grid.Column="1" Classes="Card" Padding="0">
                 <Grid RowDefinitions="Auto,*,Auto">
                     <Border Padding="16,12" Background="{DynamicResource AppSurfaceMutedBrush}" CornerRadius="18,18,0,0">
-                        <Grid ColumnDefinitions="*,82,56,100">
+                        <Grid ColumnDefinitions="*,82,92,56,100">
                             <TextBlock Classes="ColumnHeader" Text="ARTICOLO" />
                             <TextBlock Grid.Column="1" Classes="ColumnHeader" HorizontalAlignment="Right" Text="PREZZO" />
-                            <TextBlock Grid.Column="2" Classes="ColumnHeader" HorizontalAlignment="Right" Text="Q.TÀ" />
-                            <TextBlock Grid.Column="3" Classes="ColumnHeader" HorizontalAlignment="Right" Text="TOTALE" />
+                            <TextBlock Grid.Column="2" Classes="ColumnHeader" HorizontalAlignment="Center" Text="SCONTO %" />
+                            <TextBlock Grid.Column="3" Classes="ColumnHeader" HorizontalAlignment="Right" Text="Q.TÀ" />
+                            <TextBlock Grid.Column="4" Classes="ColumnHeader" HorizontalAlignment="Right" Text="TOTALE" />
                         </Grid>
                     </Border>
 
@@ -97,14 +98,23 @@
                             SelectionChanged="CashCartList_OnSelectionChanged">
                             <ListBox.ItemTemplate>
                                 <DataTemplate>
-                                    <Grid Margin="12,10" ColumnDefinitions="*,82,56,100">
+                                    <Grid Margin="12,8" ColumnDefinitions="*,82,92,56,100">
                                         <StackPanel Spacing="2">
                                             <TextBlock FontWeight="SemiBold" Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
                                             <TextBlock Classes="Muted" FontSize="11" Text="{Binding DetailsDisplay}" TextTrimming="CharacterEllipsis" />
                                         </StackPanel>
                                         <TextBlock Grid.Column="1" VerticalAlignment="Center" HorizontalAlignment="Right" Text="{Binding UnitPriceDisplay}" />
-                                        <TextBlock Grid.Column="2" VerticalAlignment="Center" HorizontalAlignment="Right" FontWeight="SemiBold" Text="{Binding QuantityDisplay}" />
-                                        <TextBlock Grid.Column="3" VerticalAlignment="Center" HorizontalAlignment="Right" FontWeight="SemiBold" Text="{Binding LineTotalDisplay}" />
+                                        <NumericUpDown
+                                            Grid.Column="2"
+                                            MinWidth="82"
+                                            Minimum="0"
+                                            Maximum="100"
+                                            Increment="1"
+                                            FormatString="0.##"
+                                            Value="{Binding DiscountPercent, Mode=OneWay}"
+                                            ValueChanged="CashLineDiscountInput_OnValueChanged" />
+                                        <TextBlock Grid.Column="3" VerticalAlignment="Center" HorizontalAlignment="Right" FontWeight="SemiBold" Text="{Binding QuantityDisplay}" />
+                                        <TextBlock Grid.Column="4" VerticalAlignment="Center" HorizontalAlignment="Right" FontWeight="SemiBold" Text="{Binding LineTotalDisplay}" />
                                     </Grid>
                                 </DataTemplate>
                             </ListBox.ItemTemplate>
@@ -137,14 +147,42 @@
                                 Text="Il carrello è locale e temporaneo. Nessun movimento di magazzino viene ancora registrato." />
 
                             <Border Classes="InsetCard" Padding="16">
-                                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="20">
+                                <Grid ColumnDefinitions="*,150,150,Auto" ColumnSpacing="16">
                                     <StackPanel Spacing="3">
-                                        <TextBlock Classes="FieldLabel" Text="TOTALE VENDITA" />
+                                        <TextBlock Classes="FieldLabel" Text="TOTALE DA PAGARE" />
                                         <TextBlock x:Name="CashTotalText" FontSize="38" FontWeight="SemiBold" Text="0,00 €" />
+                                        <TextBlock x:Name="CashSubtotalText" Classes="Muted" FontSize="11" Text="Subtotale: 0,00 €" />
+                                        <TextBlock x:Name="CashDiscountSummaryText" Classes="Muted" FontSize="11" TextWrapping="Wrap" Text="Nessuno sconto applicato" />
                                         <TextBlock x:Name="CashItemsCountText" Classes="Muted" FontSize="11" Text="0 articoli" />
                                     </StackPanel>
 
-                                    <StackPanel Grid.Column="1" MinWidth="220" VerticalAlignment="Center" Spacing="8">
+                                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="6">
+                                        <TextBlock Classes="FieldLabel" Text="SCONTO TOTALE %" />
+                                        <NumericUpDown
+                                            x:Name="CashTotalDiscountPercentInput"
+                                            Minimum="0"
+                                            Maximum="100"
+                                            Increment="1"
+                                            FormatString="0.##"
+                                            Value="0"
+                                            ValueChanged="CashTotalDiscountPercentInput_OnValueChanged" />
+                                        <TextBlock Classes="Muted" FontSize="10" TextWrapping="Wrap" Text="Applicato dopo gli sconti dei singoli articoli." />
+                                    </StackPanel>
+
+                                    <StackPanel Grid.Column="2" VerticalAlignment="Center" Spacing="6">
+                                        <TextBlock Classes="FieldLabel" Text="SCONTO €" />
+                                        <NumericUpDown
+                                            x:Name="CashFixedDiscountInput"
+                                            Minimum="-100000"
+                                            Maximum="0"
+                                            Increment="0.50"
+                                            FormatString="0.00"
+                                            Value="0"
+                                            ValueChanged="CashFixedDiscountInput_OnValueChanged" />
+                                        <TextBlock Classes="Muted" FontSize="10" TextWrapping="Wrap" Text="Esempio: inserisci −5,00 per togliere 5 euro." />
+                                    </StackPanel>
+
+                                    <StackPanel Grid.Column="3" MinWidth="220" VerticalAlignment="Center" Spacing="8">
                                         <TextBlock Classes="FieldLabel" Text="PAGAMENTO" />
                                         <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
                                             <Button IsEnabled="False" Content="Contanti" />
