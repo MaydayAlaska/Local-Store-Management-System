@@ -121,6 +121,7 @@ public partial class MainWindow
         HideSettingsView();
         HideBrandsView();
         HideCategoriesView();
+        HideLabelsView();
         HideExportView();
     }
 
