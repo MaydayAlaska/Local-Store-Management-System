@@ -5,16 +5,16 @@
     x:CompileBindings="False"
     Title="Backup ed esportazione"
     Width="900"
-    Height="760"
+    Height="800"
     MinWidth="760"
-    MinHeight="620"
+    MinHeight="650"
     WindowStartupLocation="CenterOwner">
 
     <Grid RowDefinitions="Auto,*,Auto">
         <Border Padding="24,20" BorderBrush="#D8DDE3" BorderThickness="0,0,0,1">
             <StackPanel Spacing="4">
                 <TextBlock FontSize="24" FontWeight="SemiBold" Text="Backup ed esportazione" />
-                <TextBlock Foreground="#66707A" Text="Salva una copia del database oppure esporta l'inventario in Excel." />
+                <TextBlock Foreground="#66707A" Text="Salva una copia del database oppure esporta l'inventario in Excel o PDF." />
             </StackPanel>
         </Border>
 
@@ -30,11 +30,24 @@
                 </Border>
 
                 <Border Padding="18" CornerRadius="10" BorderBrush="#D8DDE3" BorderThickness="1">
+                    <Grid ColumnDefinitions="*,240" ColumnSpacing="18">
+                        <StackPanel Spacing="4">
+                            <TextBlock FontSize="18" FontWeight="SemiBold" Text="Formato esportazione" />
+                            <TextBlock Foreground="#66707A" TextWrapping="Wrap" Text="Scegli il formato da usare sia per l'esportazione completa sia per quella parziale." />
+                        </StackPanel>
+                        <ComboBox x:Name="ExportFormatInput" Grid.Column="1" VerticalAlignment="Center" SelectedIndex="0">
+                            <ComboBoxItem Content="Excel (.xlsx)" />
+                            <ComboBoxItem Content="PDF (.pdf)" />
+                        </ComboBox>
+                    </Grid>
+                </Border>
+
+                <Border Padding="18" CornerRadius="10" BorderBrush="#D8DDE3" BorderThickness="1">
                     <StackPanel Spacing="12">
                         <Grid ColumnDefinitions="*,Auto" ColumnSpacing="16">
                             <StackPanel Spacing="4">
                                 <TextBlock FontSize="18" FontWeight="SemiBold" Text="Esportazione completa" />
-                                <TextBlock Foreground="#66707A" TextWrapping="Wrap" Text="Un unico foglio Excel con tutto l'inventario, diviso in sezioni per marca ordinate alfabeticamente." />
+                                <TextBlock Foreground="#66707A" TextWrapping="Wrap" Text="Esporta tutto l'inventario in un unico file, diviso in sezioni per marca ordinate alfabeticamente. In Excel viene creato un solo foglio." />
                             </StackPanel>
                             <Button Grid.Column="1" VerticalAlignment="Center" Click="FullExportButton_OnClick" Content="Esporta tutto..." />
                         </Grid>
