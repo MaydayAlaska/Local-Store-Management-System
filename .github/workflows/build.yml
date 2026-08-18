@@ -15,7 +15,7 @@ env:
 
 jobs:
   verify:
-    name: Flutter analyze
+    name: Flutter analyze and tests
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -40,6 +40,9 @@ jobs:
 
       - name: Analyze
         run: flutter analyze
+
+      - name: SQLite smoke test
+        run: flutter test
 
   package-windows:
     name: Windows installer
@@ -79,7 +82,8 @@ jobs:
         shell: pwsh
         run: |
           $commit = if ("${{ github.event.pull_request.head.sha }}") { "${{ github.event.pull_request.head.sha }}" } else { "${{ github.sha }}" }
-          flutter build windows --release --dart-define="GIT_COMMIT=$commit"
+          $branch = if ("${{ github.head_ref }}") { "${{ github.head_ref }}" } else { "${{ github.ref_name }}" }
+          flutter build windows --release --dart-define="GIT_COMMIT=$commit" --dart-define="BUILD_BRANCH=$branch"
 
       - name: Build installer
         shell: pwsh
@@ -136,7 +140,8 @@ jobs:
           set -euo pipefail
           COMMIT='${{ github.event.pull_request.head.sha }}'
           if [ -z "$COMMIT" ]; then COMMIT='${{ github.sha }}'; fi
-          flutter build linux --release --dart-define="GIT_COMMIT=$COMMIT"
+          BRANCH="${GITHUB_HEAD_REF:-${GITHUB_REF_NAME}}"
+          flutter build linux --release --dart-define="GIT_COMMIT=$COMMIT" --dart-define="BUILD_BRANCH=$BRANCH"
 
       - name: Build AppDir
         shell: bash
