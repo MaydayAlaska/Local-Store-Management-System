@@ -13,9 +13,10 @@ Gestionale desktop multipiattaforma per negozio, pensato per funzionare **offlin
 
 1. **Prodotti**: SKU, barcode/EAN, nome, marca, categoria, variante, taglia, prezzo di acquisto, prezzo di vendita, note e stato attivo/disattivato. Variante e taglia sono attributi distinti; non è prevista una scorta minima.
 2. **Magazzino**: carico, scarico, rettifica e storico completo dei movimenti. La giacenza è sempre derivata dalla somma dei movimenti e non è modificata direttamente nell'anagrafica prodotto.
-3. **Scanner**: ricerca tramite scanner USB/HID, riconoscimento immediato di SKU/barcode, creazione guidata se il codice non esiste e modalità rapide di carico/scarico da 1 pezzo per scansione.
+3. **Scanner e ricerca Dashboard**: ricerca tramite scanner USB/HID, riconoscimento immediato di SKU/barcode, creazione guidata se il codice non esiste, modalità rapide di carico/scarico da 1 pezzo per scansione e ricerca manuale per nome/SKU/barcode dalla Dashboard.
 4. **Etichette**: selezione prodotto, anteprima, EAN-13 quando il codice è valido (Code 128 negli altri casi), numero copie, dimensioni etichetta e stampa tramite le code di sistema Windows/Linux.
 5. **Backup ed Excel**: backup locale del database; esportazione completa dell'inventario raggruppata per marca in ordine alfabetico oppure esportazione parziale filtrando una o più marche e/o una o più categorie.
+6. **Impostazioni**: nome negozio, icona dell'applicazione e logo del negozio da riutilizzare nelle esportazioni Excel.
 
 Non è previsto un modulo separato di inventario fisico/conteggio sessioni.
 
@@ -24,7 +25,9 @@ Non è previsto un modulo separato di inventario fisico/conteggio sessioni.
 - anagrafica prodotti: implementata;
 - magazzino: carico, scarico, rettifica e storico movimenti implementati;
 - scanner: integrazione HID implementata con ricerca/apertura prodotto, creazione da codice sconosciuto, carico rapido +1 e scarico rapido -1;
+- Dashboard: ricerca manuale prodotti per nome, SKU e barcode implementata;
 - etichette: generazione/anteprima e backend di stampa Windows GDI + Linux CUPS implementati; resta da calibrare e verificare fisicamente la ApiX110 con le etichette reali;
+- impostazioni: nome negozio, icona programma e logo negozio persistenti implementati;
 - backup/esportazione Excel: da implementare.
 
 ## Struttura
@@ -33,17 +36,28 @@ Non è previsto un modulo separato di inventario fisico/conteggio sessioni.
 src/LocalStoreManagement.Desktop/
 ├── Controls/              # controlli Avalonia personalizzati (anteprima barcode)
 ├── Data/                  # repository SQLite
-├── Infrastructure/        # database, migrazioni e percorsi locali
+├── Infrastructure/        # database, impostazioni, migrazioni e percorsi locali
 ├── Models/                # modelli applicativi
 ├── Services/              # barcode, stampa etichette e servizi hardware/applicativi
 ├── App.axaml              # bootstrap Avalonia
-├── MainWindow.axaml       # shell desktop e flusso scanner
+├── MainWindow.axaml       # shell desktop, Dashboard e flusso scanner
 ├── LabelsWindow.*         # anteprima e stampa etichette
+├── SettingsWindow.*       # impostazioni negozio
 ├── ProductEditorWindow.*  # editor anagrafica prodotto
 └── StockMovementWindow.*  # carico/scarico/rettifica
 ```
 
-Il database viene creato al primo avvio nella cartella dati utente del sistema operativo. Il percorso viene mostrato nella schermata principale.
+## Dati locali
+
+Al primo avvio il programma controlla e, se necessario, crea la cartella **`Documents/Local Store Management System`** dell'utente. Al suo interno vengono salvati:
+
+- `store.db`: database SQLite;
+- `settings.json`: impostazioni del negozio;
+- `assets/`: icona e logo scelti dall'utente.
+
+Se esiste un database della precedente versione nella vecchia cartella dati locale e nella nuova cartella non è ancora presente `store.db`, il programma lo copia automaticamente nella nuova posizione.
+
+Il percorso effettivo del database viene mostrato nella Dashboard.
 
 ## Avvio in sviluppo
 
