@@ -37,11 +37,33 @@ class SettingsService {
       logoFileName: logo,
       showShopNameInMenu: showShopNameInMenu,
       showLogoInMenu: showLogoInMenu,
+      lastLabelPrinterUrl: current.lastLabelPrinterUrl,
+      lastLabelPrinterName: current.lastLabelPrinterName,
     );
-    const encoder = JsonEncoder.withIndent('  ');
-    File(AppPaths.settingsPath).writeAsStringSync(encoder.convert(settings.toJson()), flush: true);
+    _writeSettings(settings);
     if (icon != null) _ensureDerivedIconFiles(settings);
     return settings;
+  }
+
+  void saveLastLabelPrinter({required String url, required String name}) {
+    final current = load();
+    final settings = AppSettings(
+      shopName: current.shopName,
+      iconFileName: current.iconFileName,
+      logoFileName: current.logoFileName,
+      showShopNameInMenu: current.showShopNameInMenu,
+      showLogoInMenu: current.showLogoInMenu,
+      lastLabelPrinterUrl: url.trim().isEmpty ? null : url.trim(),
+      lastLabelPrinterName: name.trim().isEmpty ? null : name.trim(),
+    );
+    _writeSettings(settings);
+  }
+
+  void _writeSettings(AppSettings settings) {
+    const encoder = JsonEncoder.withIndent('  ');
+    final file = File(AppPaths.settingsPath);
+    file.parent.createSync(recursive: true);
+    file.writeAsStringSync(encoder.convert(settings.toJson()), flush: true);
   }
 
   String? resolveIconPath([AppSettings? settings]) => _resolveAsset((settings ?? load()).iconFileName);
