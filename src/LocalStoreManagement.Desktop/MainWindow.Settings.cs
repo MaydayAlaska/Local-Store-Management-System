@@ -40,7 +40,7 @@ public partial class MainWindow
 
     private void ShowSettings()
     {
-        HideSettingsView();
+        HideEmbeddedViews();
         HideAllPanels();
         EnsureSettingsView();
 
@@ -77,6 +77,12 @@ public partial class MainWindow
         {
             _settingsView.IsVisible = false;
         }
+    }
+
+    private void HideEmbeddedViews()
+    {
+        HideSettingsView();
+        HideCategoriesView();
     }
 
     private void DashboardProductSearchInput_OnTextChanged(object? sender, TextChangedEventArgs e)
