@@ -1,20 +1,26 @@
+using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Platform.Storage;
 using LocalStoreManagement.Desktop.Infrastructure;
+using LocalStoreManagement.Desktop.Services;
 
 namespace LocalStoreManagement.Desktop;
 
 public partial class SettingsView : UserControl
 {
     private readonly AppSettingsService _settingsService;
+    private readonly ApplicationUpdateService _updateService;
     private PendingAppAsset? _pendingIcon;
     private PendingAppAsset? _pendingLogo;
+    private UpdateCheckResult? _pendingUpdate;
 
     public SettingsView() : this(new AppSettingsService()) { }
 
     public SettingsView(AppSettingsService settingsService)
     {
         _settingsService = settingsService;
+        _updateService = new ApplicationUpdateService();
         InitializeComponent();
         Reload();
     }
@@ -25,6 +31,7 @@ public partial class SettingsView : UserControl
     {
         _pendingIcon = null;
         _pendingLogo = null;
+        _pendingUpdate = null;
         HideError();
         StatusText.Text = string.Empty;
         var settings = _settingsService.Load();
@@ -37,6 +44,13 @@ public partial class SettingsView : UserControl
         IconFileText.Text = iconPath is null ? "Nessuna icona personalizzata." : $"Attuale: {Path.GetFileName(iconPath)}";
         var logoPath = _settingsService.ResolveLogoPath(settings);
         LogoFileText.Text = logoPath is null ? "Nessun logo selezionato." : $"Attuale: {Path.GetFileName(logoPath)}";
+
+        VersionText.Text = $"v{_updateService.CurrentVersion}";
+        CheckUpdatesButton.Content = "Controlla aggiornamenti";
+        CheckUpdatesButton.IsEnabled = true;
+        UpdateStatusText.Text = _updateService.IsInstalledBuild
+            ? "Canale aggiornamenti: GitHub, branch main."
+            : "Build di sviluppo: il controllo è disponibile, ma l'installazione OTA viene abilitata nelle versioni pubblicate.";
     }
 
     public void FocusPrimaryField() => ShopNameInput.Focus();
@@ -79,6 +93,51 @@ public partial class SettingsView : UserControl
         catch (Exception ex)
         {
             ShowError($"Impossibile salvare le impostazioni: {ex.Message}");
+        }
+    }
+
+    private async void CheckUpdatesButton_OnClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        HideError();
+        CheckUpdatesButton.IsEnabled = false;
+
+        try
+        {
+            if (_pendingUpdate is { UpdateAvailable: true, CanInstall: true })
+            {
+                CheckUpdatesButton.Content = "Installazione...";
+                UpdateStatusText.Text = "Download dell'aggiornamento da GitHub e preparazione del riavvio...";
+                await _updateService.PrepareAndLaunchUpdateAsync(_pendingUpdate);
+                UpdateStatusText.Text = "Aggiornamento pronto. L'applicazione verrà chiusa e riavviata automaticamente.";
+
+                if (Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
+                {
+                    desktop.Shutdown();
+                    return;
+                }
+
+                throw new InvalidOperationException("Impossibile chiudere automaticamente l'applicazione per applicare l'aggiornamento.");
+            }
+
+            CheckUpdatesButton.Content = "Controllo...";
+            UpdateStatusText.Text = "Controllo del branch main su GitHub...";
+            var result = await _updateService.CheckAsync();
+            _pendingUpdate = result.CanInstall && result.UpdateAvailable ? result : null;
+            UpdateStatusText.Text = result.Message;
+            CheckUpdatesButton.Content = _pendingUpdate is not null
+                ? "Installa aggiornamento"
+                : "Controlla aggiornamenti";
+        }
+        catch (Exception ex)
+        {
+            _pendingUpdate = null;
+            CheckUpdatesButton.Content = "Controlla aggiornamenti";
+            UpdateStatusText.Text = "Controllo aggiornamenti non riuscito.";
+            ShowError(ex.Message);
+        }
+        finally
+        {
+            CheckUpdatesButton.IsEnabled = true;
         }
     }
 
