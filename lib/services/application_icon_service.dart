@@ -54,7 +54,7 @@ foreach ($dir in $dirs) {
     }
   }
 }
-'''.replaceAll(r'\', r'\'), flush: true);
+''', flush: true);
       await Process.run(
         'powershell.exe',
         ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', script.path, '-Target', target, '-Icon', iconPath],
