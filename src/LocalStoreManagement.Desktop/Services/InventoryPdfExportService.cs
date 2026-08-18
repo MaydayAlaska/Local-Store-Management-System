@@ -40,7 +40,8 @@ public sealed class InventoryPdfExportService
             }
         };
 
-        var normalStyle = document.Styles["Normal"];
+        var normalStyle = document.Styles["Normal"]
+            ?? throw new InvalidOperationException("Lo stile PDF predefinito non è disponibile.");
         normalStyle.Font.Name = InventoryPdfFontResolver.FamilyName;
         normalStyle.Font.Size = Unit.FromPoint(7.2);
         normalStyle.ParagraphFormat.SpaceAfter = Unit.FromPoint(2);
