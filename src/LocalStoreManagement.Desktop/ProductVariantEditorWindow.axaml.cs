@@ -35,7 +35,7 @@ public partial class ProductVariantEditorWindow : Window
         InitializeComponent();
         EditorTitle.Text = draft.Id.HasValue ? "Modifica variante" : "Nuova variante";
         ProductNameText.Text = _productName;
-        SkuInput.Text = string.IsNullOrWhiteSpace(draft.Sku) ? _repository.GenerateSku() : draft.Sku;
+        SkuInput.Text = string.IsNullOrWhiteSpace(draft.Sku) ? GenerateAvailableSku() : draft.Sku;
         VariantInput.Text = draft.Variant;
         SizeInput.Text = draft.Size;
         BarcodesInput.Text = string.Join(Environment.NewLine, draft.Barcodes);
@@ -48,10 +48,40 @@ public partial class ProductVariantEditorWindow : Window
 
     private void GenerateSkuButton_OnClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
-        SkuInput.Text = _repository.GenerateSku();
+        SkuInput.Text = GenerateAvailableSku();
         SkuInput.Focus();
         SkuInput.CaretIndex = SkuInput.Text?.Length ?? 0;
     }
+
+    private string GenerateAvailableSku()
+    {
+        var seed = _repository.GenerateSku();
+        if (!seed.StartsWith("ART", StringComparison.OrdinalIgnoreCase)
+            || !long.TryParse(seed[3..], NumberStyles.None, CultureInfo.InvariantCulture, out var number))
+        {
+            var fallback = seed;
+            var suffix = 2;
+            while (SkuIsAlreadyUsed(fallback))
+            {
+                fallback = $"{seed}-{suffix++}";
+            }
+            return fallback;
+        }
+
+        string candidate;
+        do
+        {
+            candidate = $"ART{number:000000}";
+            number++;
+        }
+        while (SkuIsAlreadyUsed(candidate));
+
+        return candidate;
+    }
+
+    private bool SkuIsAlreadyUsed(string sku)
+        => _otherVariants.Any(item => string.Equals(item.Sku.Trim(), sku, StringComparison.OrdinalIgnoreCase))
+           || _repository.FindSkuOwner(sku, _draft.Id) is not null;
 
     private void SaveButton_OnClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
