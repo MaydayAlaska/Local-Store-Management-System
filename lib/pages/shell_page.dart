@@ -37,13 +37,13 @@ class _ShellPageState extends State<ShellPage> {
   @override
   Widget build(BuildContext context) {
     final pages = <Widget>[
-      DashboardPage(services: widget.services),
+      DashboardPage(services: widget.services, isActive: _index == 0),
+      CashPage(services: widget.services, isActive: _index == 1),
+      LabelsPage(services: widget.services, settings: widget.settings, isActive: _index == 2),
       ProductsPage(services: widget.services),
-      StockPage(services: widget.services),
-      CashPage(services: widget.services),
-      LabelsPage(services: widget.services, settings: widget.settings),
-      ExportPage(services: widget.services, settings: widget.settings),
+      StockPage(services: widget.services, isActive: _index == 4),
       LookupsPage(services: widget.services),
+      ExportPage(services: widget.services, settings: widget.settings),
       SettingsPage(
         services: widget.services,
         current: widget.settings,
@@ -58,8 +58,8 @@ class _ShellPageState extends State<ShellPage> {
           padding: const EdgeInsets.all(10),
           child: Column(
             children: [
-              AppTitleBar(settings: widget.settings, settingsService: widget.services.settings),
-              const SizedBox(height: 10),
+              const AppTitleBar(),
+              const SizedBox(height: 6),
               Expanded(
                 child: Row(
                   children: [
@@ -72,12 +72,12 @@ class _ShellPageState extends State<ShellPage> {
                         leading: _MenuBrand(settings: widget.settings, services: widget.services),
                         destinations: const [
                           NavigationRailDestination(icon: Icon(Icons.dashboard_outlined), selectedIcon: Icon(Icons.dashboard), label: Text('Dashboard')),
-                          NavigationRailDestination(icon: Icon(Icons.inventory_2_outlined), selectedIcon: Icon(Icons.inventory_2), label: Text('Prodotti')),
-                          NavigationRailDestination(icon: Icon(Icons.warehouse_outlined), selectedIcon: Icon(Icons.warehouse), label: Text('Magazzino')),
                           NavigationRailDestination(icon: Icon(Icons.point_of_sale_outlined), selectedIcon: Icon(Icons.point_of_sale), label: Text('Cassa')),
                           NavigationRailDestination(icon: Icon(Icons.label_outline), selectedIcon: Icon(Icons.label), label: Text('Etichette')),
-                          NavigationRailDestination(icon: Icon(Icons.archive_outlined), selectedIcon: Icon(Icons.archive), label: Text('Export')),
+                          NavigationRailDestination(icon: Icon(Icons.inventory_2_outlined), selectedIcon: Icon(Icons.inventory_2), label: Text('Prodotti')),
+                          NavigationRailDestination(icon: Icon(Icons.warehouse_outlined), selectedIcon: Icon(Icons.warehouse), label: Text('Magazzino')),
                           NavigationRailDestination(icon: Icon(Icons.category_outlined), selectedIcon: Icon(Icons.category), label: Text('Anagrafiche')),
+                          NavigationRailDestination(icon: Icon(Icons.archive_outlined), selectedIcon: Icon(Icons.archive), label: Text('Export')),
                           NavigationRailDestination(icon: Icon(Icons.settings_outlined), selectedIcon: Icon(Icons.settings), label: Text('Impostazioni')),
                         ],
                       ),
@@ -122,17 +122,13 @@ class _MenuBrand extends StatelessWidget {
         child: Column(
           children: [
             if (showLogo)
-              Container(
-                padding: const EdgeInsets.all(5),
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: Theme.of(context).brightness == Brightness.dark ? 0.08 : 0.45),
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: Colors.white.withValues(alpha: 0.28)),
-                ),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(10),
-                  child: Image.file(File(logo), width: 44, height: 44, fit: BoxFit.contain),
-                ),
+              Image.file(
+                File(logo),
+                key: ValueKey(logo),
+                width: 52,
+                height: 52,
+                fit: BoxFit.contain,
+                gaplessPlayback: false,
               ),
             if (showLogo && showName) const SizedBox(height: 7),
             if (showName)
