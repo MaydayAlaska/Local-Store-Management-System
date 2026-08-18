@@ -118,6 +118,15 @@ public static class DatabaseInitializer
             updateCommand.ExecuteNonQuery();
         }
 
+        // Dopo la conversione il vecchio testo non deve più ricreare categorie
+        // rinominate o eliminate ai successivi avvii.
+        using (var clearLegacyCommand = connection.CreateCommand())
+        {
+            clearLegacyCommand.Transaction = transaction;
+            clearLegacyCommand.CommandText = "UPDATE products SET category = NULL WHERE category IS NOT NULL;";
+            clearLegacyCommand.ExecuteNonQuery();
+        }
+
         transaction.Commit();
     }
 
