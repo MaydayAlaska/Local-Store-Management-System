@@ -3,6 +3,7 @@ using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
 using LocalStoreManagement.Desktop.Infrastructure;
+using LocalStoreManagement.Desktop.Services;
 
 namespace LocalStoreManagement.Desktop;
 
@@ -20,11 +21,31 @@ public partial class App : Application
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
             var mainWindow = new MainWindow();
-            ApplyDefaultWindowIcon(mainWindow);
+            ApplyConfiguredWindowIcon(mainWindow);
             desktop.MainWindow = mainWindow;
         }
 
         base.OnFrameworkInitializationCompleted();
+    }
+
+    private static void ApplyConfiguredWindowIcon(Window window)
+    {
+        try
+        {
+            var settingsService = new AppSettingsService();
+            var customIconPath = settingsService.ResolveIconPath();
+            if (customIconPath is not null)
+            {
+                ApplicationIconIntegrationService.Apply(window, customIconPath);
+                return;
+            }
+        }
+        catch
+        {
+            // In caso di impostazioni non leggibili si torna all'icona predefinita.
+        }
+
+        ApplyDefaultWindowIcon(window);
     }
 
     private static void ApplyDefaultWindowIcon(Window window)
