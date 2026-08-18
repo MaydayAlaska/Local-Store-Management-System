@@ -13,6 +13,7 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        InitializeCustomTitleBar();
         ApplySavedSettings();
 
         DatabasePathText.Text = $"Database: {AppPaths.DatabasePath}";
