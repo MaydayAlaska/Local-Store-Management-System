@@ -12,6 +12,8 @@ public partial class MainWindow
     {
         base.OnAttachedToVisualTree(e);
 
+        ApplySavedSettings();
+
         if (_labelsNavigationAttached)
         {
             return;
