@@ -122,10 +122,28 @@ class SettingsService {
     if (!const {'.png', '.jpg', '.jpeg', '.bmp', '.ico'}.contains(extension)) {
       throw StateError('Formato immagine non supportato. Usa PNG, JPG, BMP o ICO.');
     }
+
     Directory(AppPaths.assetsDirectory).createSync(recursive: true);
-    final relative = p.join('assets', '$baseName$extension');
+    final stamp = DateTime.now().microsecondsSinceEpoch;
+    final relative = p.join('assets', '$baseName-$stamp$extension');
     final destination = File(p.join(AppPaths.dataDirectory, relative));
     File(sourcePath).copySync(destination.path);
+    _cleanSourceAssets(baseName, destination.path);
     return relative;
+  }
+
+  void _cleanSourceAssets(String baseName, String keepPath) {
+    try {
+      for (final entity in Directory(AppPaths.assetsDirectory).listSync()) {
+        if (entity is! File || p.equals(entity.path, keepPath)) continue;
+        final name = p.basenameWithoutExtension(entity.path).toLowerCase();
+        final base = baseName.toLowerCase();
+        if (name == base || name.startsWith('$base-')) {
+          entity.deleteSync();
+        }
+      }
+    } catch (_) {
+      // Pulizia best effort: il nuovo asset è comunque già stato salvato.
+    }
   }
 }
