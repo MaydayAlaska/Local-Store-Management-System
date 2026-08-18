@@ -17,8 +17,8 @@
             </Border>
         </Grid>
 
-        <Grid Grid.Row="1" ColumnDefinitions="390,*" ColumnSpacing="16">
-            <Border Classes="Card" Padding="14">
+        <Grid Grid.Row="1" ColumnDefinitions="2*,5*" ColumnSpacing="16">
+            <Border Classes="Card" Padding="14" MinWidth="280">
                 <Grid RowDefinitions="Auto,Auto,*,Auto" RowSpacing="10">
                     <TextBox
                         x:Name="CashSearchInput"
@@ -44,7 +44,7 @@
                                 DoubleTapped="CashProductsList_OnDoubleTapped">
                                 <ListBox.ItemTemplate>
                                     <DataTemplate>
-                                        <Grid Margin="10,8" ColumnDefinitions="*,74,86">
+                                        <Grid Margin="10,8" ColumnDefinitions="*,68,82">
                                             <StackPanel Spacing="2">
                                                 <TextBlock FontWeight="SemiBold" Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
                                                 <TextBlock Classes="Muted" FontSize="11" Text="{Binding DetailsDisplay}" TextTrimming="CharacterEllipsis" />
@@ -79,10 +79,10 @@
                 </Grid>
             </Border>
 
-            <Border Grid.Column="1" Classes="Card" Padding="0">
+            <Border Grid.Column="1" Classes="Card" Padding="0" MinWidth="0">
                 <Grid RowDefinitions="Auto,*,Auto">
                     <Border Padding="16,12" Background="{DynamicResource AppSurfaceMutedBrush}" CornerRadius="18,18,0,0">
-                        <Grid ColumnDefinitions="*,82,92,56,100">
+                        <Grid ColumnDefinitions="*,76,86,50,88">
                             <TextBlock Classes="ColumnHeader" Text="ARTICOLO" />
                             <TextBlock Grid.Column="1" Classes="ColumnHeader" HorizontalAlignment="Right" Text="PREZZO" />
                             <TextBlock Grid.Column="2" Classes="ColumnHeader" HorizontalAlignment="Center" Text="SCONTO %" />
@@ -98,7 +98,7 @@
                             SelectionChanged="CashCartList_OnSelectionChanged">
                             <ListBox.ItemTemplate>
                                 <DataTemplate>
-                                    <Grid Margin="12,8" ColumnDefinitions="*,82,92,56,100">
+                                    <Grid Margin="12,8" ColumnDefinitions="*,76,86,50,88">
                                         <StackPanel Spacing="2">
                                             <TextBlock FontWeight="SemiBold" Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
                                             <TextBlock Classes="Muted" FontSize="11" Text="{Binding DetailsDisplay}" TextTrimming="CharacterEllipsis" />
@@ -106,7 +106,7 @@
                                         <TextBlock Grid.Column="1" VerticalAlignment="Center" HorizontalAlignment="Right" Text="{Binding UnitPriceDisplay}" />
                                         <NumericUpDown
                                             Grid.Column="2"
-                                            MinWidth="82"
+                                            MinWidth="76"
                                             Minimum="0"
                                             Maximum="100"
                                             Increment="1"
@@ -115,7 +115,7 @@
                                             AllowSpin="False"
                                             IsVisible="{Binding IsProductLine}"
                                             Value="{Binding DiscountPercent, Mode=OneWay}"
-                                            ValueChanged="CashLineDiscountInput_OnValueChanged" />
+                                            KeyDown="CashLineDiscountInput_OnKeyDown" />
                                         <TextBlock
                                             Grid.Column="2"
                                             HorizontalAlignment="Center"
@@ -157,61 +157,68 @@
                                 Text="Il carrello è locale e temporaneo. Nessun movimento di magazzino viene ancora registrato." />
 
                             <Border Classes="InsetCard" Padding="16">
-                                <Grid ColumnDefinitions="*,150,150,Auto" ColumnSpacing="16">
-                                    <StackPanel Spacing="3">
+                                <Grid ColumnDefinitions="2*,3*" ColumnSpacing="16">
+                                    <StackPanel Spacing="3" MinWidth="170">
                                         <TextBlock Classes="FieldLabel" Text="TOTALE DA PAGARE" />
-                                        <TextBlock x:Name="CashTotalText" FontSize="38" FontWeight="SemiBold" Text="0,00 €" />
-                                        <TextBlock x:Name="CashSubtotalText" Classes="Muted" FontSize="11" Text="Subtotale: 0,00 €" />
+                                        <TextBlock x:Name="CashTotalText" FontSize="38" FontWeight="SemiBold" Text="0,00 €" TextWrapping="NoWrap" />
+                                        <TextBlock x:Name="CashSubtotalText" Classes="Muted" FontSize="11" Text="Subtotale: 0,00 €" TextWrapping="Wrap" />
                                         <TextBlock x:Name="CashDiscountSummaryText" Classes="Muted" FontSize="11" TextWrapping="Wrap" Text="Nessuno sconto applicato" />
                                         <TextBlock x:Name="CashItemsCountText" Classes="Muted" FontSize="11" Text="0 articoli" />
                                     </StackPanel>
 
-                                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="6">
-                                        <TextBlock Classes="FieldLabel" Text="SCONTO TOTALE %" />
-                                        <NumericUpDown
-                                            x:Name="CashTotalDiscountPercentInput"
-                                            Minimum="0"
-                                            Maximum="100"
-                                            Increment="1"
-                                            FormatString="0.##"
-                                            Value="0"
-                                            ValueChanged="CashTotalDiscountPercentInput_OnValueChanged" />
-                                        <TextBlock Classes="Muted" FontSize="10" TextWrapping="Wrap" Text="Applicato dopo gli sconti dei singoli articoli." />
-                                    </StackPanel>
+                                    <WrapPanel Grid.Column="1" HorizontalAlignment="Stretch" VerticalAlignment="Center">
+                                        <StackPanel Width="140" Margin="0,0,10,10" Spacing="6">
+                                            <TextBlock Classes="FieldLabel" Text="SCONTO TOTALE %" />
+                                            <NumericUpDown
+                                                x:Name="CashTotalDiscountPercentInput"
+                                                Minimum="0"
+                                                Maximum="100"
+                                                Increment="1"
+                                                FormatString="0.##"
+                                                ShowButtonSpinner="False"
+                                                AllowSpin="False"
+                                                Value="0"
+                                                ValueChanged="CashTotalDiscountPercentInput_OnValueChanged" />
+                                            <TextBlock Classes="Muted" FontSize="10" TextWrapping="Wrap" Text="Dopo gli sconti articolo." />
+                                        </StackPanel>
 
-                                    <StackPanel Grid.Column="2" VerticalAlignment="Center" Spacing="6">
-                                        <TextBlock Classes="FieldLabel" Text="SCONTO €" />
-                                        <NumericUpDown
-                                            x:Name="CashFixedDiscountInput"
-                                            Minimum="0"
-                                            Maximum="100000"
-                                            Increment="0.50"
-                                            FormatString="0.00"
-                                            Value="0"
-                                            InnerLeftContent="−"
-                                            InnerRightContent="€"
-                                            KeyDown="CashFixedDiscountInput_OnKeyDown" />
-                                        <TextBlock Classes="Muted" FontSize="10" TextWrapping="Wrap" Text="Inserisci 5,00 e premi Invio: verrà aggiunto al carrello come −5,00 €." />
-                                    </StackPanel>
+                                        <StackPanel Width="140" Margin="0,0,10,10" Spacing="6">
+                                            <TextBlock Classes="FieldLabel" Text="SCONTO €" />
+                                            <NumericUpDown
+                                                x:Name="CashFixedDiscountInput"
+                                                Minimum="0"
+                                                Maximum="100000"
+                                                Increment="0.50"
+                                                FormatString="0.00"
+                                                ShowButtonSpinner="False"
+                                                AllowSpin="False"
+                                                Value="0"
+                                                InnerLeftContent="−"
+                                                InnerRightContent="€"
+                                                KeyDown="CashFixedDiscountInput_OnKeyDown" />
+                                            <TextBlock Classes="Muted" FontSize="10" TextWrapping="Wrap" Text="Scrivi 5,00 e premi Invio." />
+                                        </StackPanel>
 
-                                    <StackPanel Grid.Column="3" MinWidth="220" VerticalAlignment="Center" Spacing="8">
-                                        <TextBlock Classes="FieldLabel" Text="PAGAMENTO" />
-                                        <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
-                                            <Button IsEnabled="False" Content="Contanti" />
-                                            <Button Grid.Column="1" IsEnabled="False" Content="Carta" />
-                                        </Grid>
-                                        <Button
-                                            x:Name="CashCheckoutButton"
-                                            Classes="Primary"
-                                            HorizontalAlignment="Stretch"
-                                            IsEnabled="False"
-                                            Content="Emetti scontrino" />
-                                        <TextBlock
-                                            Classes="Muted"
-                                            HorizontalAlignment="Center"
-                                            FontSize="10"
-                                            Text="Disponibile dopo l'integrazione con il registratore telematico." />
-                                    </StackPanel>
+                                        <StackPanel Width="220" Margin="0,0,0,10" Spacing="8">
+                                            <TextBlock Classes="FieldLabel" Text="PAGAMENTO" />
+                                            <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+                                                <Button IsEnabled="False" Content="Contanti" />
+                                                <Button Grid.Column="1" IsEnabled="False" Content="Carta" />
+                                            </Grid>
+                                            <Button
+                                                x:Name="CashCheckoutButton"
+                                                Classes="Primary"
+                                                HorizontalAlignment="Stretch"
+                                                IsEnabled="False"
+                                                Content="Emetti scontrino" />
+                                            <TextBlock
+                                                Classes="Muted"
+                                                HorizontalAlignment="Center"
+                                                FontSize="10"
+                                                TextWrapping="Wrap"
+                                                Text="Disponibile dopo l'integrazione con il registratore telematico." />
+                                        </StackPanel>
+                                    </WrapPanel>
                                 </Grid>
                             </Border>
                         </StackPanel>
