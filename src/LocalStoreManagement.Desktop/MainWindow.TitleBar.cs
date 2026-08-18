@@ -2,7 +2,6 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Chrome;
 using Avalonia.Data;
-using Avalonia.Input;
 using Avalonia.Layout;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
@@ -12,11 +11,10 @@ namespace LocalStoreManagement.Desktop;
 
 public partial class MainWindow
 {
-    private const double CustomTitleBarHeight = 36;
+    private const double CustomTitleBarHeight = 46;
 
     private Image? _titleBarIconImage;
     private Bitmap? _titleBarIconBitmap;
-    private Button? _maximizeRestoreButton;
 
     private void InitializeCustomTitleBar()
     {
@@ -43,83 +41,93 @@ public partial class MainWindow
         var titleBar = new Border
         {
             Height = CustomTitleBarHeight,
-            BorderThickness = new Thickness(0, 0, 0, 1),
-            BorderBrush = new SolidColorBrush(Color.FromArgb(0x28, 0x7F, 0x7F, 0x7F))
+            Background = new SolidColorBrush(Color.FromRgb(0xF2, 0xF2, 0xF7)),
+            BorderBrush = new SolidColorBrush(Color.FromRgb(0xE1, 0xE1, 0xE8)),
+            BorderThickness = new Thickness(0, 0, 0, 1)
         };
-        titleBar.Bind(Border.BackgroundProperty, new Binding(nameof(Background)) { Source = this });
         WindowDecorationProperties.SetElementRole(titleBar, WindowDecorationsElementRole.TitleBar);
+        titleBar.DoubleTapped += (_, _) => ToggleMaximizeRestore();
 
-        var dock = new DockPanel
+        var titleGrid = new Grid
         {
-            LastChildFill = true,
-            Height = CustomTitleBarHeight
+            Height = CustomTitleBarHeight,
+            ColumnDefinitions = new ColumnDefinitions("120,*,120")
         };
 
-        var captionButtons = new StackPanel
+        var trafficLights = new StackPanel
         {
             Orientation = Orientation.Horizontal,
-            HorizontalAlignment = HorizontalAlignment.Right,
-            Height = CustomTitleBarHeight
-        };
-        DockPanel.SetDock(captionButtons, Dock.Right);
-
-        var minimizeButton = CreateCaptionButton("—", "Riduci a icona", WindowDecorationsElementRole.MinimizeButton);
-        minimizeButton.Click += (_, _) => WindowState = Avalonia.Controls.WindowState.Minimized;
-
-        _maximizeRestoreButton = CreateCaptionButton("□", "Massimizza", WindowDecorationsElementRole.MaximizeButton);
-        _maximizeRestoreButton.Click += (_, _) =>
-        {
-            WindowState = WindowState == Avalonia.Controls.WindowState.Maximized
-                ? Avalonia.Controls.WindowState.Normal
-                : Avalonia.Controls.WindowState.Maximized;
+            Spacing = 8,
+            Margin = new Thickness(16, 0, 0, 0),
+            VerticalAlignment = VerticalAlignment.Center,
+            HorizontalAlignment = HorizontalAlignment.Left
         };
 
-        var closeButton = CreateCaptionButton("×", "Chiudi", WindowDecorationsElementRole.CloseButton);
-        closeButton.Classes.Add("TitleBarClose");
-        closeButton.FontSize = 20;
+        var closeButton = CreateTrafficButton(
+            Color.FromRgb(0xFF, 0x5F, 0x57),
+            "Chiudi",
+            WindowDecorationsElementRole.CloseButton);
         closeButton.Click += (_, _) => Close();
 
-        captionButtons.Children.Add(minimizeButton);
-        captionButtons.Children.Add(_maximizeRestoreButton);
-        captionButtons.Children.Add(closeButton);
-        dock.Children.Add(captionButtons);
+        var minimizeButton = CreateTrafficButton(
+            Color.FromRgb(0xFE, 0xBC, 0x2E),
+            "Riduci a icona",
+            WindowDecorationsElementRole.MinimizeButton);
+        minimizeButton.Click += (_, _) => WindowState = Avalonia.Controls.WindowState.Minimized;
+
+        var maximizeButton = CreateTrafficButton(
+            Color.FromRgb(0x28, 0xC8, 0x40),
+            "Massimizza / ripristina",
+            WindowDecorationsElementRole.MaximizeButton);
+        maximizeButton.Click += (_, _) => ToggleMaximizeRestore();
+
+        trafficLights.Children.Add(closeButton);
+        trafficLights.Children.Add(minimizeButton);
+        trafficLights.Children.Add(maximizeButton);
+        titleGrid.Children.Add(trafficLights);
+
+        var centeredTitle = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Spacing = 7,
+            HorizontalAlignment = HorizontalAlignment.Center,
+            VerticalAlignment = VerticalAlignment.Center,
+            IsHitTestVisible = false
+        };
+        Grid.SetColumn(centeredTitle, 1);
 
         _titleBarIconImage = new Image
         {
-            Width = 16,
-            Height = 16,
+            Width = 18,
+            Height = 18,
             Stretch = Stretch.Uniform,
-            VerticalAlignment = VerticalAlignment.Center,
-            Margin = new Thickness(10, 0, 8, 0)
+            VerticalAlignment = VerticalAlignment.Center
         };
-        DockPanel.SetDock(_titleBarIconImage, Dock.Left);
-        dock.Children.Add(_titleBarIconImage);
+        centeredTitle.Children.Add(_titleBarIconImage);
 
         var titleText = new TextBlock
         {
             VerticalAlignment = VerticalAlignment.Center,
             FontSize = 12.5,
             FontWeight = FontWeight.SemiBold,
-            Margin = new Thickness(0, 0, 12, 0)
+            Foreground = new SolidColorBrush(Color.FromRgb(0x1D, 0x1D, 0x1F)),
+            MaxWidth = 560,
+            TextTrimming = TextTrimming.CharacterEllipsis
         };
         titleText.Bind(TextBlock.TextProperty, new Binding(nameof(Title)) { Source = this });
-        dock.Children.Add(titleText);
+        centeredTitle.Children.Add(titleText);
+        titleGrid.Children.Add(centeredTitle);
 
-        titleBar.Child = dock;
+        titleBar.Child = titleGrid;
         Grid.SetRow(titleBar, 0);
         Grid.SetColumnSpan(titleBar, Math.Max(1, rootGrid.ColumnDefinitions.Count));
         rootGrid.Children.Add(titleBar);
 
         RefreshTitleBarIcon();
-        UpdateMaximizeRestoreButton();
 
         PropertyChanged += (_, change) =>
         {
-            if (change.Property == WindowStateProperty)
-            {
-                UpdateMaximizeRestoreButton();
-            }
-            else if (change.Property == IconProperty)
+            if (change.Property == IconProperty)
             {
                 RefreshTitleBarIcon();
             }
@@ -132,33 +140,28 @@ public partial class MainWindow
         };
     }
 
-    private static Button CreateCaptionButton(
-        string content,
+    private static Button CreateTrafficButton(
+        Color color,
         string tooltip,
         WindowDecorationsElementRole role)
     {
         var button = new Button
         {
-            Content = content,
-            VerticalAlignment = VerticalAlignment.Stretch,
-            HorizontalAlignment = HorizontalAlignment.Stretch
+            Background = new SolidColorBrush(color),
+            VerticalAlignment = VerticalAlignment.Center,
+            HorizontalAlignment = HorizontalAlignment.Center
         };
-        button.Classes.Add("TitleBarButton");
+        button.Classes.Add("TitleTraffic");
         ToolTip.SetTip(button, tooltip);
         WindowDecorationProperties.SetElementRole(button, role);
         return button;
     }
 
-    private void UpdateMaximizeRestoreButton()
+    private void ToggleMaximizeRestore()
     {
-        if (_maximizeRestoreButton is null)
-        {
-            return;
-        }
-
-        var maximized = WindowState == Avalonia.Controls.WindowState.Maximized;
-        _maximizeRestoreButton.Content = maximized ? "❐" : "□";
-        ToolTip.SetTip(_maximizeRestoreButton, maximized ? "Ripristina" : "Massimizza");
+        WindowState = WindowState == Avalonia.Controls.WindowState.Maximized
+            ? Avalonia.Controls.WindowState.Normal
+            : Avalonia.Controls.WindowState.Maximized;
     }
 
     private void RefreshTitleBarIcon()
