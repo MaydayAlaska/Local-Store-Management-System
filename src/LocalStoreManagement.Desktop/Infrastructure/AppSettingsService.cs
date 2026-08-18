@@ -5,41 +5,29 @@ namespace LocalStoreManagement.Desktop.Infrastructure;
 public sealed record AppSettings(
     string ShopName,
     string? IconFileName,
-    string? LogoFileName)
+    string? LogoFileName,
+    bool? ShowShopNameInMenu = null,
+    bool? ShowLogoInMenu = null)
 {
-    public static AppSettings Default { get; } = new("Negozio", null, null);
+    public static AppSettings Default { get; } = new("Negozio", null, null, true, false);
 }
 
 public sealed class AppSettingsService
 {
-    private static readonly JsonSerializerOptions JsonOptions = new()
-    {
-        WriteIndented = true
-    };
+    private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
 
     public AppSettings Load()
     {
         Directory.CreateDirectory(AppPaths.DataDirectory);
         Directory.CreateDirectory(AppPaths.AssetsDirectory);
-
-        if (!File.Exists(AppPaths.SettingsPath))
-        {
-            return AppSettings.Default;
-        }
+        if (!File.Exists(AppPaths.SettingsPath)) return AppSettings.Default;
 
         try
         {
             var json = File.ReadAllText(AppPaths.SettingsPath);
             var settings = JsonSerializer.Deserialize<AppSettings>(json, JsonOptions);
-            if (settings is null)
-            {
-                return AppSettings.Default;
-            }
-
-            var shopName = string.IsNullOrWhiteSpace(settings.ShopName)
-                ? AppSettings.Default.ShopName
-                : settings.ShopName.Trim();
-
+            if (settings is null) return AppSettings.Default;
+            var shopName = string.IsNullOrWhiteSpace(settings.ShopName) ? AppSettings.Default.ShopName : settings.ShopName.Trim();
             return settings with { ShopName = shopName };
         }
         catch
@@ -48,51 +36,44 @@ public sealed class AppSettingsService
         }
     }
 
+    public AppSettings Save(string shopName, PendingAppAsset? icon = null, PendingAppAsset? logo = null)
+    {
+        var current = Load();
+        return Save(
+            shopName,
+            current.ShowShopNameInMenu ?? true,
+            current.ShowLogoInMenu ?? false,
+            icon,
+            logo);
+    }
+
     public AppSettings Save(
         string shopName,
+        bool showShopNameInMenu,
+        bool showLogoInMenu,
         PendingAppAsset? icon = null,
         PendingAppAsset? logo = null)
     {
         Directory.CreateDirectory(AppPaths.DataDirectory);
         Directory.CreateDirectory(AppPaths.AssetsDirectory);
-
         var current = Load();
-        var normalizedName = string.IsNullOrWhiteSpace(shopName)
-            ? AppSettings.Default.ShopName
-            : shopName.Trim();
-
-        var iconFileName = icon is null
-            ? current.IconFileName
-            : SaveAsset(icon, "app-icon");
-        var logoFileName = logo is null
-            ? current.LogoFileName
-            : SaveAsset(logo, "shop-logo");
-
-        var settings = new AppSettings(normalizedName, iconFileName, logoFileName);
+        var normalizedName = string.IsNullOrWhiteSpace(shopName) ? AppSettings.Default.ShopName : shopName.Trim();
+        var iconFileName = icon is null ? current.IconFileName : SaveAsset(icon, "app-icon");
+        var logoFileName = logo is null ? current.LogoFileName : SaveAsset(logo, "shop-logo");
+        var settings = new AppSettings(normalizedName, iconFileName, logoFileName, showShopNameInMenu, showLogoInMenu);
         File.WriteAllText(AppPaths.SettingsPath, JsonSerializer.Serialize(settings, JsonOptions));
         return settings;
     }
 
-    public string? ResolveIconPath(AppSettings? settings = null)
-        => ResolveAssetPath((settings ?? Load()).IconFileName);
-
-    public string? ResolveLogoPath(AppSettings? settings = null)
-        => ResolveAssetPath((settings ?? Load()).LogoFileName);
+    public string? ResolveIconPath(AppSettings? settings = null) => ResolveAssetPath((settings ?? Load()).IconFileName);
+    public string? ResolveLogoPath(AppSettings? settings = null) => ResolveAssetPath((settings ?? Load()).LogoFileName);
 
     public string? ResolveAssetPath(string? relativeFileName)
     {
-        if (string.IsNullOrWhiteSpace(relativeFileName))
-        {
-            return null;
-        }
-
+        if (string.IsNullOrWhiteSpace(relativeFileName)) return null;
         var fullPath = Path.GetFullPath(Path.Combine(AppPaths.DataDirectory, relativeFileName));
         var root = Path.GetFullPath(AppPaths.DataDirectory) + Path.DirectorySeparatorChar;
-        if (!fullPath.StartsWith(root, StringComparison.OrdinalIgnoreCase))
-        {
-            return null;
-        }
-
+        if (!fullPath.StartsWith(root, StringComparison.OrdinalIgnoreCase)) return null;
         return File.Exists(fullPath) ? fullPath : null;
     }
 
@@ -101,7 +82,6 @@ public sealed class AppSettingsService
         var extension = NormalizeImageExtension(asset.Extension);
         var relativePath = Path.Combine("assets", baseFileName + extension);
         var destination = Path.Combine(AppPaths.DataDirectory, relativePath);
-
         File.WriteAllBytes(destination, asset.Data);
         return relativePath;
     }
@@ -109,11 +89,7 @@ public sealed class AppSettingsService
     private static string NormalizeImageExtension(string extension)
     {
         var normalized = extension.Trim().ToLowerInvariant();
-        if (!normalized.StartsWith('.'))
-        {
-            normalized = "." + normalized;
-        }
-
+        if (!normalized.StartsWith('.')) normalized = "." + normalized;
         return normalized switch
         {
             ".png" or ".jpg" or ".jpeg" or ".bmp" or ".ico" => normalized,

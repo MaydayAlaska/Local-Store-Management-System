@@ -9,6 +9,7 @@ public sealed record Product(
     string Name,
     long? CategoryId,
     string? Category,
+    long? BrandId,
     string? Brand,
     string? Variant,
     string? Size,
@@ -19,9 +20,7 @@ public sealed record Product(
     long StockQuantity)
 {
     public string SalePriceDisplay => FormatMoney(SalePriceCents);
-
     public string PurchasePriceDisplay => FormatMoney(PurchasePriceCents);
-
     public string StatusDisplay => IsActive ? "Attivo" : "Disattivato";
 
     public string DetailsDisplay
@@ -29,27 +28,16 @@ public sealed record Product(
         get
         {
             var details = new List<string>();
-
-            if (!string.IsNullOrWhiteSpace(Variant))
-            {
-                details.Add($"Variante: {Variant}");
-            }
-
-            if (!string.IsNullOrWhiteSpace(Size))
-            {
-                details.Add($"Taglia: {Size}");
-            }
-
+            if (!string.IsNullOrWhiteSpace(Variant)) details.Add($"Variante: {Variant}");
+            if (!string.IsNullOrWhiteSpace(Size)) details.Add($"Taglia: {Size}");
             return details.Count == 0 ? "—" : string.Join("  •  ", details);
         }
     }
 
     private static string FormatMoney(long? cents)
-    {
-        return cents.HasValue
+        => cents.HasValue
             ? (cents.Value / 100m).ToString("C", CultureInfo.CurrentCulture)
             : "—";
-    }
 }
 
 public sealed record ProductDraft(
@@ -58,7 +46,7 @@ public sealed record ProductDraft(
     string? Barcode,
     string Name,
     long? CategoryId,
-    string? Brand,
+    long? BrandId,
     string? Variant,
     string? Size,
     long? PurchasePriceCents,

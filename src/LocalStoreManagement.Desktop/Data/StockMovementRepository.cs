@@ -11,11 +11,7 @@ public sealed class StockMovementRepository
     {
         using var connection = OpenConnection();
         using var command = connection.CreateCommand();
-        command.CommandText = """
-            SELECT COALESCE(SUM(quantity_delta), 0)
-            FROM stock_movements
-            WHERE product_id = @productId;
-            """;
+        command.CommandText = "SELECT COALESCE(SUM(quantity_delta), 0) FROM stock_movements WHERE product_id = @productId;";
         command.Parameters.AddWithValue("@productId", productId);
         return Convert.ToInt64(command.ExecuteScalar() ?? 0L, CultureInfo.InvariantCulture);
     }
@@ -32,7 +28,6 @@ public sealed class StockMovementRepository
     {
         using var connection = OpenConnection();
         using var transaction = connection.BeginTransaction();
-
         var currentStock = GetCurrentStock(connection, transaction, productId);
         string movementType;
         long quantityDelta;
@@ -40,45 +35,22 @@ public sealed class StockMovementRepository
         switch (kind)
         {
             case StockMovementKind.Incoming:
-                if (quantity <= 0)
-                {
-                    throw new ArgumentOutOfRangeException(nameof(quantity), "La quantità di carico deve essere maggiore di zero.");
-                }
-
+                if (quantity <= 0) throw new ArgumentOutOfRangeException(nameof(quantity), "La quantità di carico deve essere maggiore di zero.");
                 movementType = "IN";
                 quantityDelta = quantity;
                 break;
-
             case StockMovementKind.Outgoing:
-                if (quantity <= 0)
-                {
-                    throw new ArgumentOutOfRangeException(nameof(quantity), "La quantità di scarico deve essere maggiore di zero.");
-                }
-
-                if (quantity > currentStock)
-                {
-                    throw new InvalidOperationException($"Giacenza insufficiente. Disponibili: {currentStock}.");
-                }
-
+                if (quantity <= 0) throw new ArgumentOutOfRangeException(nameof(quantity), "La quantità di scarico deve essere maggiore di zero.");
+                if (quantity > currentStock) throw new InvalidOperationException($"Giacenza insufficiente. Disponibili: {currentStock}.");
                 movementType = "OUT";
                 quantityDelta = -quantity;
                 break;
-
             case StockMovementKind.Adjustment:
-                if (quantity < 0)
-                {
-                    throw new ArgumentOutOfRangeException(nameof(quantity), "La giacenza rettificata non può essere negativa.");
-                }
-
+                if (quantity < 0) throw new ArgumentOutOfRangeException(nameof(quantity), "La giacenza rettificata non può essere negativa.");
                 movementType = "ADJUSTMENT";
                 quantityDelta = quantity - currentStock;
-                if (quantityDelta == 0)
-                {
-                    throw new InvalidOperationException("La giacenza indicata coincide già con quella attuale.");
-                }
-
+                if (quantityDelta == 0) throw new InvalidOperationException("La giacenza indicata coincide già con quella attuale.");
                 break;
-
             default:
                 throw new ArgumentOutOfRangeException(nameof(kind));
         }
@@ -86,10 +58,8 @@ public sealed class StockMovementRepository
         using var command = connection.CreateCommand();
         command.Transaction = transaction;
         command.CommandText = """
-            INSERT INTO stock_movements (
-                product_id, movement_type, quantity_delta, note, created_at_utc)
-            VALUES (
-                @productId, @movementType, @quantityDelta, @note, @createdAtUtc);
+            INSERT INTO stock_movements (product_id, movement_type, quantity_delta, note, created_at_utc)
+            VALUES (@productId, @movementType, @quantityDelta, @note, @createdAtUtc);
             SELECT last_insert_rowid();
             """;
         command.Parameters.AddWithValue("@productId", productId);
@@ -97,7 +67,6 @@ public sealed class StockMovementRepository
         command.Parameters.AddWithValue("@quantityDelta", quantityDelta);
         command.Parameters.AddWithValue("@note", string.IsNullOrWhiteSpace(note) ? DBNull.Value : note.Trim());
         command.Parameters.AddWithValue("@createdAtUtc", DateTimeOffset.UtcNow.ToString("O"));
-
         var movementId = Convert.ToInt64(command.ExecuteScalar() ?? 0L, CultureInfo.InvariantCulture);
         transaction.Commit();
         return movementId;
@@ -108,21 +77,12 @@ public sealed class StockMovementRepository
         using var connection = OpenConnection();
         using var command = connection.CreateCommand();
         var normalizedQuery = query?.Trim() ?? string.Empty;
-
         command.CommandText = """
             WITH movement_rows AS (
                 SELECT
-                    sm.id,
-                    sm.product_id,
-                    p.sku,
-                    p.barcode,
-                    p.name,
-                    p.brand,
-                    c.name AS category,
-                    sm.movement_type,
-                    sm.quantity_delta,
-                    sm.note,
-                    sm.created_at_utc,
+                    sm.id, sm.product_id, p.sku, p.barcode, p.name,
+                    b.name AS brand, c.name AS category,
+                    sm.movement_type, sm.quantity_delta, sm.note, sm.created_at_utc,
                     SUM(sm.quantity_delta) OVER (
                         PARTITION BY sm.product_id
                         ORDER BY sm.created_at_utc, sm.id
@@ -130,21 +90,11 @@ public sealed class StockMovementRepository
                     ) AS stock_after
                 FROM stock_movements sm
                 INNER JOIN products p ON p.id = sm.product_id
+                LEFT JOIN brands b ON b.id = p.brand_id
                 LEFT JOIN categories c ON c.id = p.category_id
             )
-            SELECT
-                id,
-                product_id,
-                sku,
-                barcode,
-                name,
-                brand,
-                category,
-                movement_type,
-                quantity_delta,
-                note,
-                created_at_utc,
-                stock_after
+            SELECT id, product_id, sku, barcode, name, brand, category,
+                   movement_type, quantity_delta, note, created_at_utc, stock_after
             FROM movement_rows
             WHERE @search = ''
                OR sku LIKE @pattern COLLATE NOCASE
@@ -166,20 +116,12 @@ public sealed class StockMovementRepository
         while (reader.Read())
         {
             movements.Add(new StockMovement(
-                reader.GetInt64(0),
-                reader.GetInt64(1),
-                reader.GetString(2),
-                GetNullableString(reader, 3),
-                reader.GetString(4),
-                GetNullableString(reader, 5),
-                GetNullableString(reader, 6),
-                ParseKind(reader.GetString(7)),
-                reader.GetInt64(8),
-                GetNullableString(reader, 9),
+                reader.GetInt64(0), reader.GetInt64(1), reader.GetString(2), GetNullableString(reader, 3),
+                reader.GetString(4), GetNullableString(reader, 5), GetNullableString(reader, 6),
+                ParseKind(reader.GetString(7)), reader.GetInt64(8), GetNullableString(reader, 9),
                 DateTimeOffset.Parse(reader.GetString(10), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind),
                 reader.GetInt64(11)));
         }
-
         return movements;
     }
 
@@ -187,11 +129,7 @@ public sealed class StockMovementRepository
     {
         using var command = connection.CreateCommand();
         command.Transaction = transaction;
-        command.CommandText = """
-            SELECT COALESCE(SUM(quantity_delta), 0)
-            FROM stock_movements
-            WHERE product_id = @productId;
-            """;
+        command.CommandText = "SELECT COALESCE(SUM(quantity_delta), 0) FROM stock_movements WHERE product_id = @productId;";
         command.Parameters.AddWithValue("@productId", productId);
         return Convert.ToInt64(command.ExecuteScalar() ?? 0L, CultureInfo.InvariantCulture);
     }
@@ -211,11 +149,9 @@ public sealed class StockMovementRepository
     {
         var connection = new SqliteConnection($"Data Source={AppPaths.DatabasePath}");
         connection.Open();
-
         using var command = connection.CreateCommand();
         command.CommandText = "PRAGMA foreign_keys = ON;";
         command.ExecuteNonQuery();
-
         return connection;
     }
 }

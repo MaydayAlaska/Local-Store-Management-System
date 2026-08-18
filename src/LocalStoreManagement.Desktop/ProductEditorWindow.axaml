@@ -41,15 +41,17 @@
                 <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
                     <StackPanel Spacing="5">
                         <TextBlock FontWeight="SemiBold" Text="Marca" />
-                        <TextBox x:Name="BrandInput" />
+                        <ComboBox x:Name="BrandInput">
+                            <ComboBox.ItemTemplate>
+                                <DataTemplate><TextBlock Text="{Binding DisplayName}" /></DataTemplate>
+                            </ComboBox.ItemTemplate>
+                        </ComboBox>
                     </StackPanel>
                     <StackPanel Grid.Column="1" Spacing="5">
                         <TextBlock FontWeight="SemiBold" Text="Categoria" />
                         <ComboBox x:Name="CategoryInput">
                             <ComboBox.ItemTemplate>
-                                <DataTemplate>
-                                    <TextBlock Text="{Binding DisplayName}" />
-                                </DataTemplate>
+                                <DataTemplate><TextBlock Text="{Binding DisplayName}" /></DataTemplate>
                             </ComboBox.ItemTemplate>
                         </ComboBox>
                     </StackPanel>
@@ -83,7 +85,6 @@
                 </StackPanel>
 
                 <CheckBox x:Name="IsActiveInput" IsChecked="True" Content="Prodotto attivo" />
-
                 <Border Padding="12" CornerRadius="8" Background="#FFF4E5" IsVisible="False" x:Name="ErrorPanel">
                     <TextBlock x:Name="ErrorText" Foreground="#8A4B00" TextWrapping="Wrap" />
                 </Border>

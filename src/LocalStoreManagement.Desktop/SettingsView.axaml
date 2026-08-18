@@ -7,16 +7,14 @@
     <ScrollViewer>
         <StackPanel Margin="28" Spacing="26" MaxWidth="860" HorizontalAlignment="Left">
             <Grid ColumnDefinitions="220,*" ColumnSpacing="24">
-                <StackPanel Spacing="4">
-                    <TextBlock FontSize="16" FontWeight="SemiBold" Text="Nome negozio" />
-                    <TextBlock Opacity="0.62" TextWrapping="Wrap" Text="Compare in alto nel menu laterale e nelle esportazioni." />
+                <StackPanel Spacing="5">
+                    <StackPanel Orientation="Horizontal" Spacing="12">
+                        <TextBlock FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center" Text="Nome negozio" />
+                        <CheckBox x:Name="ShowShopNameInMenuInput" VerticalAlignment="Center" Content="Mostra in menù" />
+                    </StackPanel>
+                    <TextBlock Opacity="0.62" TextWrapping="Wrap" Text="Usato nelle esportazioni e, se selezionato, nel menu laterale." />
                 </StackPanel>
-                <TextBox
-                    x:Name="ShopNameInput"
-                    Grid.Column="1"
-                    MinWidth="360"
-                    VerticalAlignment="Top"
-                    PlaceholderText="Negozio" />
+                <TextBox x:Name="ShopNameInput" Grid.Column="1" MinWidth="360" VerticalAlignment="Top" PlaceholderText="Negozio" />
             </Grid>
 
             <Grid ColumnDefinitions="220,*" ColumnSpacing="24">
@@ -31,9 +29,12 @@
             </Grid>
 
             <Grid ColumnDefinitions="220,*" ColumnSpacing="24">
-                <StackPanel Spacing="4">
-                    <TextBlock FontSize="16" FontWeight="SemiBold" Text="Logo negozio" />
-                    <TextBlock Opacity="0.62" TextWrapping="Wrap" Text="Viene inserito in cima alle esportazioni Excel e PDF." />
+                <StackPanel Spacing="5">
+                    <StackPanel Orientation="Horizontal" Spacing="12">
+                        <TextBlock FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center" Text="Logo negozio" />
+                        <CheckBox x:Name="ShowLogoInMenuInput" VerticalAlignment="Center" Content="Mostra in menù" />
+                    </StackPanel>
+                    <TextBlock Opacity="0.62" TextWrapping="Wrap" Text="Usato nelle esportazioni e, se selezionato, ridimensionato nel menu laterale." />
                 </StackPanel>
                 <StackPanel Grid.Column="1" Spacing="8">
                     <Button HorizontalAlignment="Left" Click="ChooseLogoButton_OnClick" Content="Scegli immagine..." />
@@ -49,18 +50,11 @@
                 <TextBlock x:Name="DataDirectoryText" Grid.Column="1" VerticalAlignment="Center" Opacity="0.72" TextWrapping="Wrap" />
             </Grid>
 
-            <TextBlock
-                x:Name="ErrorText"
-                IsVisible="False"
-                Foreground="#D14B43"
-                FontWeight="SemiBold"
-                TextWrapping="Wrap" />
-
+            <TextBlock x:Name="ErrorText" IsVisible="False" Foreground="#D14B43" FontWeight="SemiBold" TextWrapping="Wrap" />
             <StackPanel Orientation="Horizontal" Spacing="14">
                 <Button Click="SaveButton_OnClick" Content="Salva impostazioni" />
                 <TextBlock x:Name="StatusText" VerticalAlignment="Center" Opacity="0.65" />
             </StackPanel>
-
             <TextBlock Opacity="0.55" FontSize="12" Text="Immagini supportate: PNG, JPG, BMP; per l'icona è supportato anche ICO." />
         </StackPanel>
     </ScrollViewer>
