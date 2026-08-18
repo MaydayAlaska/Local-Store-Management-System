@@ -4,7 +4,7 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     x:CompileBindings="False">
 
-    <Grid Margin="24,8,24,24" RowDefinitions="Auto,*,Auto" RowSpacing="14" MaxWidth="1040" HorizontalAlignment="Stretch">
+    <Grid Margin="24,8,24,24" RowDefinitions="Auto,*,Auto,Auto" RowSpacing="14" MaxWidth="1040" HorizontalAlignment="Stretch">
         <Border Classes="Card" Padding="18">
             <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
                 <StackPanel Spacing="6">
@@ -53,11 +53,10 @@
             </Grid>
         </Border>
 
-        <StackPanel Grid.Row="3" IsVisible="False" />
-
-        <StackPanel Grid.Row="2" Margin="0,92,0,0" IsHitTestVisible="False" Spacing="4">
+        <StackPanel Grid.Row="3" Spacing="4">
             <TextBlock x:Name="StatusText" Classes="Muted" FontSize="11" TextWrapping="Wrap" />
             <TextBlock x:Name="ErrorText" IsVisible="False" Foreground="#C12820" FontWeight="SemiBold" TextWrapping="Wrap" />
+            <TextBlock Classes="Muted" FontSize="10" Text="Gli ID liberati vengono riutilizzati dalla prossima marca creata." />
         </StackPanel>
     </Grid>
 </UserControl>
