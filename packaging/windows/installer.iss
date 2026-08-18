@@ -7,7 +7,11 @@
 #endif
 
 #ifndef AppVersion
-  #define AppVersion "0.1.0"
+  #define AppVersion "0.1.1"
+#endif
+
+#ifndef IconFile
+  #error IconFile must be provided with /DIconFile=...
 #endif
 
 #define AppName "Local Store Management System"
@@ -26,6 +30,7 @@ ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 OutputDir={#OutputDir}
 OutputBaseFilename=LocalStoreManagement-Setup-win-x64
+SetupIconFile={#IconFile}
 Compression=lzma2
 SolidCompression=yes
 WizardStyle=modern
