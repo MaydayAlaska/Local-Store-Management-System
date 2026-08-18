@@ -1,0 +1,278 @@
+import 'package:flutter/material.dart';
+
+import '../core/formatters.dart';
+import '../models/catalog.dart';
+import '../repositories/lookup_repository.dart';
+import '../services/app_services.dart';
+
+class ProductEditorDialog extends StatefulWidget {
+  const ProductEditorDialog({
+    super.key,
+    required this.services,
+    this.product,
+    this.initialBarcode,
+  });
+
+  final AppServices services;
+  final ProductSummary? product;
+  final String? initialBarcode;
+
+  @override
+  State<ProductEditorDialog> createState() => _ProductEditorDialogState();
+}
+
+class _ProductEditorDialogState extends State<ProductEditorDialog> {
+  late final TextEditingController _name;
+  late final TextEditingController _notes;
+  late List<_VariantForm> _variants;
+  int? _brandId;
+  int? _categoryId;
+  bool _active = true;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    final product = widget.product;
+    _name = TextEditingController(text: product?.name ?? '');
+    _notes = TextEditingController(text: product?.notes ?? '');
+    _brandId = product?.brandId;
+    _categoryId = product?.categoryId;
+    _active = product?.isActive ?? true;
+    if (product != null) {
+      _variants = widget.services.products.getVariants(product.id).map(_VariantForm.fromDraft).toList();
+    } else {
+      _variants = [
+        _VariantForm(
+          id: null,
+          sku: widget.services.products.generateSku(),
+          barcodes: widget.initialBarcode?.trim().isNotEmpty == true ? widget.initialBarcode!.trim() : '',
+        ),
+      ];
+    }
+  }
+
+  @override
+  void dispose() {
+    _name.dispose();
+    _notes.dispose();
+    for (final variant in _variants) {
+      variant.dispose();
+    }
+    super.dispose();
+  }
+
+  String _nextSku() {
+    final base = widget.services.products.generateSku();
+    final match = RegExp(r'^(.*?)(\d+)$').firstMatch(base);
+    if (match == null) return '$base-${_variants.length + 1}';
+    final prefix = match.group(1)!;
+    var number = int.parse(match.group(2)!);
+    var result = base;
+    final used = _variants.map((e) => e.sku.text.toLowerCase()).toSet();
+    while (used.contains(result.toLowerCase())) {
+      number++;
+      result = '$prefix${number.toString().padLeft(match.group(2)!.length, '0')}';
+    }
+    return result;
+  }
+
+  void _addVariant() => setState(() => _variants.add(_VariantForm(id: null, sku: _nextSku())));
+
+  void _removeVariant(int index) {
+    if (_variants.length == 1 || _variants[index].id != null) return;
+    final form = _variants.removeAt(index);
+    form.dispose();
+    setState(() {});
+  }
+
+  void _save() {
+    try {
+      final draft = ProductDraft(
+        id: widget.product?.id,
+        name: _name.text,
+        categoryId: _categoryId,
+        brandId: _brandId,
+        notes: _notes.text,
+        isActive: _active,
+        variants: _variants.map((v) => v.toDraft()).toList(),
+      );
+      widget.services.products.save(draft);
+      Navigator.of(context).pop(true);
+    } catch (error) {
+      setState(() => _error = error.toString().replaceFirst('Bad state: ', '').replaceFirst('Invalid argument(s): ', ''));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final brands = widget.services.lookups.getAll(LookupKind.brand);
+    final categories = widget.services.lookups.getAll(LookupKind.category);
+    return Dialog(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 1080, maxHeight: 760),
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            Row(children: [
+              Expanded(child: Text(widget.product == null ? 'Nuovo prodotto' : 'Modifica prodotto', style: Theme.of(context).textTheme.headlineSmall)),
+              IconButton(onPressed: () => Navigator.pop(context, false), icon: const Icon(Icons.close)),
+            ]),
+            const SizedBox(height: 12),
+            Row(children: [
+              Expanded(flex: 2, child: TextField(controller: _name, decoration: const InputDecoration(border: OutlineInputBorder(), labelText: 'Nome *'))),
+              const SizedBox(width: 10),
+              Expanded(child: DropdownButtonFormField<int?>(
+                initialValue: _brandId,
+                decoration: const InputDecoration(border: OutlineInputBorder(), labelText: 'Marca'),
+                items: [const DropdownMenuItem<int?>(value: null, child: Text('—')), ...brands.map((b) => DropdownMenuItem<int?>(value: b.id, child: Text(b.name)))],
+                onChanged: (v) => _brandId = v,
+              )),
+              const SizedBox(width: 10),
+              Expanded(child: DropdownButtonFormField<int?>(
+                initialValue: _categoryId,
+                decoration: const InputDecoration(border: OutlineInputBorder(), labelText: 'Categoria'),
+                items: [const DropdownMenuItem<int?>(value: null, child: Text('—')), ...categories.map((c) => DropdownMenuItem<int?>(value: c.id, child: Text(c.name)))],
+                onChanged: (v) => _categoryId = v,
+              )),
+            ]),
+            const SizedBox(height: 10),
+            Row(children: [
+              Expanded(child: TextField(controller: _notes, decoration: const InputDecoration(border: OutlineInputBorder(), labelText: 'Note'))),
+              const SizedBox(width: 16),
+              Switch(value: _active, onChanged: (v) => setState(() => _active = v)),
+              const Text('Prodotto attivo'),
+            ]),
+            const SizedBox(height: 16),
+            Row(children: [
+              Expanded(child: Text('Varianti', style: Theme.of(context).textTheme.titleMedium)),
+              OutlinedButton.icon(onPressed: _addVariant, icon: const Icon(Icons.add), label: const Text('Aggiungi variante')),
+            ]),
+            const SizedBox(height: 8),
+            Expanded(
+              child: ListView.separated(
+                itemCount: _variants.length,
+                separatorBuilder: (_, __) => const SizedBox(height: 10),
+                itemBuilder: (context, index) => _VariantEditor(
+                  form: _variants[index],
+                  canRemove: _variants[index].id == null && _variants.length > 1,
+                  onRemove: () => _removeVariant(index),
+                ),
+              ),
+            ),
+            if (_error != null) Padding(padding: const EdgeInsets.only(top: 8), child: Text(_error!, style: TextStyle(color: Theme.of(context).colorScheme.error))),
+            const SizedBox(height: 12),
+            Row(mainAxisAlignment: MainAxisAlignment.end, children: [
+              TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Annulla')),
+              const SizedBox(width: 8),
+              FilledButton.icon(onPressed: _save, icon: const Icon(Icons.save), label: const Text('Salva')),
+            ]),
+          ]),
+        ),
+      ),
+    );
+  }
+}
+
+class _VariantEditor extends StatelessWidget {
+  const _VariantEditor({required this.form, required this.canRemove, required this.onRemove});
+  final _VariantForm form;
+  final bool canRemove;
+  final VoidCallback onRemove;
+
+  @override
+  Widget build(BuildContext context) => Card(
+        margin: EdgeInsets.zero,
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Column(children: [
+            Row(children: [
+              Expanded(child: TextField(controller: form.sku, decoration: const InputDecoration(border: OutlineInputBorder(), labelText: 'SKU *'))),
+              const SizedBox(width: 8),
+              Expanded(child: TextField(controller: form.variant, decoration: const InputDecoration(border: OutlineInputBorder(), labelText: 'Variante'))),
+              const SizedBox(width: 8),
+              Expanded(child: TextField(controller: form.size, decoration: const InputDecoration(border: OutlineInputBorder(), labelText: 'Taglia'))),
+              const SizedBox(width: 8),
+              IconButton(onPressed: canRemove ? onRemove : null, tooltip: canRemove ? 'Rimuovi variante nuova' : 'Le varianti già salvate non vengono eliminate per preservare lo storico', icon: const Icon(Icons.delete_outline)),
+            ]),
+            const SizedBox(height: 8),
+            Row(children: [
+              Expanded(flex: 2, child: TextField(controller: form.barcodes, decoration: const InputDecoration(border: OutlineInputBorder(), labelText: 'Barcode (uno per riga o separati da virgola)'))),
+              const SizedBox(width: 8),
+              Expanded(child: TextField(controller: form.purchase, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(border: OutlineInputBorder(), labelText: 'Prezzo acquisto €'))),
+              const SizedBox(width: 8),
+              Expanded(child: TextField(controller: form.sale, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(border: OutlineInputBorder(), labelText: 'Prezzo vendita €'))),
+              const SizedBox(width: 12),
+              StatefulBuilder(builder: (context, setLocal) => Row(children: [
+                Switch(value: form.active, onChanged: (v) => setLocal(() => form.active = v)),
+                const Text('Attiva'),
+              ])),
+              const SizedBox(width: 12),
+              Text('Giacenza: ${form.stock}'),
+            ]),
+          ]),
+        ),
+      );
+}
+
+class _VariantForm {
+  _VariantForm({
+    required this.id,
+    required String sku,
+    String variant = '',
+    String size = '',
+    String purchase = '',
+    String sale = '',
+    String barcodes = '',
+    this.active = true,
+    this.stock = 0,
+  })  : sku = TextEditingController(text: sku),
+        variant = TextEditingController(text: variant),
+        size = TextEditingController(text: size),
+        purchase = TextEditingController(text: purchase),
+        sale = TextEditingController(text: sale),
+        barcodes = TextEditingController(text: barcodes);
+
+  factory _VariantForm.fromDraft(ProductVariantDraft draft) => _VariantForm(
+        id: draft.id,
+        sku: draft.sku,
+        variant: draft.variant ?? '',
+        size: draft.size ?? '',
+        purchase: draft.purchasePriceCents == null ? '' : (draft.purchasePriceCents! / 100).toStringAsFixed(2).replaceAll('.', ','),
+        sale: draft.salePriceCents == null ? '' : (draft.salePriceCents! / 100).toStringAsFixed(2).replaceAll('.', ','),
+        barcodes: draft.barcodes.join('\n'),
+        active: draft.isActive,
+        stock: draft.stockQuantity,
+      );
+
+  final int? id;
+  final TextEditingController sku;
+  final TextEditingController variant;
+  final TextEditingController size;
+  final TextEditingController purchase;
+  final TextEditingController sale;
+  final TextEditingController barcodes;
+  bool active;
+  final int stock;
+
+  ProductVariantDraft toDraft() => ProductVariantDraft(
+        id: id,
+        sku: sku.text,
+        variant: variant.text,
+        size: size.text,
+        purchasePriceCents: parseEuroCents(purchase.text),
+        salePriceCents: parseEuroCents(sale.text),
+        isActive: active,
+        barcodes: barcodes.text.split(RegExp(r'[,;\n\r]+')).map((e) => e.trim()).where((e) => e.isNotEmpty).toList(),
+        stockQuantity: stock,
+      );
+
+  void dispose() {
+    sku.dispose();
+    variant.dispose();
+    size.dispose();
+    purchase.dispose();
+    sale.dispose();
+    barcodes.dispose();
+  }
+}
