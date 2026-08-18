@@ -18,6 +18,7 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        ApplySavedSettings();
 
         DatabasePathText.Text = $"Database: {AppPaths.DatabasePath}";
         Opened += (_, _) =>
