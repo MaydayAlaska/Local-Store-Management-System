@@ -89,12 +89,22 @@ public partial class CashView : UserControl
     private void CashIncreaseButton_OnClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
         => ChangeSelectedQuantity(1);
 
-    private void CashLineDiscountInput_OnValueChanged(object? sender, NumericUpDownValueChangedEventArgs e)
+    private void CashLineDiscountInput_OnKeyDown(object? sender, KeyEventArgs e)
     {
+        if (e.Key != Key.Enter) return;
         if (sender is not NumericUpDown input || input.DataContext is not CashCartLine line) return;
 
+        e.Handled = true;
         var discountPercent = ClampPercent(input.Value ?? 0m);
-        if (line.DiscountPercent == discountPercent) return;
+        input.Value = discountPercent;
+
+        if (line.DiscountPercent == discountPercent)
+        {
+            CashCartStatusText.Text = discountPercent == 0m
+                ? $"Nessuno sconto applicato a {line.Name}."
+                : $"Sconto del {discountPercent:0.##}% confermato su {line.Name}.";
+            return;
+        }
 
         line.DiscountPercent = discountPercent;
         UpdateCartView(line.VariantId);
