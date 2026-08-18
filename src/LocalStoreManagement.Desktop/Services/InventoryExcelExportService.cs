@@ -338,7 +338,8 @@ public sealed class InventoryExcelExportService
             }
 
             var relationshipId = drawingsPart.GetIdOfPart(imagePart);
-            drawingsPart.WorksheetDrawing = new Xdr.WorksheetDrawing();
+            var worksheetDrawing = new Xdr.WorksheetDrawing();
+            drawingsPart.WorksheetDrawing = worksheetDrawing;
 
             const long emuPerPixel = 9525L;
             var width = 230L * emuPerPixel;
@@ -367,8 +368,8 @@ public sealed class InventoryExcelExportService
                 picture,
                 new Xdr.ClientData());
 
-            drawingsPart.WorksheetDrawing.Append(anchor);
-            drawingsPart.WorksheetDrawing.Save();
+            worksheetDrawing.Append(anchor);
+            worksheetDrawing.Save();
 
             worksheetPart.Worksheet.Append(new Drawing
             {
