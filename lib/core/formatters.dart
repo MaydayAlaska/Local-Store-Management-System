@@ -1,9 +1,17 @@
-import 'package:intl/intl.dart';
-
-final _currency = NumberFormat.currency(locale: 'it_IT', symbol: '€');
-final _dateTime = DateFormat('dd/MM/yyyy HH:mm', 'it_IT');
-
-String formatMoney(int? cents) => cents == null ? '—' : _currency.format(cents / 100);
+String formatMoney(int? cents) {
+  if (cents == null) return '—';
+  final negative = cents < 0;
+  final absolute = cents.abs();
+  final euros = absolute ~/ 100;
+  final decimals = (absolute % 100).toString().padLeft(2, '0');
+  final groups = euros.toString().split('').reversed.toList();
+  final parts = <String>[];
+  for (var i = 0; i < groups.length; i += 3) {
+    parts.add(groups.skip(i).take(3).toList().reversed.join());
+  }
+  final formattedEuros = parts.reversed.join('.');
+  return '${negative ? '−' : ''}€ $formattedEuros,$decimals';
+}
 
 String formatMoneyRange(int? min, int? max) {
   if (min == null && max == null) return '—';
@@ -11,7 +19,11 @@ String formatMoneyRange(int? min, int? max) {
   return '${formatMoney(min)} – ${formatMoney(max)}';
 }
 
-String formatLocalDateTime(DateTime utc) => _dateTime.format(utc.toLocal());
+String formatLocalDateTime(DateTime utc) {
+  final value = utc.toLocal();
+  String two(int n) => n.toString().padLeft(2, '0');
+  return '${two(value.day)}/${two(value.month)}/${value.year} ${two(value.hour)}:${two(value.minute)}';
+}
 
 int? parseEuroCents(String value) {
   final normalized = value.trim().replaceAll('€', '').replaceAll(' ', '').replaceAll(',', '.');
