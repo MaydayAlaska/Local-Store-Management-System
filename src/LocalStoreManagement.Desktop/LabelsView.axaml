@@ -33,11 +33,11 @@
                                     <Grid Margin="12,9" ColumnDefinitions="92,*,70">
                                         <StackPanel>
                                             <TextBlock FontWeight="SemiBold" Text="{Binding Sku}" />
-                                            <TextBlock FontSize="11" Opacity="0.62" Text="{Binding Barcode}" />
+                                            <TextBlock FontSize="11" Text="{Binding Barcode}" />
                                         </StackPanel>
                                         <StackPanel Grid.Column="1">
                                             <TextBlock FontWeight="SemiBold" Text="{Binding Name}" />
-                                            <TextBlock FontSize="11" Opacity="0.62" Text="{Binding DetailsDisplay}" />
+                                            <TextBlock FontSize="11" Text="{Binding DetailsDisplay}" />
                                         </StackPanel>
                                         <TextBlock
                                             Grid.Column="2"
