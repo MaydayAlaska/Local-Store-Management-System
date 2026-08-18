@@ -1,0 +1,98 @@
+<UserControl
+    x:Class="LocalStoreManagement.Desktop.ExportView"
+    xmlns="https://github.com/avaloniaui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    x:CompileBindings="False">
+
+    <ScrollViewer>
+        <StackPanel Margin="28" Spacing="22" MaxWidth="980" HorizontalAlignment="Stretch">
+            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="20">
+                <StackPanel Spacing="5">
+                    <TextBlock FontSize="18" FontWeight="SemiBold" Text="Backup database" />
+                    <TextBlock Opacity="0.62" TextWrapping="Wrap" Text="Crea una copia consistente del database SQLite nella cartella Backups." />
+                    <TextBlock x:Name="BackupStatusText" FontSize="12" Opacity="0.72" TextWrapping="Wrap" Text="Nessun backup creato in questa sessione." />
+                </StackPanel>
+                <Button Grid.Column="1" VerticalAlignment="Center" Click="BackupButton_OnClick" Content="Crea backup" />
+            </Grid>
+
+            <Separator />
+
+            <Grid ColumnDefinitions="*,260" ColumnSpacing="20">
+                <StackPanel Spacing="5">
+                    <TextBlock FontSize="18" FontWeight="SemiBold" Text="Formato esportazione" />
+                    <TextBlock Opacity="0.62" TextWrapping="Wrap" Text="Scegli il formato per l'esportazione completa o parziale." />
+                </StackPanel>
+                <ComboBox x:Name="ExportFormatInput" Grid.Column="1" VerticalAlignment="Center" SelectedIndex="0">
+                    <ComboBoxItem Content="Excel (.xlsx)" />
+                    <ComboBoxItem Content="PDF (.pdf)" />
+                </ComboBox>
+            </Grid>
+
+            <Separator />
+
+            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="20">
+                <StackPanel Spacing="5">
+                    <TextBlock FontSize="18" FontWeight="SemiBold" Text="Esportazione completa" />
+                    <TextBlock Opacity="0.62" TextWrapping="Wrap" Text="Esporta tutto l'inventario in un unico file, suddiviso per marche ordinate alfabeticamente. In Excel viene creato un solo foglio." />
+                    <TextBlock x:Name="FullExportSummaryText" FontSize="12" Opacity="0.72" />
+                </StackPanel>
+                <Button Grid.Column="1" VerticalAlignment="Center" Click="FullExportButton_OnClick" Content="Esporta tutto..." />
+            </Grid>
+
+            <Separator />
+
+            <StackPanel Spacing="14">
+                <StackPanel Spacing="5">
+                    <TextBlock FontSize="18" FontWeight="SemiBold" Text="Esportazione parziale" />
+                    <TextBlock Opacity="0.62" TextWrapping="Wrap" Text="Seleziona una o più marche e/o categorie. Le selezioni della stessa colonna sono alternative; se scegli sia marche sia categorie vengono applicati entrambi i filtri." />
+                </StackPanel>
+
+                <Grid ColumnDefinitions="*,*" ColumnSpacing="20">
+                    <StackPanel Spacing="8">
+                        <TextBlock FontWeight="SemiBold" Text="Marche" />
+                        <Border Height="220" BorderBrush="#808080" BorderThickness="1" CornerRadius="8">
+                            <ScrollViewer Padding="10">
+                                <ItemsControl x:Name="BrandFilterList">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <CheckBox Margin="2,4" IsChecked="{Binding IsSelected}" Content="{Binding DisplayName}" />
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </ScrollViewer>
+                        </Border>
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="1" Spacing="8">
+                        <TextBlock FontWeight="SemiBold" Text="Categorie" />
+                        <Border Height="220" BorderBrush="#808080" BorderThickness="1" CornerRadius="8">
+                            <ScrollViewer Padding="10">
+                                <ItemsControl x:Name="CategoryFilterList">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <CheckBox Margin="2,4" IsChecked="{Binding IsSelected}" Content="{Binding DisplayName}" />
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </ScrollViewer>
+                        </Border>
+                    </StackPanel>
+                </Grid>
+
+                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                    <TextBlock x:Name="PartialExportSummaryText" VerticalAlignment="Center" FontSize="12" Opacity="0.72" Text="Seleziona almeno una marca o una categoria." />
+                    <Button Grid.Column="1" Click="PartialExportButton_OnClick" Content="Esporta selezione..." />
+                </Grid>
+            </StackPanel>
+
+            <TextBlock
+                x:Name="ErrorText"
+                IsVisible="False"
+                Foreground="#D14B43"
+                FontWeight="SemiBold"
+                TextWrapping="Wrap" />
+
+            <TextBlock x:Name="DataDirectoryText" FontSize="12" Opacity="0.55" TextWrapping="Wrap" />
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

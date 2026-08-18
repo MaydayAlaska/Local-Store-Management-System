@@ -1,0 +1,188 @@
+<UserControl
+    x:Class="LocalStoreManagement.Desktop.LabelsView"
+    xmlns="https://github.com/avaloniaui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:controls="using:LocalStoreManagement.Desktop.Controls"
+    x:CompileBindings="False">
+
+    <Grid Margin="28" RowDefinitions="Auto,*" RowSpacing="16">
+        <Grid ColumnDefinitions="*,Auto">
+            <TextBlock
+                VerticalAlignment="Center"
+                Opacity="0.62"
+                Text="Seleziona un prodotto, controlla l'anteprima e invia l'etichetta alla stampante di sistema." />
+            <Border Grid.Column="1" Padding="12,6" CornerRadius="14" BorderBrush="#D8DDE3" BorderThickness="1">
+                <TextBlock x:Name="BackendText" />
+            </Border>
+        </Grid>
+
+        <Grid Grid.Row="1" ColumnDefinitions="360,*" ColumnSpacing="22">
+            <Grid RowDefinitions="Auto,*">
+                <TextBox
+                    x:Name="LabelSearchInput"
+                    TextChanged="LabelSearchInput_OnTextChanged"
+                    PlaceholderText="Cerca prodotto, SKU, barcode, marca o categoria..." />
+
+                <Border Grid.Row="1" Margin="0,12,0,0" BorderBrush="#D8DDE3" BorderThickness="1" CornerRadius="10">
+                    <Grid>
+                        <ListBox
+                            x:Name="ProductsList"
+                            SelectionChanged="ProductsList_OnSelectionChanged">
+                            <ListBox.ItemTemplate>
+                                <DataTemplate>
+                                    <Grid Margin="12,9" ColumnDefinitions="92,*,70">
+                                        <StackPanel>
+                                            <TextBlock FontWeight="SemiBold" Text="{Binding Sku}" />
+                                            <TextBlock FontSize="11" Text="{Binding Barcode}" />
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="1">
+                                            <TextBlock FontWeight="SemiBold" Text="{Binding Name}" />
+                                            <TextBlock FontSize="11" Text="{Binding DetailsDisplay}" />
+                                        </StackPanel>
+                                        <TextBlock
+                                            Grid.Column="2"
+                                            VerticalAlignment="Center"
+                                            HorizontalAlignment="Right"
+                                            Text="{Binding SalePriceDisplay}" />
+                                    </Grid>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
+
+                        <TextBlock
+                            x:Name="EmptyProductsText"
+                            IsVisible="False"
+                            HorizontalAlignment="Center"
+                            VerticalAlignment="Center"
+                            Opacity="0.62"
+                            Text="Nessun prodotto trovato." />
+                    </Grid>
+                </Border>
+            </Grid>
+
+            <ScrollViewer Grid.Column="1">
+                <StackPanel Spacing="16">
+                    <TextBlock FontSize="18" FontWeight="SemiBold" Text="Anteprima" />
+
+                    <Border
+                        x:Name="LabelPreviewContainer"
+                        Width="420"
+                        Height="252"
+                        HorizontalAlignment="Center"
+                        Padding="18"
+                        Background="White"
+                        BorderBrush="#B9C1C9"
+                        BorderThickness="1"
+                        CornerRadius="8">
+                        <Grid RowDefinitions="Auto,Auto,*,Auto,Auto">
+                            <TextBlock
+                                x:Name="PreviewProductName"
+                                FontSize="20"
+                                FontWeight="Bold"
+                                Foreground="Black"
+                                TextTrimming="CharacterEllipsis" />
+
+                            <TextBlock
+                                x:Name="PreviewDetails"
+                                Grid.Row="1"
+                                Margin="0,2,0,8"
+                                FontSize="12"
+                                Foreground="#4C5660"
+                                TextTrimming="CharacterEllipsis" />
+
+                            <controls:BarcodePreviewControl
+                                x:Name="BarcodePreview"
+                                Grid.Row="2"
+                                MinHeight="80"
+                                Margin="0,4" />
+
+                            <TextBlock
+                                x:Name="PreviewBarcodeText"
+                                Grid.Row="3"
+                                HorizontalAlignment="Center"
+                                FontFamily="Consolas"
+                                FontSize="12"
+                                Foreground="Black" />
+
+                            <Grid Grid.Row="4" Margin="0,6,0,0" ColumnDefinitions="*,Auto">
+                                <TextBlock
+                                    x:Name="PreviewSku"
+                                    VerticalAlignment="Center"
+                                    FontWeight="SemiBold"
+                                    Foreground="Black" />
+                                <TextBlock
+                                    x:Name="PreviewPrice"
+                                    Grid.Column="1"
+                                    VerticalAlignment="Center"
+                                    FontSize="22"
+                                    FontWeight="Bold"
+                                    Foreground="Black" />
+                            </Grid>
+                        </Grid>
+                    </Border>
+
+                    <TextBlock
+                        x:Name="SymbologyText"
+                        HorizontalAlignment="Center"
+                        FontSize="12"
+                        Opacity="0.62" />
+
+                    <Border Padding="16" CornerRadius="10" BorderBrush="#D8DDE3" BorderThickness="1">
+                        <StackPanel Spacing="12">
+                            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
+                                <StackPanel Spacing="5">
+                                    <TextBlock FontWeight="SemiBold" Text="Stampante" />
+                                    <ComboBox
+                                        x:Name="PrinterInput"
+                                        MinWidth="300"
+                                        SelectionChanged="PrinterInput_OnSelectionChanged" />
+                                </StackPanel>
+                                <Button
+                                    Grid.Column="1"
+                                    VerticalAlignment="Bottom"
+                                    Click="RefreshPrintersButton_OnClick"
+                                    Content="Aggiorna" />
+                            </Grid>
+
+                            <Grid ColumnDefinitions="*,*,*" ColumnSpacing="12">
+                                <StackPanel Spacing="5">
+                                    <TextBlock FontWeight="SemiBold" Text="Copie" />
+                                    <NumericUpDown x:Name="CopiesInput" Minimum="1" Maximum="100" Increment="1" Value="1" FormatString="0" />
+                                </StackPanel>
+
+                                <StackPanel Grid.Column="1" Spacing="5">
+                                    <TextBlock FontWeight="SemiBold" Text="Larghezza (mm)" />
+                                    <NumericUpDown x:Name="WidthInput" Minimum="20" Maximum="120" Increment="1" Value="50" FormatString="0" ValueChanged="LabelSizeInput_OnValueChanged" />
+                                </StackPanel>
+
+                                <StackPanel Grid.Column="2" Spacing="5">
+                                    <TextBlock FontWeight="SemiBold" Text="Altezza (mm)" />
+                                    <NumericUpDown x:Name="HeightInput" Minimum="15" Maximum="200" Increment="1" Value="30" FormatString="0" ValueChanged="LabelSizeInput_OnValueChanged" />
+                                </StackPanel>
+                            </Grid>
+
+                            <TextBlock x:Name="DriverHelpText" FontSize="12" Opacity="0.62" TextWrapping="Wrap" />
+
+                            <Border x:Name="StatusPanel" Padding="10" CornerRadius="7" BorderBrush="#D8DDE3" BorderThickness="1">
+                                <TextBlock x:Name="StatusText" Text="Seleziona un prodotto e una stampante." TextWrapping="Wrap" />
+                            </Border>
+
+                            <Button
+                                x:Name="PrintButton"
+                                HorizontalAlignment="Stretch"
+                                Click="PrintButton_OnClick"
+                                Content="Stampa etichetta"
+                                IsEnabled="False" />
+
+                            <TextBlock
+                                FontSize="12"
+                                Opacity="0.55"
+                                TextWrapping="Wrap"
+                                Text="Il barcode usa EAN-13 quando il codice è valido; negli altri casi usa Code 128." />
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </ScrollViewer>
+        </Grid>
+    </Grid>
+</UserControl>

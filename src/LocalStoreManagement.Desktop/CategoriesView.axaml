@@ -1,0 +1,93 @@
+<UserControl
+    x:Class="LocalStoreManagement.Desktop.CategoriesView"
+    xmlns="https://github.com/avaloniaui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    x:CompileBindings="False">
+
+    <Grid Margin="28" RowDefinitions="Auto,*,Auto" RowSpacing="18" MaxWidth="980" HorizontalAlignment="Stretch">
+        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+            <StackPanel Spacing="6">
+                <TextBlock FontSize="16" FontWeight="SemiBold" Text="Nuova categoria" />
+                <TextBox
+                    x:Name="NewCategoryNameInput"
+                    MinWidth="360"
+                    PlaceholderText="Nome categoria" />
+            </StackPanel>
+            <Button
+                Grid.Column="1"
+                VerticalAlignment="Bottom"
+                Click="CreateButton_OnClick"
+                Content="+ Crea" />
+        </Grid>
+
+        <Grid Grid.Row="1" RowDefinitions="Auto,*,Auto" RowSpacing="10">
+            <Grid Margin="12,0" ColumnDefinitions="70,*,150">
+                <TextBlock FontWeight="SemiBold" Text="ID" />
+                <TextBlock Grid.Column="1" FontWeight="SemiBold" Text="Categoria" />
+                <TextBlock Grid.Column="2" HorizontalAlignment="Right" FontWeight="SemiBold" Text="Prodotti" />
+            </Grid>
+
+            <Border Grid.Row="1" BorderBrush="#808080" BorderThickness="1" CornerRadius="8" Opacity="0.9">
+                <Grid>
+                    <ListBox x:Name="CategoriesList" SelectionChanged="CategoriesList_OnSelectionChanged">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <Grid Margin="12,10" ColumnDefinitions="70,*,150">
+                                    <TextBlock VerticalAlignment="Center" FontWeight="SemiBold" Text="{Binding Id}" />
+                                    <TextBlock Grid.Column="1" VerticalAlignment="Center" Text="{Binding Name}" />
+                                    <TextBlock Grid.Column="2" VerticalAlignment="Center" HorizontalAlignment="Right" Opacity="0.68" Text="{Binding ProductCountDisplay}" />
+                                </Grid>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+
+                    <TextBlock
+                        x:Name="EmptyCategoriesText"
+                        IsVisible="False"
+                        HorizontalAlignment="Center"
+                        VerticalAlignment="Center"
+                        Opacity="0.62"
+                        Text="Nessuna categoria creata." />
+                </Grid>
+            </Border>
+
+            <Grid Grid.Row="2" ColumnDefinitions="*,Auto,Auto" ColumnSpacing="10">
+                <StackPanel Spacing="5">
+                    <TextBlock FontWeight="SemiBold" Text="Categoria selezionata" />
+                    <TextBox
+                        x:Name="SelectedCategoryNameInput"
+                        IsEnabled="False"
+                        PlaceholderText="Seleziona una categoria" />
+                </StackPanel>
+                <Button
+                    x:Name="RenameButton"
+                    Grid.Column="1"
+                    VerticalAlignment="Bottom"
+                    IsEnabled="False"
+                    Click="RenameButton_OnClick"
+                    Content="Rinomina" />
+                <Button
+                    x:Name="DeleteButton"
+                    Grid.Column="2"
+                    VerticalAlignment="Bottom"
+                    IsEnabled="False"
+                    Click="DeleteButton_OnClick"
+                    Content="Elimina..." />
+            </Grid>
+        </Grid>
+
+        <StackPanel Grid.Row="2" Spacing="7">
+            <TextBlock x:Name="StatusText" Opacity="0.68" TextWrapping="Wrap" />
+            <TextBlock
+                x:Name="ErrorText"
+                IsVisible="False"
+                Foreground="#D14B43"
+                FontWeight="SemiBold"
+                TextWrapping="Wrap" />
+            <TextBlock
+                FontSize="12"
+                Opacity="0.55"
+                Text="Gli ID liberati vengono riutilizzati dalla prossima categoria creata." />
+        </StackPanel>
+    </Grid>
+</UserControl>

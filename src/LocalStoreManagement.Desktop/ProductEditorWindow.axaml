@@ -1,0 +1,102 @@
+<Window
+    x:Class="LocalStoreManagement.Desktop.ProductEditorWindow"
+    xmlns="https://github.com/avaloniaui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    x:CompileBindings="False"
+    Title="Prodotto"
+    Width="650"
+    Height="760"
+    MinWidth="560"
+    MinHeight="650"
+    WindowStartupLocation="CenterOwner">
+
+    <Grid RowDefinitions="Auto,*,Auto">
+        <Border Padding="24,20" BorderBrush="#D8DDE3" BorderThickness="0,0,0,1">
+            <StackPanel>
+                <TextBlock x:Name="EditorTitle" FontSize="24" FontWeight="SemiBold" Text="Nuovo prodotto" />
+                <TextBlock Foreground="#66707A" Text="Anagrafica articolo" />
+            </StackPanel>
+        </Border>
+
+        <ScrollViewer Grid.Row="1">
+            <StackPanel Margin="24" Spacing="14">
+                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
+                    <StackPanel Spacing="5">
+                        <TextBlock FontWeight="SemiBold" Text="Codice interno / SKU *" />
+                        <TextBox x:Name="SkuInput" PlaceholderText="ART000001" />
+                    </StackPanel>
+                    <Button Grid.Column="1" VerticalAlignment="Bottom" Click="GenerateSkuButton_OnClick" Content="Genera" />
+                </Grid>
+
+                <StackPanel Spacing="5">
+                    <TextBlock FontWeight="SemiBold" Text="Barcode / EAN" />
+                    <TextBox x:Name="BarcodeInput" KeyDown="BarcodeInput_OnKeyDown" PlaceholderText="Scansiona o inserisci il codice" />
+                </StackPanel>
+
+                <StackPanel Spacing="5">
+                    <TextBlock FontWeight="SemiBold" Text="Nome prodotto *" />
+                    <TextBox x:Name="NameInput" />
+                </StackPanel>
+
+                <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
+                    <StackPanel Spacing="5">
+                        <TextBlock FontWeight="SemiBold" Text="Marca" />
+                        <ComboBox x:Name="BrandInput">
+                            <ComboBox.ItemTemplate>
+                                <DataTemplate><TextBlock Text="{Binding DisplayName}" /></DataTemplate>
+                            </ComboBox.ItemTemplate>
+                        </ComboBox>
+                    </StackPanel>
+                    <StackPanel Grid.Column="1" Spacing="5">
+                        <TextBlock FontWeight="SemiBold" Text="Categoria" />
+                        <ComboBox x:Name="CategoryInput">
+                            <ComboBox.ItemTemplate>
+                                <DataTemplate><TextBlock Text="{Binding DisplayName}" /></DataTemplate>
+                            </ComboBox.ItemTemplate>
+                        </ComboBox>
+                    </StackPanel>
+                </Grid>
+
+                <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
+                    <StackPanel Spacing="5">
+                        <TextBlock FontWeight="SemiBold" Text="Variante" />
+                        <TextBox x:Name="VariantInput" PlaceholderText="es. Nero, Classic, Limited" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="1" Spacing="5">
+                        <TextBlock FontWeight="SemiBold" Text="Taglia" />
+                        <TextBox x:Name="SizeInput" PlaceholderText="es. M, 42, 10 anni" />
+                    </StackPanel>
+                </Grid>
+
+                <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
+                    <StackPanel Spacing="5">
+                        <TextBlock FontWeight="SemiBold" Text="Prezzo acquisto (€)" />
+                        <TextBox x:Name="PurchasePriceInput" PlaceholderText="0,00" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="1" Spacing="5">
+                        <TextBlock FontWeight="SemiBold" Text="Prezzo vendita (€)" />
+                        <TextBox x:Name="SalePriceInput" PlaceholderText="0,00" />
+                    </StackPanel>
+                </Grid>
+
+                <StackPanel Spacing="5">
+                    <TextBlock FontWeight="SemiBold" Text="Note" />
+                    <TextBox x:Name="NotesInput" Height="90" AcceptsReturn="True" TextWrapping="Wrap" />
+                </StackPanel>
+
+                <CheckBox x:Name="IsActiveInput" IsChecked="True" Content="Prodotto attivo" />
+                <Border Padding="12" CornerRadius="8" Background="#FFF4E5" IsVisible="False" x:Name="ErrorPanel">
+                    <TextBlock x:Name="ErrorText" Foreground="#8A4B00" TextWrapping="Wrap" />
+                </Border>
+            </StackPanel>
+        </ScrollViewer>
+
+        <Border Grid.Row="2" Padding="24,16" BorderBrush="#D8DDE3" BorderThickness="0,1,0,0">
+            <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="10">
+                <TextBlock VerticalAlignment="Center" Foreground="#66707A" Text="* campo obbligatorio" />
+                <Button Grid.Column="1" Click="CancelButton_OnClick" Content="Annulla" />
+                <Button Grid.Column="2" Click="SaveButton_OnClick" Content="Salva prodotto" />
+            </Grid>
+        </Border>
+    </Grid>
+</Window>

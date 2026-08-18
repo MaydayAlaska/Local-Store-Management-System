@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Local Store Management System
+Comment=Gestionale locale per negozio
+Exec=LocalStoreManagement.Desktop
+Icon=local-store-management
+Terminal=false
+Categories=Office;
+StartupNotify=true

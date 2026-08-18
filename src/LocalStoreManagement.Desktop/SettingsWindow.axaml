@@ -1,0 +1,68 @@
+<Window
+    x:Class="LocalStoreManagement.Desktop.SettingsWindow"
+    xmlns="https://github.com/avaloniaui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    x:CompileBindings="False"
+    Title="Impostazioni"
+    Width="680"
+    Height="620"
+    MinWidth="600"
+    MinHeight="540"
+    WindowStartupLocation="CenterOwner">
+
+    <Grid RowDefinitions="Auto,*,Auto">
+        <Border Padding="24,20" BorderBrush="#D8DDE3" BorderThickness="0,0,0,1">
+            <StackPanel Spacing="4">
+                <TextBlock FontSize="24" FontWeight="SemiBold" Text="Impostazioni" />
+                <TextBlock Foreground="#66707A" Text="Personalizza il gestionale e i dati del negozio." />
+            </StackPanel>
+        </Border>
+
+        <ScrollViewer Grid.Row="1">
+            <StackPanel Margin="24" Spacing="20">
+                <StackPanel Spacing="6">
+                    <TextBlock FontWeight="SemiBold" Text="Nome negozio" />
+                    <TextBox x:Name="ShopNameInput" PlaceholderText="Negozio" />
+                    <TextBlock FontSize="12" Foreground="#66707A" Text="Sostituisce la scritta in alto nel menu laterale." />
+                </StackPanel>
+
+                <Border Padding="16" CornerRadius="10" BorderBrush="#D8DDE3" BorderThickness="1">
+                    <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="12" RowSpacing="8">
+                        <TextBlock FontWeight="SemiBold" Text="Icona programma" />
+                        <Button Grid.Column="1" Grid.RowSpan="2" VerticalAlignment="Center" Click="ChooseIconButton_OnClick" Content="Scegli immagine..." />
+                        <TextBlock Grid.Row="1" Foreground="#66707A" Text="Usata per la finestra e la barra delle applicazioni." />
+                        <TextBlock Grid.Row="2" x:Name="IconFileText" FontSize="12" Foreground="#44515E" TextWrapping="Wrap" Text="Nessuna icona personalizzata." />
+                    </Grid>
+                </Border>
+
+                <Border Padding="16" CornerRadius="10" BorderBrush="#D8DDE3" BorderThickness="1">
+                    <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="12" RowSpacing="8">
+                        <TextBlock FontWeight="SemiBold" Text="Logo negozio" />
+                        <Button Grid.Column="1" Grid.RowSpan="2" VerticalAlignment="Center" Click="ChooseLogoButton_OnClick" Content="Scegli immagine..." />
+                        <TextBlock Grid.Row="1" Foreground="#66707A" Text="Verrà usato in cima alle future esportazioni Excel." />
+                        <TextBlock Grid.Row="2" x:Name="LogoFileText" FontSize="12" Foreground="#44515E" TextWrapping="Wrap" Text="Nessun logo selezionato." />
+                    </Grid>
+                </Border>
+
+                <Border Padding="14" CornerRadius="8" Background="#F5F7F9">
+                    <StackPanel Spacing="5">
+                        <TextBlock FontWeight="SemiBold" Text="Cartella dati" />
+                        <TextBlock x:Name="DataDirectoryText" Foreground="#66707A" TextWrapping="Wrap" />
+                    </StackPanel>
+                </Border>
+
+                <Border x:Name="ErrorPanel" IsVisible="False" Padding="12" CornerRadius="8" Background="#FFF4E5">
+                    <TextBlock x:Name="ErrorText" Foreground="#8A4B00" TextWrapping="Wrap" />
+                </Border>
+            </StackPanel>
+        </ScrollViewer>
+
+        <Border Grid.Row="2" Padding="24,16" BorderBrush="#D8DDE3" BorderThickness="0,1,0,0">
+            <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="10">
+                <TextBlock VerticalAlignment="Center" Foreground="#66707A" Text="PNG, JPG, BMP e ICO supportati" />
+                <Button Grid.Column="1" Click="CancelButton_OnClick" Content="Annulla" />
+                <Button Grid.Column="2" Click="SaveButton_OnClick" Content="Salva impostazioni" />
+            </Grid>
+        </Border>
+    </Grid>
+</Window>
