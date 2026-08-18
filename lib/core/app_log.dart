@@ -34,7 +34,7 @@ class AppLog {
         ..writeln('Messaggio: $message');
       if (error != null) buffer.writeln('Errore: $error');
       if (stackTrace != null) buffer.writeln(stackTrace);
-      buffer.writeln('-' * 80);
+      buffer.writeln(List.filled(80, '-').join());
       file.writeAsStringSync(buffer.toString(), mode: FileMode.append, flush: true);
     } catch (_) {
       // Il logging non deve mai causare a sua volta la chiusura dell'applicazione.
