@@ -383,7 +383,7 @@ public sealed class InventoryExcelExportService
         }
     }
 
-    private static ImagePartType? GetImagePartType(string extension)
+    private static PartTypeInfo? GetImagePartType(string extension)
         => extension.ToLowerInvariant() switch
         {
             ".png" => ImagePartType.Png,
