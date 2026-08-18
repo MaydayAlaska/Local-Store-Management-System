@@ -2,6 +2,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Layout;
 using Avalonia.Media;
+using Avalonia.Threading;
 using Avalonia.VisualTree;
 
 namespace LocalStoreManagement.Desktop;
@@ -9,11 +10,24 @@ namespace LocalStoreManagement.Desktop;
 public partial class MainWindow
 {
     private bool _scannerDirectionSwitchAttached;
+    private bool _scannerDirectionSwitchScheduled;
 
     protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
     {
         base.OnAttachedToVisualTree(e);
-        AttachScannerDirectionSwitch();
+
+        if (_scannerDirectionSwitchScheduled)
+        {
+            return;
+        }
+
+        _scannerDirectionSwitchScheduled = true;
+
+        // Non modificare la collezione Children mentre Avalonia sta ancora
+        // percorrendo il visual tree durante l'attach: su Windows può terminare
+        // il processo prima che la finestra venga mostrata. Rimandiamo la
+        // sostituzione al giro successivo del dispatcher UI.
+        Dispatcher.UIThread.Post(AttachScannerDirectionSwitch);
     }
 
     private void AttachScannerDirectionSwitch()
