@@ -11,7 +11,7 @@ public partial class StockMovementWindow : Window
     private readonly StockMovementKind _kind;
 
     public StockMovementWindow()
-        : this(new StockMovementRepository(), new Product(0, "", null, "", null, null, null, null, null, null, null, true, 0), StockMovementKind.Incoming)
+        : this(new StockMovementRepository(), new Product(0, "", null, "", null, null, null, null, null, null, null, null, true, 0), StockMovementKind.Incoming)
     {
     }
 
