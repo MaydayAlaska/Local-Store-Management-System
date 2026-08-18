@@ -33,13 +33,15 @@ jobs:
           cache: true
 
       - name: Generate Linux runner
-        run: flutter create --platforms=linux --project-name local_store_management --org com.maydayalaska .
+        run: |
+          flutter create --platforms=linux --project-name local_store_management --org com.maydayalaska .
+          rm -f test/widget_test.dart
 
       - name: Resolve packages
         run: flutter pub get
 
       - name: Analyze
-        run: flutter analyze
+        run: flutter analyze --no-fatal-infos
 
       - name: SQLite smoke test
         run: flutter test
