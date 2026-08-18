@@ -1,5 +1,6 @@
 using System.Runtime.InteropServices;
 using System.Runtime.InteropServices.ComTypes;
+using System.Runtime.Versioning;
 using System.Security.Cryptography;
 using System.Text;
 using Avalonia;
@@ -98,20 +99,21 @@ public static class ApplicationIconIntegrationService
         using var stream = File.Create(destinationPath);
         using var writer = new BinaryWriter(stream, Encoding.UTF8, leaveOpen: false);
 
-        writer.Write((ushort)0); // reserved
-        writer.Write((ushort)1); // image type: icon
-        writer.Write((ushort)1); // one image
+        writer.Write((ushort)0);
+        writer.Write((ushort)1);
+        writer.Write((ushort)1);
         writer.Write(pixelSize.Width >= 256 ? (byte)0 : (byte)pixelSize.Width);
         writer.Write(pixelSize.Height >= 256 ? (byte)0 : (byte)pixelSize.Height);
-        writer.Write((byte)0); // color count
-        writer.Write((byte)0); // reserved
-        writer.Write((ushort)1); // color planes
-        writer.Write((ushort)32); // bits per pixel
+        writer.Write((byte)0);
+        writer.Write((byte)0);
+        writer.Write((ushort)1);
+        writer.Write((ushort)32);
         writer.Write((uint)pngBytes.Length);
-        writer.Write((uint)22); // ICONDIR (6) + ICONDIRENTRY (16)
+        writer.Write((uint)22);
         writer.Write(pngBytes);
     }
 
+    [SupportedOSPlatform("windows")]
     private static void UpdateWindowsShortcuts(string iconPath)
     {
         var executablePath = Environment.ProcessPath;
@@ -175,6 +177,7 @@ public static class ApplicationIconIntegrationService
         }
     }
 
+    [SupportedOSPlatform("windows")]
     private static void TryUpdateShortcut(string shortcutPath, string executablePath, string iconPath)
     {
         object? shellLinkObject = null;
