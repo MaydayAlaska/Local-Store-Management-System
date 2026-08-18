@@ -83,6 +83,7 @@ public partial class MainWindow
     {
         HideSettingsView();
         HideCategoriesView();
+        HideExportView();
     }
 
     private void DashboardProductSearchInput_OnTextChanged(object? sender, TextChangedEventArgs e)
