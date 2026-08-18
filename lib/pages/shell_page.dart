@@ -34,6 +34,11 @@ class ShellPage extends StatefulWidget {
 class _ShellPageState extends State<ShellPage> {
   int _index = 0;
 
+  void _selectPage(int value) {
+    FocusManager.instance.primaryFocus?.unfocus();
+    setState(() => _index = value);
+  }
+
   @override
   Widget build(BuildContext context) {
     final pages = <Widget>[
@@ -67,7 +72,7 @@ class _ShellPageState extends State<ShellPage> {
                       borderRadius: BorderRadius.circular(24),
                       child: NavigationRail(
                         selectedIndex: _index,
-                        onDestinationSelected: (value) => setState(() => _index = value),
+                        onDestinationSelected: _selectPage,
                         labelType: NavigationRailLabelType.all,
                         leading: _MenuBrand(settings: widget.settings, services: widget.services),
                         destinations: const [
