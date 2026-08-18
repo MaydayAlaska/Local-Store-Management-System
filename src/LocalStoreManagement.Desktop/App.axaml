@@ -18,11 +18,9 @@
         </Style>
         <Style Selector="Button.SidebarNav:pointerover">
             <Setter Property="Background" Value="#2A2E34" />
-            <Setter Property="Foreground" Value="#FFFFFF" />
         </Style>
         <Style Selector="Button.SidebarNav:pressed">
             <Setter Property="Background" Value="#343941" />
-            <Setter Property="Foreground" Value="#FFFFFF" />
         </Style>
 
         <!-- Impostazioni: sola icona, senza riquadro permanente. -->
@@ -40,11 +38,9 @@
         </Style>
         <Style Selector="Button.SidebarIcon:pointerover">
             <Setter Property="Background" Value="#2A2E34" />
-            <Setter Property="Foreground" Value="#FFFFFF" />
         </Style>
         <Style Selector="Button.SidebarIcon:pressed">
             <Setter Property="Background" Value="#343941" />
-            <Setter Property="Foreground" Value="#FFFFFF" />
         </Style>
     </Application.Styles>
 </Application>
