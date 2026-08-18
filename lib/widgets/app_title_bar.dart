@@ -1,45 +1,26 @@
-import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'package:window_manager/window_manager.dart';
 
-import '../models/app_settings.dart';
-import '../services/settings_service.dart';
-import 'glass.dart';
-
 class AppTitleBar extends StatelessWidget {
-  const AppTitleBar({super.key, required this.settings, required this.settingsService});
-
-  final AppSettings settings;
-  final SettingsService settingsService;
+  const AppTitleBar({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    final iconPath = settingsService.resolveIconPreviewPath(settings);
-    return GlassSurface(
-      blur: 24,
-      borderRadius: BorderRadius.circular(18),
-      child: SizedBox(
+  Widget build(BuildContext context) => SizedBox(
         height: 44,
         child: Row(
           children: [
             Expanded(
               child: DragToMoveArea(
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 13),
-                  child: Row(
-                    children: [
-                      _AppIcon(path: iconPath),
-                      const SizedBox(width: 9),
-                      Expanded(
-                        child: Text(
-                          settings.shopName,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
-                        ),
-                      ),
-                    ],
+                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      'Local Store Management System',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+                    ),
                   ),
                 ),
               ),
@@ -68,25 +49,7 @@ class AppTitleBar extends StatelessWidget {
             ),
           ],
         ),
-      ),
-    );
-  }
-}
-
-class _AppIcon extends StatelessWidget {
-  const _AppIcon({this.path});
-  final String? path;
-
-  @override
-  Widget build(BuildContext context) {
-    if (path != null) {
-      return ClipRRect(
-        borderRadius: BorderRadius.circular(7),
-        child: Image.file(File(path!), width: 25, height: 25, fit: BoxFit.cover),
       );
-    }
-    return Icon(Icons.storefront_rounded, size: 22, color: Theme.of(context).colorScheme.primary);
-  }
 }
 
 class _CaptionButton extends StatelessWidget {
@@ -99,19 +62,16 @@ class _CaptionButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 5),
-      child: SizedBox(
-        width: 40,
-        height: 34,
-        child: IconButton(
-          tooltip: tooltip,
-          onPressed: onPressed,
-          hoverColor: danger
-              ? theme.colorScheme.errorContainer.withValues(alpha: 0.78)
-              : Colors.white.withValues(alpha: theme.brightness == Brightness.dark ? 0.10 : 0.38),
-          icon: Icon(icon, size: 18),
-        ),
+    return SizedBox(
+      width: 42,
+      height: 36,
+      child: IconButton(
+        tooltip: tooltip,
+        onPressed: onPressed,
+        hoverColor: danger
+            ? theme.colorScheme.errorContainer.withValues(alpha: 0.78)
+            : Colors.white.withValues(alpha: theme.brightness == Brightness.dark ? 0.10 : 0.34),
+        icon: Icon(icon, size: 18),
       ),
     );
   }
