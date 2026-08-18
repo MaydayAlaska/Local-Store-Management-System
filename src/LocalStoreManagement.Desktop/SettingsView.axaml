@@ -83,9 +83,7 @@
                 </StackPanel>
             </Border>
 
-            <Border x:Name="ErrorContainer" Classes="InsetCard" IsVisible="False" Padding="12" Background="{DynamicResource AppRedSoftBrush}">
-                <TextBlock x:Name="ErrorText" IsVisible="False" Foreground="#C12820" FontWeight="SemiBold" TextWrapping="Wrap" />
-            </Border>
+            <TextBlock x:Name="ErrorText" IsVisible="False" Foreground="#C12820" FontWeight="SemiBold" TextWrapping="Wrap" />
 
             <Grid ColumnDefinitions="Auto,*" ColumnSpacing="14">
                 <Button Classes="Primary" Click="SaveButton_OnClick" Content="Salva impostazioni" />
