@@ -6,36 +6,50 @@ namespace LocalStoreManagement.Desktop;
 
 public partial class MainWindow
 {
-    private bool _labelsNavigationAttached;
+    private bool _secondaryNavigationAttached;
 
     protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
     {
         base.OnAttachedToVisualTree(e);
 
-        if (_labelsNavigationAttached)
+        if (_secondaryNavigationAttached)
         {
             return;
         }
 
-        var labelsButton = this
+        var buttons = this
             .GetVisualDescendants()
             .OfType<Button>()
-            .FirstOrDefault(button =>
-                string.Equals(button.Content as string, "Etichette", StringComparison.Ordinal));
+            .ToList();
 
-        if (labelsButton is null)
+        var labelsButton = buttons.FirstOrDefault(button =>
+            string.Equals(button.Content as string, "Etichette", StringComparison.Ordinal));
+        if (labelsButton is not null)
         {
-            return;
+            labelsButton.IsEnabled = true;
+            labelsButton.Click += LabelsButton_OnClick;
         }
 
-        labelsButton.IsEnabled = true;
-        labelsButton.Click += LabelsButton_OnClick;
-        _labelsNavigationAttached = true;
+        var exportButton = buttons.FirstOrDefault(button =>
+            string.Equals(button.Content as string, "Esportazione", StringComparison.Ordinal));
+        if (exportButton is not null)
+        {
+            exportButton.IsEnabled = true;
+            exportButton.Click += ExportButton_OnClick;
+        }
+
+        _secondaryNavigationAttached = true;
     }
 
     private async void LabelsButton_OnClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
         var window = new LabelsWindow(_productRepository);
+        await window.ShowDialog(this);
+    }
+
+    private async void ExportButton_OnClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        var window = new ExportWindow(_productRepository, _appSettingsService);
         await window.ShowDialog(this);
     }
 }
