@@ -18,7 +18,8 @@ public sealed class ProductRepository
                 p.sku,
                 p.barcode,
                 p.name,
-                p.category,
+                p.category_id,
+                c.name AS category_name,
                 p.brand,
                 p.variant,
                 p.size,
@@ -28,13 +29,14 @@ public sealed class ProductRepository
                 p.is_active,
                 COALESCE(SUM(sm.quantity_delta), 0) AS stock_quantity
             FROM products p
+            LEFT JOIN categories c ON c.id = p.category_id
             LEFT JOIN stock_movements sm ON sm.product_id = p.id
             WHERE @search = ''
                OR p.sku LIKE @pattern COLLATE NOCASE
                OR COALESCE(p.barcode, '') LIKE @pattern COLLATE NOCASE
                OR p.name LIKE @pattern COLLATE NOCASE
                OR COALESCE(p.brand, '') LIKE @pattern COLLATE NOCASE
-               OR COALESCE(p.category, '') LIKE @pattern COLLATE NOCASE
+               OR COALESCE(c.name, '') LIKE @pattern COLLATE NOCASE
                OR COALESCE(p.variant, '') LIKE @pattern COLLATE NOCASE
                OR COALESCE(p.size, '') LIKE @pattern COLLATE NOCASE
             GROUP BY p.id
@@ -63,7 +65,8 @@ public sealed class ProductRepository
                 p.sku,
                 p.barcode,
                 p.name,
-                p.category,
+                p.category_id,
+                c.name AS category_name,
                 p.brand,
                 p.variant,
                 p.size,
@@ -73,6 +76,7 @@ public sealed class ProductRepository
                 p.is_active,
                 COALESCE(SUM(sm.quantity_delta), 0) AS stock_quantity
             FROM products p
+            LEFT JOIN categories c ON c.id = p.category_id
             LEFT JOIN stock_movements sm ON sm.product_id = p.id
             WHERE p.id = @id
             GROUP BY p.id;
@@ -93,7 +97,8 @@ public sealed class ProductRepository
                 p.sku,
                 p.barcode,
                 p.name,
-                p.category,
+                p.category_id,
+                c.name AS category_name,
                 p.brand,
                 p.variant,
                 p.size,
@@ -103,6 +108,7 @@ public sealed class ProductRepository
                 p.is_active,
                 COALESCE(SUM(sm.quantity_delta), 0) AS stock_quantity
             FROM products p
+            LEFT JOIN categories c ON c.id = p.category_id
             LEFT JOIN stock_movements sm ON sm.product_id = p.id
             WHERE p.barcode = @barcode OR p.sku = @barcode
             GROUP BY p.id
@@ -144,7 +150,7 @@ public sealed class ProductRepository
                 SET sku = @sku,
                     barcode = @barcode,
                     name = @name,
-                    category = @category,
+                    category_id = @categoryId,
                     brand = @brand,
                     variant = @variant,
                     size = @size,
@@ -161,11 +167,11 @@ public sealed class ProductRepository
         {
             command.CommandText = """
                 INSERT INTO products (
-                    sku, barcode, name, category, brand, variant, size,
+                    sku, barcode, name, category_id, brand, variant, size,
                     purchase_price_cents, sale_price_cents, notes, is_active,
                     created_at_utc, updated_at_utc)
                 VALUES (
-                    @sku, @barcode, @name, @category, @brand, @variant, @size,
+                    @sku, @barcode, @name, @categoryId, @brand, @variant, @size,
                     @purchasePrice, @salePrice, @notes, @isActive,
                     @createdAt, @updatedAt);
                 """;
@@ -175,7 +181,7 @@ public sealed class ProductRepository
         AddNullableParameter(command, "@barcode", draft.Barcode);
         command.Parameters.AddWithValue("@sku", draft.Sku.Trim());
         command.Parameters.AddWithValue("@name", draft.Name.Trim());
-        AddNullableParameter(command, "@category", draft.Category);
+        AddNullableParameter(command, "@categoryId", draft.CategoryId);
         AddNullableParameter(command, "@brand", draft.Brand);
         AddNullableParameter(command, "@variant", draft.Variant);
         AddNullableParameter(command, "@size", draft.Size);
@@ -216,15 +222,16 @@ public sealed class ProductRepository
             reader.GetString(1),
             GetNullableString(reader, 2),
             reader.GetString(3),
-            GetNullableString(reader, 4),
+            GetNullableInt64(reader, 4),
             GetNullableString(reader, 5),
             GetNullableString(reader, 6),
             GetNullableString(reader, 7),
-            GetNullableInt64(reader, 8),
+            GetNullableString(reader, 8),
             GetNullableInt64(reader, 9),
-            GetNullableString(reader, 10),
-            reader.GetInt64(11) != 0,
-            reader.GetInt64(12));
+            GetNullableInt64(reader, 10),
+            GetNullableString(reader, 11),
+            reader.GetInt64(12) != 0,
+            reader.GetInt64(13));
     }
 
     private static string? GetNullableString(SqliteDataReader reader, int ordinal)
