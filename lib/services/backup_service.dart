@@ -42,20 +42,21 @@ class BackupService {
     if (targetFile.existsSync()) targetFile.deleteSync();
 
     final destination = sqlite3.open(destinationPath);
+    var completed = false;
     try {
-      await database.db.backup(destination).drain<void>();
-    } catch (_) {
-      try {
-        destination.dispose();
-      } catch (_) {}
-      try {
-        if (targetFile.existsSync()) targetFile.deleteSync();
-      } catch (_) {}
-      rethrow;
+      await for (final _ in database.db.backup(destination)) {
+        // La lettura dello stream fa avanzare l'API sqlite3_backup fino al completamento.
+      }
+      completed = true;
     } finally {
-      try {
-        destination.dispose();
-      } catch (_) {}
+      destination.dispose();
+      if (!completed) {
+        try {
+          if (targetFile.existsSync()) targetFile.deleteSync();
+        } catch (_) {
+          // Pulizia best effort del backup incompleto.
+        }
+      }
     }
   }
 }
