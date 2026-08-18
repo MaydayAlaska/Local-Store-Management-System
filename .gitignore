@@ -1,25 +1,35 @@
-# .NET
-bin/
-obj/
-*.user
-*.suo
-*.userosscache
-*.sln.docstates
+# Flutter / Dart
+.dart_tool/
+.packages
+.pub/
+.pub-cache/
+build/
+coverage/
+.flutter-plugins
+.flutter-plugins-dependencies
 
-# IDE
-.vs/
+# Generated desktop intermediates
+windows/flutter/ephemeral/
+linux/flutter/ephemeral/
+
+# Editors
 .idea/
 .vscode/
-
-# Build / publish
-artifacts/
-publish/
-
-# Local application data / databases
-*.db
-*.db-shm
-*.db-wal
+*.iml
+*.swp
 
 # OS
 .DS_Store
 Thumbs.db
+
+# Local runtime data
+store.db
+store.db-shm
+store.db-wal
+settings.json
+
+# Packaging output
+AppDir/
+dist/
+publish/
+*.AppImage

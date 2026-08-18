@@ -2,7 +2,7 @@
 Type=Application
 Name=Local Store Management System
 Comment=Gestionale locale per negozio
-Exec=LocalStoreManagement.Desktop
+Exec=local_store_management
 Icon=local-store-management
 Terminal=false
 Categories=Office;
