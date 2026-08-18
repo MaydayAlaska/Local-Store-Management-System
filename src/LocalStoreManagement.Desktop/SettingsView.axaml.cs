@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
@@ -45,12 +46,15 @@ public partial class SettingsView : UserControl
         var logoPath = _settingsService.ResolveLogoPath(settings);
         LogoFileText.Text = logoPath is null ? "Nessun logo selezionato." : $"Attuale: {Path.GetFileName(logoPath)}";
 
-        VersionText.Text = $"v{_updateService.CurrentVersion}";
+        var isBetaBuild = IsBetaBuild();
+        VersionText.Text = $"v{_updateService.CurrentVersion}{(isBetaBuild ? " BETA" : string.Empty)}";
         CheckUpdatesButton.Content = "Controlla aggiornamenti";
-        CheckUpdatesButton.IsEnabled = true;
-        UpdateStatusText.Text = _updateService.IsInstalledBuild
-            ? "Canale aggiornamenti: GitHub, branch main."
-            : "Build di sviluppo: il controllo è disponibile, ma l'installazione OTA viene abilitata nelle versioni pubblicate.";
+        CheckUpdatesButton.IsEnabled = !isBetaBuild;
+        UpdateStatusText.Text = isBetaBuild
+            ? "Build BETA/TEST dal branch test. Gli aggiornamenti OTA stabili sono disattivati: scarica l'ultima beta dalla sezione Releases di GitHub."
+            : _updateService.IsInstalledBuild
+                ? "Canale aggiornamenti: GitHub, branch main."
+                : "Build di sviluppo: il controllo è disponibile, ma l'installazione OTA viene abilitata nelle versioni pubblicate.";
     }
 
     public void FocusPrimaryField() => ShopNameInput.Focus();
@@ -78,12 +82,19 @@ public partial class SettingsView : UserControl
         HideError();
         try
         {
-            _settingsService.Save(
+            var savedSettings = _settingsService.Save(
                 ShopNameInput.Text ?? string.Empty,
                 ShowShopNameInMenuInput.IsChecked ?? false,
                 ShowLogoInMenuInput.IsChecked ?? false,
                 _pendingIcon,
                 _pendingLogo);
+
+            var iconPath = _settingsService.ResolveIconPath(savedSettings);
+            if (iconPath is not null && TopLevel.GetTopLevel(this) is Window window)
+            {
+                ApplicationIconIntegrationService.Apply(window, iconPath);
+            }
+
             _pendingIcon = null;
             _pendingLogo = null;
             StatusText.Text = "Impostazioni salvate.";
@@ -188,6 +199,30 @@ public partial class SettingsView : UserControl
         {
             ShowError($"Impossibile leggere l'immagine: {ex.Message}");
             return null;
+        }
+    }
+
+    private static bool IsBetaBuild()
+    {
+        var buildInfoPath = Path.Combine(AppContext.BaseDirectory, "build-info.json");
+        if (!File.Exists(buildInfoPath))
+        {
+            return false;
+        }
+
+        try
+        {
+            using var document = JsonDocument.Parse(File.ReadAllText(buildInfoPath));
+            if (!document.RootElement.TryGetProperty("branch", out var branchElement))
+            {
+                return false;
+            }
+
+            return string.Equals(branchElement.GetString()?.Trim(), "test", StringComparison.OrdinalIgnoreCase);
+        }
+        catch
+        {
+            return false;
         }
     }
 
