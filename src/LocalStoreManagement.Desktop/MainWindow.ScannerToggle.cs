@@ -1,5 +1,6 @@
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Controls.Primitives;
 using Avalonia.Layout;
 using Avalonia.Media;
 using Avalonia.Threading;
@@ -9,30 +10,29 @@ namespace LocalStoreManagement.Desktop;
 
 public partial class MainWindow
 {
-    private bool _scannerDirectionSwitchAttached;
-    private bool _scannerDirectionSwitchScheduled;
+    private bool _scannerDirectionButtonsAttached;
+    private bool _scannerDirectionButtonsScheduled;
 
     protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
     {
         base.OnAttachedToVisualTree(e);
 
-        if (_scannerDirectionSwitchScheduled)
+        if (_scannerDirectionButtonsScheduled)
         {
             return;
         }
 
-        _scannerDirectionSwitchScheduled = true;
+        _scannerDirectionButtonsScheduled = true;
 
         // Non modificare la collezione Children mentre Avalonia sta ancora
-        // percorrendo il visual tree durante l'attach: su Windows può terminare
-        // il processo prima che la finestra venga mostrata. Rimandiamo la
-        // sostituzione al giro successivo del dispatcher UI.
-        Dispatcher.UIThread.Post(AttachScannerDirectionSwitch);
+        // percorrendo il visual tree durante l'attach. La sostituzione viene
+        // eseguita al giro successivo del dispatcher UI.
+        Dispatcher.UIThread.Post(AttachScannerDirectionButtons);
     }
 
-    private void AttachScannerDirectionSwitch()
+    private void AttachScannerDirectionButtons()
     {
-        if (_scannerDirectionSwitchAttached || ScannerModeInput.Parent is not StackPanel modePanel)
+        if (_scannerDirectionButtonsAttached || ScannerModeInput.Parent is not StackPanel modePanel)
         {
             return;
         }
@@ -51,30 +51,56 @@ public partial class MainWindow
             label.Text = "Movimento";
         }
 
-        // Il codice esistente usa ancora SelectedIndex internamente:
-        // 1 = carico, 2 = scarico. Il vecchio modo 0 (apri prodotto)
-        // non è più raggiungibile dall'interfaccia.
+        // Il codice di gestione scanner usa ancora SelectedIndex internamente:
+        // 1 = carico, 2 = scarico. L'interfaccia espone solo queste due azioni.
         ScannerModeInput.SelectedIndex = 1;
 
-        var directionSwitch = new ToggleSwitch
+        var incomingButton = new ToggleButton
         {
-            OffContent = "+1",
-            OnContent = "-1",
-            IsChecked = false,
-            HorizontalAlignment = HorizontalAlignment.Left,
+            Content = "+1",
+            IsChecked = true,
+            MinWidth = 64,
             FontWeight = FontWeight.SemiBold
         };
 
-        directionSwitch.IsCheckedChanged += (_, _) =>
+        var outgoingButton = new ToggleButton
         {
-            ScannerModeInput.SelectedIndex = directionSwitch.IsChecked == true ? 2 : 1;
+            Content = "-1",
+            IsChecked = false,
+            MinWidth = 64,
+            FontWeight = FontWeight.SemiBold
+        };
+
+        incomingButton.Click += (_, _) =>
+        {
+            incomingButton.IsChecked = true;
+            outgoingButton.IsChecked = false;
+            ScannerModeInput.SelectedIndex = 1;
             BarcodeInput.Focus();
         };
 
-        ToolTip.SetTip(directionSwitch, "+1 carica un pezzo · -1 scarica un pezzo");
+        outgoingButton.Click += (_, _) =>
+        {
+            incomingButton.IsChecked = false;
+            outgoingButton.IsChecked = true;
+            ScannerModeInput.SelectedIndex = 2;
+            BarcodeInput.Focus();
+        };
+
+        ToolTip.SetTip(incomingButton, "+1 carica un pezzo");
+        ToolTip.SetTip(outgoingButton, "-1 scarica un pezzo");
+
+        var buttonPanel = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Spacing = 8,
+            HorizontalAlignment = HorizontalAlignment.Left
+        };
+        buttonPanel.Children.Add(incomingButton);
+        buttonPanel.Children.Add(outgoingButton);
 
         modePanel.Children.RemoveAt(comboIndex);
-        modePanel.Children.Insert(comboIndex, directionSwitch);
-        _scannerDirectionSwitchAttached = true;
+        modePanel.Children.Insert(comboIndex, buttonPanel);
+        _scannerDirectionButtonsAttached = true;
     }
 }
