@@ -7,11 +7,15 @@ using Microsoft.Data.Sqlite;
 
 namespace LocalStoreManagement.Desktop;
 
+public sealed record CategorySelectionOption(long? Id, string DisplayName);
+
 public partial class ProductEditorWindow : Window
 {
     private readonly ProductRepository _repository;
+    private readonly CategoryRepository _categoryRepository = new();
     private readonly long? _productId;
     private readonly string? _initialBarcode;
+    private readonly List<CategorySelectionOption> _categoryOptions = new();
 
     public ProductEditorWindow()
         : this(new ProductRepository(), null)
@@ -25,6 +29,7 @@ public partial class ProductEditorWindow : Window
         _initialBarcode = string.IsNullOrWhiteSpace(initialBarcode) ? null : initialBarcode.Trim();
 
         InitializeComponent();
+        LoadCategories(product?.CategoryId);
 
         if (product is null)
         {
@@ -39,7 +44,6 @@ public partial class ProductEditorWindow : Window
             BarcodeInput.Text = product.Barcode;
             NameInput.Text = product.Name;
             BrandInput.Text = product.Brand;
-            CategoryInput.Text = product.Category;
             VariantInput.Text = product.Variant;
             SizeInput.Text = product.Size;
             PurchasePriceInput.Text = FormatEditablePrice(product.PurchasePriceCents);
@@ -58,6 +62,19 @@ public partial class ProductEditorWindow : Window
 
             SkuInput.Focus();
         };
+    }
+
+    private void LoadCategories(long? selectedCategoryId)
+    {
+        _categoryOptions.Clear();
+        _categoryOptions.Add(new CategorySelectionOption(null, "(Nessuna categoria)"));
+        _categoryOptions.AddRange(_categoryRepository
+            .GetAll()
+            .Select(category => new CategorySelectionOption(category.Id, category.Name)));
+
+        CategoryInput.ItemsSource = _categoryOptions;
+        CategoryInput.SelectedItem = _categoryOptions.FirstOrDefault(option => option.Id == selectedCategoryId)
+                                     ?? _categoryOptions[0];
     }
 
     private void GenerateSkuButton_OnClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
@@ -111,12 +128,13 @@ public partial class ProductEditorWindow : Window
             return;
         }
 
+        var selectedCategoryId = (CategoryInput.SelectedItem as CategorySelectionOption)?.Id;
         var draft = new ProductDraft(
             _productId,
             sku,
             NormalizeOptional(BarcodeInput.Text),
             name,
-            NormalizeOptional(CategoryInput.Text),
+            selectedCategoryId,
             NormalizeOptional(BrandInput.Text),
             NormalizeOptional(VariantInput.Text),
             NormalizeOptional(SizeInput.Text),
@@ -132,7 +150,7 @@ public partial class ProductEditorWindow : Window
         }
         catch (SqliteException ex) when (ex.SqliteErrorCode == 19)
         {
-            ShowError("SKU o barcode già presente. Ogni prodotto deve avere codici univoci.");
+            ShowError("SKU o barcode già presente, oppure la categoria selezionata non è più disponibile.");
         }
         catch (Exception ex)
         {
