@@ -9,7 +9,9 @@ import '../core/formatters.dart';
 import '../models/catalog.dart';
 
 class LabelService {
-  Barcode barcodeFor(String code) => isValidEan13(code) ? Barcode.ean13() : Barcode.code128();
+  Barcode barcodeFor(String code) => isValidEan13(code)
+      ? Barcode.ean13()
+      : Barcode.code128(useCode128A: false, useCode128B: true, useCode128C: false);
 
   bool isValidEan13(String value) {
     if (!RegExp(r'^\d{13}$').hasMatch(value)) return false;
@@ -40,7 +42,7 @@ class LabelService {
       throw ArgumentError('Il numero di copie deve essere compreso tra 1 e 100.');
     }
 
-    final code = (product.barcode?.trim().isNotEmpty == true ? product.barcode!.trim() : product.sku.trim());
+    final code = product.barcode?.trim().isNotEmpty == true ? product.barcode!.trim() : product.sku.trim();
     if (code.isEmpty) throw ArgumentError('Il prodotto non ha un barcode o SKU stampabile.');
 
     final pageWidth = widthMm * PdfPageFormat.mm;
