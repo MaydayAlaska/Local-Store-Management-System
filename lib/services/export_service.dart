@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:excel/excel.dart';
 import 'package:file_selector/file_selector.dart';
@@ -77,7 +78,7 @@ class ExportService {
     required AppSettings settings,
   }) async {
     final inventory = filteredInventory(brandIds, categoryIds);
-    final document = pw.Document();
+    final document = pw.Document(theme: _loadPdfTheme());
     final logoPath = settingsService.resolveLogoPath(settings);
     pw.MemoryImage? logo;
     if (logoPath != null && !logoPath.toLowerCase().endsWith('.ico')) {
@@ -114,6 +115,33 @@ class ExportService {
     if (location == null) return null;
     await File(location.path).writeAsBytes(bytes, flush: true);
     return location.path;
+  }
+
+  pw.ThemeData _loadPdfTheme() {
+    final regular = _firstExistingFont([
+      if (Platform.isWindows) r'C:\Windows\Fonts\arial.ttf',
+      if (Platform.isLinux) '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf',
+      if (Platform.isMacOS) '/System/Library/Fonts/Supplemental/Arial.ttf',
+    ]);
+    final bold = _firstExistingFont([
+      if (Platform.isWindows) r'C:\Windows\Fonts\arialbd.ttf',
+      if (Platform.isLinux) '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf',
+      if (Platform.isMacOS) '/System/Library/Fonts/Supplemental/Arial Bold.ttf',
+    ]);
+
+    if (regular == null) return pw.ThemeData.base();
+    final baseFont = pw.Font.ttf(ByteData.sublistView(File(regular).readAsBytesSync()));
+    final boldFont = bold == null
+        ? baseFont
+        : pw.Font.ttf(ByteData.sublistView(File(bold).readAsBytesSync()));
+    return pw.ThemeData.withFont(base: baseFont, bold: boldFont);
+  }
+
+  String? _firstExistingFont(List<String> candidates) {
+    for (final path in candidates) {
+      if (File(path).existsSync()) return path;
+    }
+    return null;
   }
 
   pw.Widget _inventoryTable(List<ProductVariant> rows) {
