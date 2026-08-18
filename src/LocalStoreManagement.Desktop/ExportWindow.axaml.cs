@@ -22,12 +22,19 @@ public sealed class ExportFilterOption
     public bool IsSelected { get; set; }
 }
 
+public enum InventoryExportFileFormat
+{
+    Excel,
+    Pdf
+}
+
 public partial class ExportWindow : Window
 {
     private readonly ProductRepository _productRepository;
     private readonly AppSettingsService _settingsService;
     private readonly DatabaseBackupService _backupService = new();
     private readonly InventoryExcelExportService _excelExportService = new();
+    private readonly InventoryPdfExportService _pdfExportService = new();
     private readonly List<ExportFilterOption> _brandOptions = new();
     private readonly List<ExportFilterOption> _categoryOptions = new();
 
@@ -136,19 +143,20 @@ public partial class ExportWindow : Window
             return;
         }
 
-        var excelType = new FilePickerFileType("Cartella di lavoro Excel")
-        {
-            Patterns = new[] { "*.xlsx" },
-            MimeTypes = new[] { "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }
-        };
+        var format = GetSelectedExportFormat();
+        var fileType = CreateFileType(format);
+        var extension = format == InventoryExportFileFormat.Pdf ? "pdf" : "xlsx";
+        var formatLabel = format == InventoryExportFileFormat.Pdf ? "PDF" : "Excel";
 
         var file = await StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
         {
-            Title = options.IsPartial ? "Salva inventario parziale" : "Salva inventario completo",
-            SuggestedFileName = $"{fileNamePrefix}-{DateTime.Now:yyyyMMdd}.xlsx",
-            DefaultExtension = "xlsx",
-            FileTypeChoices = new[] { excelType },
-            SuggestedFileType = excelType,
+            Title = options.IsPartial
+                ? $"Salva inventario parziale in {formatLabel}"
+                : $"Salva inventario completo in {formatLabel}",
+            SuggestedFileName = $"{fileNamePrefix}-{DateTime.Now:yyyyMMdd}.{extension}",
+            DefaultExtension = extension,
+            FileTypeChoices = new[] { fileType },
+            SuggestedFileType = fileType,
             ShowOverwritePrompt = true
         });
 
@@ -165,10 +173,22 @@ public partial class ExportWindow : Window
                 stream.SetLength(0);
             }
 
-            _excelExportService.Export(stream, products, options);
+            switch (format)
+            {
+                case InventoryExportFileFormat.Pdf:
+                    _pdfExportService.Export(stream, products, options);
+                    break;
+
+                default:
+                    _excelExportService.Export(stream, products, options);
+                    break;
+            }
+
             await stream.FlushAsync();
 
-            var exportLabel = options.IsPartial ? "Esportazione parziale completata" : "Esportazione completa completata";
+            var exportLabel = options.IsPartial
+                ? $"Esportazione parziale {formatLabel} completata"
+                : $"Esportazione completa {formatLabel} completata";
             if (options.IsPartial)
             {
                 PartialExportSummaryText.Text = $"{exportLabel}: {products.Count} prodotti · {file.Name}";
@@ -180,9 +200,29 @@ public partial class ExportWindow : Window
         }
         catch (Exception ex)
         {
-            ShowError($"Impossibile creare il file Excel: {ex.Message}");
+            ShowError($"Impossibile creare il file {formatLabel}: {ex.Message}");
         }
     }
+
+    private InventoryExportFileFormat GetSelectedExportFormat()
+        => ExportFormatInput.SelectedIndex == 1
+            ? InventoryExportFileFormat.Pdf
+            : InventoryExportFileFormat.Excel;
+
+    private static FilePickerFileType CreateFileType(InventoryExportFileFormat format)
+        => format switch
+        {
+            InventoryExportFileFormat.Pdf => new FilePickerFileType("Documento PDF")
+            {
+                Patterns = new[] { "*.pdf" },
+                MimeTypes = new[] { "application/pdf" }
+            },
+            _ => new FilePickerFileType("Cartella di lavoro Excel")
+            {
+                Patterns = new[] { "*.xlsx" },
+                MimeTypes = new[] { "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }
+            }
+        };
 
     private InventoryExportOptions BuildExportOptions(bool isPartial, string filterSummary)
     {
