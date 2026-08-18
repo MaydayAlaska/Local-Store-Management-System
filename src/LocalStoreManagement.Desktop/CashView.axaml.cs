@@ -9,7 +9,9 @@ public partial class CashView : UserControl
 {
     private readonly ProductRepository _productRepository;
     private readonly List<CashCartLine> _cart = new();
+    private readonly List<CashFixedDiscountLine> _fixedDiscounts = new();
     private bool _resettingSaleDiscounts;
+    private long _nextFixedDiscountId = 1;
 
     public CashView()
         : this(new ProductRepository())
@@ -118,37 +120,78 @@ public partial class CashView : UserControl
             : $"Sconto del {discountPercent:0.##}% applicato al totale del carrello.";
     }
 
-    private void CashFixedDiscountInput_OnValueChanged(object? sender, NumericUpDownValueChangedEventArgs e)
+    private void CashFixedDiscountInput_OnKeyDown(object? sender, KeyEventArgs e)
     {
-        if (_resettingSaleDiscounts) return;
+        if (e.Key != Key.Enter) return;
 
-        var value = CashFixedDiscountInput.Value ?? 0m;
-        if (value > 0m)
+        e.Handled = true;
+        AddFixedDiscountFromInput();
+    }
+
+    private void AddFixedDiscountFromInput()
+    {
+        if (_cart.Count == 0)
         {
-            CashFixedDiscountInput.Value = -value;
+            CashFixedDiscountInput.Value = 0m;
+            CashCartStatusText.Text = "Aggiungi almeno un articolo prima di inserire uno sconto in euro.";
+            CashSearchInput.Focus();
             return;
         }
 
-        UpdateCartTotals();
-        var amount = Math.Abs(value);
-        CashCartStatusText.Text = amount == 0m
-            ? "Sconto fisso in euro rimosso."
-            : $"Sconto fisso di {amount:0.00} € applicato al carrello.";
+        var amount = Math.Abs(CashFixedDiscountInput.Value ?? 0m);
+        var amountCents = EuroAmountToCents(amount);
+        if (amountCents <= 0)
+        {
+            CashCartStatusText.Text = "Inserisci uno sconto maggiore di 0 euro e premi Invio.";
+            CashFixedDiscountInput.Focus();
+            return;
+        }
+
+        var remainingBeforeFixedDiscount = Math.Max(
+            0L,
+            GetTotalBeforeFixedDiscountCents() - _fixedDiscounts.Sum(line => line.AmountCents));
+
+        if (amountCents > remainingBeforeFixedDiscount)
+        {
+            CashCartStatusText.Text = $"Lo sconto supera il totale residuo di {MoneyFormatter.Format(remainingBeforeFixedDiscount)}.";
+            CashFixedDiscountInput.Focus();
+            return;
+        }
+
+        var discountLine = new CashFixedDiscountLine(_nextFixedDiscountId++, amountCents);
+        _fixedDiscounts.Add(discountLine);
+        CashFixedDiscountInput.Value = 0m;
+        UpdateCartView(selectedFixedDiscountId: discountLine.Id);
+        CashCartStatusText.Text = $"Sconto di {MoneyFormatter.Format(amountCents)} aggiunto al carrello come −{MoneyFormatter.Format(amountCents)}.";
+        CashFixedDiscountInput.Focus();
     }
 
     private void CashRemoveButton_OnClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
-        if (CashCartList.SelectedItem is not CashCartLine line) return;
+        switch (CashCartList.SelectedItem)
+        {
+            case CashCartLine line:
+                _cart.RemoveAll(item => item.VariantId == line.VariantId);
+                UpdateCartView();
+                CashCartStatusText.Text = $"{line.Name} rimosso dal carrello.";
+                break;
 
-        _cart.RemoveAll(item => item.VariantId == line.VariantId);
-        UpdateCartView();
-        CashCartStatusText.Text = $"{line.Name} rimosso dal carrello.";
+            case CashFixedDiscountLine discountLine:
+                _fixedDiscounts.RemoveAll(item => item.Id == discountLine.Id);
+                UpdateCartView();
+                CashCartStatusText.Text = $"Sconto di {MoneyFormatter.Format(discountLine.AmountCents)} rimosso dal carrello.";
+                break;
+
+            default:
+                return;
+        }
+
         CashSearchInput.Focus();
     }
 
     private void CashClearButton_OnClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
-        if (_cart.Count == 0) return;
+        if (_cart.Count == 0 && _fixedDiscounts.Count == 0) return;
 
         _cart.Clear();
         ResetSaleDiscounts();
@@ -315,22 +358,39 @@ public partial class CashView : UserControl
         }
     }
 
-    private void UpdateCartView(long? selectedVariantId = null)
+    private void UpdateCartView(long? selectedVariantId = null, long? selectedFixedDiscountId = null)
     {
         selectedVariantId ??= (CashCartList.SelectedItem as CashCartLine)?.VariantId;
+        selectedFixedDiscountId ??= (CashCartList.SelectedItem as CashFixedDiscountLine)?.Id;
 
-        var items = _cart.ToList();
+        if (_cart.Count == 0) ResetSaleDiscounts();
+
+        var items = new List<object>(_cart.Count + _fixedDiscounts.Count);
+        items.AddRange(_cart);
+        items.AddRange(_fixedDiscounts);
+
         CashCartList.ItemsSource = items;
         CashEmptyCartText.IsVisible = items.Count == 0;
         CashClearButton.IsEnabled = items.Count > 0;
-        CashTotalDiscountPercentInput.IsEnabled = items.Count > 0;
-        CashFixedDiscountInput.IsEnabled = items.Count > 0;
+        CashTotalDiscountPercentInput.IsEnabled = _cart.Count > 0;
+        CashFixedDiscountInput.IsEnabled = _cart.Count > 0;
 
-        if (items.Count == 0) ResetSaleDiscounts();
-
-        CashCartList.SelectedItem = selectedVariantId.HasValue
-            ? items.FirstOrDefault(line => line.VariantId == selectedVariantId.Value)
-            : null;
+        if (selectedVariantId.HasValue)
+        {
+            CashCartList.SelectedItem = items
+                .OfType<CashCartLine>()
+                .FirstOrDefault(line => line.VariantId == selectedVariantId.Value);
+        }
+        else if (selectedFixedDiscountId.HasValue)
+        {
+            CashCartList.SelectedItem = items
+                .OfType<CashFixedDiscountLine>()
+                .FirstOrDefault(line => line.Id == selectedFixedDiscountId.Value);
+        }
+        else
+        {
+            CashCartList.SelectedItem = null;
+        }
 
         UpdateCartTotals();
         UpdateSelectedLineButtons();
@@ -347,7 +407,7 @@ public partial class CashView : UserControl
         var afterPercentCents = ApplyPercentDiscount(subtotalCents, totalDiscountPercent);
         var totalPercentDiscountCents = Math.Max(0L, subtotalCents - afterPercentCents);
 
-        var requestedFixedDiscountCents = EuroAmountToCents(Math.Abs(CashFixedDiscountInput.Value ?? 0m));
+        var requestedFixedDiscountCents = _fixedDiscounts.Sum(line => line.AmountCents);
         var fixedDiscountCents = Math.Min(requestedFixedDiscountCents, afterPercentCents);
         var finalTotalCents = Math.Max(0L, afterPercentCents - fixedDiscountCents);
 
@@ -370,7 +430,7 @@ public partial class CashView : UserControl
 
         if (fixedDiscountCents > 0)
         {
-            discounts.Add($"fisso −{MoneyFormatter.Format(fixedDiscountCents)}");
+            discounts.Add($"fissi −{MoneyFormatter.Format(fixedDiscountCents)}");
         }
 
         CashDiscountSummaryText.Text = discounts.Count == 0
@@ -378,19 +438,35 @@ public partial class CashView : UserControl
             : $"Sconti: {string.Join(" · ", discounts)}";
     }
 
+    private long GetTotalBeforeFixedDiscountCents()
+    {
+        var subtotalCents = _cart.Sum(line => line.LineTotalCents);
+        var totalDiscountPercent = ClampPercent(CashTotalDiscountPercentInput.Value ?? 0m);
+        return ApplyPercentDiscount(subtotalCents, totalDiscountPercent);
+    }
+
     private void UpdateSelectedLineButtons()
     {
-        if (CashCartList.SelectedItem is not CashCartLine line)
+        switch (CashCartList.SelectedItem)
         {
-            CashDecreaseButton.IsEnabled = false;
-            CashIncreaseButton.IsEnabled = false;
-            CashRemoveButton.IsEnabled = false;
-            return;
-        }
+            case CashCartLine line:
+                CashDecreaseButton.IsEnabled = line.Quantity > 1;
+                CashIncreaseButton.IsEnabled = line.Quantity < line.Product.StockQuantity;
+                CashRemoveButton.IsEnabled = true;
+                break;
 
-        CashDecreaseButton.IsEnabled = line.Quantity > 1;
-        CashIncreaseButton.IsEnabled = line.Quantity < line.Product.StockQuantity;
-        CashRemoveButton.IsEnabled = true;
+            case CashFixedDiscountLine:
+                CashDecreaseButton.IsEnabled = false;
+                CashIncreaseButton.IsEnabled = false;
+                CashRemoveButton.IsEnabled = true;
+                break;
+
+            default:
+                CashDecreaseButton.IsEnabled = false;
+                CashIncreaseButton.IsEnabled = false;
+                CashRemoveButton.IsEnabled = false;
+                break;
+        }
     }
 
     private void ResetSaleDiscounts()
@@ -400,6 +476,7 @@ public partial class CashView : UserControl
         {
             CashTotalDiscountPercentInput.Value = 0m;
             CashFixedDiscountInput.Value = 0m;
+            _fixedDiscounts.Clear();
         }
         finally
         {
@@ -440,6 +517,8 @@ public partial class CashView : UserControl
         public Product Product { get; }
         public int Quantity { get; }
         public decimal DiscountPercent { get; set; }
+        public bool IsProductLine => true;
+        public bool IsFixedDiscountLine => false;
         public long VariantId => Product.Id;
         public string Name => Product.Name;
         public string QuantityDisplay => Quantity.ToString();
@@ -458,5 +537,25 @@ public partial class CashView : UserControl
                 return string.Join(" · ", details);
             }
         }
+    }
+
+    private sealed class CashFixedDiscountLine
+    {
+        public CashFixedDiscountLine(long id, long amountCents)
+        {
+            Id = id;
+            AmountCents = Math.Max(0L, amountCents);
+        }
+
+        public long Id { get; }
+        public long AmountCents { get; }
+        public decimal DiscountPercent => 0m;
+        public bool IsProductLine => false;
+        public bool IsFixedDiscountLine => true;
+        public string Name => "Sconto";
+        public string DetailsDisplay => "Sconto fisso sul carrello";
+        public string UnitPriceDisplay => MoneyFormatter.Format(-AmountCents);
+        public string QuantityDisplay => "1";
+        public string LineTotalDisplay => MoneyFormatter.Format(-AmountCents);
     }
 }

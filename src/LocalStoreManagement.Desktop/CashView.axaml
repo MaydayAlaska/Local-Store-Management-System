@@ -111,8 +111,18 @@
                                             Maximum="100"
                                             Increment="1"
                                             FormatString="0.##"
+                                            ShowButtonSpinner="False"
+                                            AllowSpin="False"
+                                            IsVisible="{Binding IsProductLine}"
                                             Value="{Binding DiscountPercent, Mode=OneWay}"
                                             ValueChanged="CashLineDiscountInput_OnValueChanged" />
+                                        <TextBlock
+                                            Grid.Column="2"
+                                            HorizontalAlignment="Center"
+                                            VerticalAlignment="Center"
+                                            Classes="Muted"
+                                            IsVisible="{Binding IsFixedDiscountLine}"
+                                            Text="—" />
                                         <TextBlock Grid.Column="3" VerticalAlignment="Center" HorizontalAlignment="Right" FontWeight="SemiBold" Text="{Binding QuantityDisplay}" />
                                         <TextBlock Grid.Column="4" VerticalAlignment="Center" HorizontalAlignment="Right" FontWeight="SemiBold" Text="{Binding LineTotalDisplay}" />
                                     </Grid>
@@ -173,13 +183,15 @@
                                         <TextBlock Classes="FieldLabel" Text="SCONTO €" />
                                         <NumericUpDown
                                             x:Name="CashFixedDiscountInput"
-                                            Minimum="-100000"
-                                            Maximum="0"
+                                            Minimum="0"
+                                            Maximum="100000"
                                             Increment="0.50"
                                             FormatString="0.00"
                                             Value="0"
-                                            ValueChanged="CashFixedDiscountInput_OnValueChanged" />
-                                        <TextBlock Classes="Muted" FontSize="10" TextWrapping="Wrap" Text="Esempio: inserisci −5,00 per togliere 5 euro." />
+                                            InnerLeftContent="−"
+                                            InnerRightContent="€"
+                                            KeyDown="CashFixedDiscountInput_OnKeyDown" />
+                                        <TextBlock Classes="Muted" FontSize="10" TextWrapping="Wrap" Text="Inserisci 5,00 e premi Invio: verrà aggiunto al carrello come −5,00 €." />
                                     </StackPanel>
 
                                     <StackPanel Grid.Column="3" MinWidth="220" VerticalAlignment="Center" Spacing="8">
