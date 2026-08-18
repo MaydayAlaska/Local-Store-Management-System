@@ -39,6 +39,9 @@ class ProductVariant {
   final String? brand;
   final String? variant;
   final String? size;
+
+  /// Prezzi effettivi: il repository applica l'override variante quando
+  /// presente, altrimenti restituisce il prezzo del prodotto.
   final int? purchasePriceCents;
   final int? salePriceCents;
   final String? notes;
@@ -66,6 +69,8 @@ class ProductSummary {
     this.category,
     this.brandId,
     this.brand,
+    this.purchasePriceCents,
+    this.salePriceCents,
     this.notes,
     required this.isActive,
     required this.variantCount,
@@ -80,6 +85,8 @@ class ProductSummary {
   final String? category;
   final int? brandId;
   final String? brand;
+  final int? purchasePriceCents;
+  final int? salePriceCents;
   final String? notes;
   final bool isActive;
   final int variantCount;
@@ -97,6 +104,8 @@ class ProductDraft {
     required this.name,
     this.categoryId,
     this.brandId,
+    this.purchasePriceCents,
+    this.salePriceCents,
     this.notes,
     required this.isActive,
     required this.variants,
@@ -105,6 +114,8 @@ class ProductDraft {
   final String name;
   final int? categoryId;
   final int? brandId;
+  final int? purchasePriceCents;
+  final int? salePriceCents;
   final String? notes;
   final bool isActive;
   final List<ProductVariantDraft> variants;
@@ -126,6 +137,8 @@ class ProductVariantDraft {
   final String sku;
   final String? variant;
   final String? size;
+
+  /// Override opzionali. Se null vengono usati i prezzi del prodotto.
   final int? purchasePriceCents;
   final int? salePriceCents;
   final bool isActive;
