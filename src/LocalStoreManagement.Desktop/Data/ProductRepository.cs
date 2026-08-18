@@ -524,14 +524,7 @@ public sealed class ProductRepository
     }
 
     private static SqliteConnection OpenConnection()
-    {
-        var connection = new SqliteConnection($"Data Source={AppPaths.DatabasePath}");
-        connection.Open();
-        using var command = connection.CreateCommand();
-        command.CommandText = "PRAGMA foreign_keys = ON;";
-        command.ExecuteNonQuery();
-        return connection;
-    }
+        => DatabaseConnectionFactory.Open();
 
     private const string VariantSelectSql = """
         SELECT
@@ -556,7 +549,7 @@ public sealed class ProductRepository
         INNER JOIN products p ON p.id = pv.product_id
         LEFT JOIN categories c ON c.id = p.category_id
         LEFT JOIN brands b ON b.id = p.brand_id
-        """;
+        """ + "\n";
 
     private const string ProductSummarySelectSql = """
         SELECT
@@ -579,5 +572,5 @@ public sealed class ProductRepository
         FROM products p
         LEFT JOIN categories c ON c.id = p.category_id
         LEFT JOIN brands b ON b.id = p.brand_id
-        """;
+        """ + "\n";
 }
