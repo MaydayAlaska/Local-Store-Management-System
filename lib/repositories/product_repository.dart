@@ -151,16 +151,40 @@ class ProductRepository {
   int _saveProductRow(ProductDraft draft, String name, String now) {
     if (draft.id != null) {
       _db.execute('''
-        UPDATE products SET name=?, category_id=?, brand_id=?, notes=?, is_active=?, updated_at_utc=?
+        UPDATE products
+        SET name=?, category_id=?, brand_id=?, purchase_price_cents=?, sale_price_cents=?,
+            notes=?, is_active=?, updated_at_utc=?
         WHERE id=?;
-      ''', [name, draft.categoryId, draft.brandId, _optional(draft.notes), draft.isActive ? 1 : 0, now, draft.id]);
+      ''', [
+        name,
+        draft.categoryId,
+        draft.brandId,
+        draft.purchasePriceCents,
+        draft.salePriceCents,
+        _optional(draft.notes),
+        draft.isActive ? 1 : 0,
+        now,
+        draft.id,
+      ]);
       if (_db.updatedRows == 0) throw StateError('Il prodotto da modificare non esiste più.');
       return draft.id!;
     }
     _db.execute('''
-      INSERT INTO products (name, category_id, brand_id, notes, is_active, created_at_utc, updated_at_utc)
-      VALUES (?, ?, ?, ?, ?, ?, ?);
-    ''', [name, draft.categoryId, draft.brandId, _optional(draft.notes), draft.isActive ? 1 : 0, now, now]);
+      INSERT INTO products (
+        name, category_id, brand_id, purchase_price_cents, sale_price_cents,
+        notes, is_active, created_at_utc, updated_at_utc)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
+    ''', [
+      name,
+      draft.categoryId,
+      draft.brandId,
+      draft.purchasePriceCents,
+      draft.salePriceCents,
+      _optional(draft.notes),
+      draft.isActive ? 1 : 0,
+      now,
+      now,
+    ]);
     return _db.lastInsertRowId;
   }
 
@@ -285,6 +309,8 @@ class ProductRepository {
         category: row['category_name'] as String?,
         brandId: row['brand_id'] as int?,
         brand: row['brand_name'] as String?,
+        purchasePriceCents: row['product_purchase_price_cents'] as int?,
+        salePriceCents: row['product_sale_price_cents'] as int?,
         notes: row['notes'] as String?,
         isActive: (row['is_active'] as int) != 0,
         variantCount: row['variant_count'] as int,
@@ -297,7 +323,10 @@ class ProductRepository {
     SELECT pv.id, p.id AS product_id, pv.sku,
       (SELECT pb.barcode FROM product_barcodes pb WHERE pb.variant_id=pv.id ORDER BY pb.is_primary DESC, pb.id LIMIT 1) AS primary_barcode,
       p.name, p.category_id, c.name AS category_name, p.brand_id, b.name AS brand_name,
-      pv.variant, pv.size, pv.purchase_price_cents, pv.sale_price_cents, p.notes,
+      pv.variant, pv.size,
+      COALESCE(pv.purchase_price_cents, p.purchase_price_cents) AS purchase_price_cents,
+      COALESCE(pv.sale_price_cents, p.sale_price_cents) AS sale_price_cents,
+      p.notes,
       CASE WHEN p.is_active=1 AND pv.is_active=1 THEN 1 ELSE 0 END AS is_active,
       COALESCE((SELECT SUM(sm.quantity_delta) FROM stock_movements sm WHERE sm.variant_id=pv.id), 0) AS stock_quantity,
       (SELECT GROUP_CONCAT(pb2.barcode, ' • ') FROM product_barcodes pb2 WHERE pb2.variant_id=pv.id) AS barcodes_display
@@ -309,14 +338,16 @@ class ProductRepository {
 
   static const _productSummarySelect = '''
     SELECT p.id, p.name, p.category_id, c.name AS category_name, p.brand_id, b.name AS brand_name,
+      p.purchase_price_cents AS product_purchase_price_cents,
+      p.sale_price_cents AS product_sale_price_cents,
       p.notes, p.is_active,
       (SELECT COUNT(*) FROM product_variants pv_count WHERE pv_count.product_id=p.id) AS variant_count,
       COALESCE((SELECT SUM(sm.quantity_delta) FROM product_variants pv_stock
         LEFT JOIN stock_movements sm ON sm.variant_id=pv_stock.id WHERE pv_stock.product_id=p.id), 0) AS stock_quantity,
-      (SELECT MIN(pv_min.sale_price_cents) FROM product_variants pv_min
-        WHERE pv_min.product_id=p.id AND pv_min.sale_price_cents IS NOT NULL) AS min_sale_price,
-      (SELECT MAX(pv_max.sale_price_cents) FROM product_variants pv_max
-        WHERE pv_max.product_id=p.id AND pv_max.sale_price_cents IS NOT NULL) AS max_sale_price
+      (SELECT MIN(COALESCE(pv_min.sale_price_cents, p.sale_price_cents)) FROM product_variants pv_min
+        WHERE pv_min.product_id=p.id) AS min_sale_price,
+      (SELECT MAX(COALESCE(pv_max.sale_price_cents, p.sale_price_cents)) FROM product_variants pv_max
+        WHERE pv_max.product_id=p.id) AS max_sale_price
     FROM products p
     LEFT JOIN categories c ON c.id=p.category_id
     LEFT JOIN brands b ON b.id=p.brand_id
