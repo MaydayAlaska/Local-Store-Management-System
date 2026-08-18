@@ -119,12 +119,13 @@ jobs:
           & $iscc "/DPublishDir=$publishDir" "/DOutputDir=$outputDir" "/DAppVersion=$version" "/DIconFile=$iconFile" "/DAllowedArchitectures=${{ matrix.allowed_architectures }}" "/DOutputBaseFilename=LocalStoreManagement-Setup-win-${{ matrix.arch }}" 'packaging/windows/installer.iss'
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
-      - name: Upload Windows installer
+      - name: Upload Windows installer for release jobs
         uses: actions/upload-artifact@v4
         with:
           name: package-win-${{ matrix.arch }}
           path: dist/LocalStoreManagement-Setup-win-${{ matrix.arch }}.exe
           if-no-files-found: error
+          retention-days: 1
 
   package-linux:
     name: Linux packages (${{ matrix.arch }})
@@ -237,7 +238,7 @@ jobs:
           EOF
           dpkg-deb --build --root-owner-group DebRoot dist/LocalStoreManagement-linux-${{ matrix.arch }}.deb
 
-      - name: Upload Linux packages
+      - name: Upload Linux packages for release jobs
         uses: actions/upload-artifact@v4
         with:
           name: package-linux-${{ matrix.arch }}
@@ -245,6 +246,35 @@ jobs:
             dist/LocalStoreManagement-linux-${{ matrix.arch }}.AppImage
             dist/LocalStoreManagement-linux-${{ matrix.arch }}.deb
           if-no-files-found: error
+          retention-days: 1
+
+  release-flutter:
+    name: Publish Flutter development assets
+    if: github.event_name == 'push' && github.ref == 'refs/heads/Flutter'
+    needs: [package-windows, package-linux]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: package-*
+          path: dist
+          merge-multiple: true
+      - name: Publish direct development downloads
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG='flutter-latest'
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release delete "$TAG" --repo "$GITHUB_REPOSITORY" --cleanup-tag --yes
+          fi
+          gh release create "$TAG" dist/* --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --prerelease --latest=false \
+            --title "Flutter development build (${GITHUB_SHA::7})" \
+            --notes 'Build di sviluppo del branch Flutter. Scarica direttamente il file adatto al sistema: EXE per Windows, AppImage o DEB per Linux. Gli artifact Actions sono solo trasferimenti interni temporanei.'
 
   release-test:
     name: Publish test beta assets
