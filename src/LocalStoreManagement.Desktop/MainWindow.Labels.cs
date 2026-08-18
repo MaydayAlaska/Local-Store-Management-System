@@ -1,4 +1,3 @@
-using Avalonia;
 using Avalonia.Controls;
 using Avalonia.VisualTree;
 
@@ -8,10 +7,14 @@ public partial class MainWindow
 {
     private bool _secondaryNavigationAttached;
 
-    protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
+    protected override void OnOpened(EventArgs e)
     {
-        base.OnAttachedToVisualTree(e);
+        base.OnOpened(e);
+        AttachSecondaryNavigation();
+    }
 
+    private void AttachSecondaryNavigation()
+    {
         if (_secondaryNavigationAttached)
         {
             return;
