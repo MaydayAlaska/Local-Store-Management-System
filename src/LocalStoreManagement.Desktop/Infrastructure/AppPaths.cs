@@ -15,6 +15,15 @@ public static class AppPaths
 
     private static string InitializeDataDirectory()
     {
+        var overrideDirectory = Environment.GetEnvironmentVariable("LSMS_DATA_DIRECTORY_OVERRIDE");
+        if (!string.IsNullOrWhiteSpace(overrideDirectory))
+        {
+            var testDirectory = Path.GetFullPath(overrideDirectory);
+            Directory.CreateDirectory(testDirectory);
+            Directory.CreateDirectory(Path.Combine(testDirectory, "assets"));
+            return testDirectory;
+        }
+
         var documentsDirectory = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
         if (string.IsNullOrWhiteSpace(documentsDirectory))
         {
