@@ -7,6 +7,8 @@ Gestionale desktop multipiattaforma per negozio, pensato per funzionare **offlin
 - .NET 10 LTS
 - Avalonia UI 12.1.1
 - SQLite tramite `Microsoft.Data.Sqlite`
+- esportazione Excel tramite `DocumentFormat.OpenXml`
+- esportazione PDF tramite PDFsharp + MigraDoc
 - Architettura desktop nativa: **nessun browser e nessun server web richiesto**
 
 ## Funzioni concordate
@@ -15,8 +17,8 @@ Gestionale desktop multipiattaforma per negozio, pensato per funzionare **offlin
 2. **Magazzino**: carico, scarico, rettifica e storico completo dei movimenti. La giacenza è sempre derivata dalla somma dei movimenti e non è modificata direttamente nell'anagrafica prodotto.
 3. **Scanner e ricerca Dashboard**: ricerca tramite scanner USB/HID, riconoscimento immediato di SKU/barcode, creazione guidata se il codice non esiste, modalità rapide di carico/scarico da 1 pezzo per scansione e ricerca manuale per nome/SKU/barcode dalla Dashboard.
 4. **Etichette**: selezione prodotto, anteprima, EAN-13 quando il codice è valido (Code 128 negli altri casi), numero copie, dimensioni etichetta e stampa tramite le code di sistema Windows/Linux.
-5. **Backup ed Excel**: backup locale del database; esportazione completa dell'inventario raggruppata per marca in ordine alfabetico oppure esportazione parziale filtrando una o più marche e/o una o più categorie.
-6. **Impostazioni**: nome negozio, icona dell'applicazione e logo del negozio da riutilizzare nelle esportazioni Excel.
+5. **Backup ed esportazione**: backup locale del database; esportazione completa dell'inventario in Excel o PDF, raggruppata per marca in ordine alfabetico, oppure esportazione parziale filtrando una o più marche e/o una o più categorie. L'Excel completo usa un unico foglio diviso in sezioni per marca.
+6. **Impostazioni**: nome negozio, icona dell'applicazione e logo del negozio da riutilizzare nelle esportazioni Excel/PDF.
 
 Non è previsto un modulo separato di inventario fisico/conteggio sessioni.
 
@@ -28,7 +30,9 @@ Non è previsto un modulo separato di inventario fisico/conteggio sessioni.
 - Dashboard: ricerca manuale prodotti per nome, SKU e barcode implementata;
 - etichette: generazione/anteprima e backend di stampa Windows GDI + Linux CUPS implementati; resta da calibrare e verificare fisicamente la ApiX110 con le etichette reali;
 - impostazioni: nome negozio, icona programma e logo negozio persistenti implementati;
-- backup/esportazione Excel: da implementare.
+- backup database: implementato;
+- esportazione inventario Excel: implementata con export completo su un unico foglio e filtri parziali per marca/categoria;
+- esportazione inventario PDF: implementata con lo stesso raggruppamento e gli stessi filtri dell'Excel.
 
 ## Struttura
 
@@ -38,10 +42,11 @@ src/LocalStoreManagement.Desktop/
 ├── Data/                  # repository SQLite
 ├── Infrastructure/        # database, impostazioni, migrazioni e percorsi locali
 ├── Models/                # modelli applicativi
-├── Services/              # barcode, stampa etichette e servizi hardware/applicativi
+├── Services/              # barcode, stampa etichette, backup ed esportazioni
 ├── App.axaml              # bootstrap Avalonia
 ├── MainWindow.axaml       # shell desktop, Dashboard e flusso scanner
 ├── LabelsWindow.*         # anteprima e stampa etichette
+├── ExportWindow.*         # backup ed esportazioni Excel/PDF
 ├── SettingsWindow.*       # impostazioni negozio
 ├── ProductEditorWindow.*  # editor anagrafica prodotto
 └── StockMovementWindow.*  # carico/scarico/rettifica
@@ -53,7 +58,8 @@ Al primo avvio il programma controlla e, se necessario, crea la cartella **`Docu
 
 - `store.db`: database SQLite;
 - `settings.json`: impostazioni del negozio;
-- `assets/`: icona e logo scelti dall'utente.
+- `assets/`: icona e logo scelti dall'utente;
+- `Backups/`: copie di backup del database create dall'applicazione.
 
 Se esiste un database della precedente versione nella vecchia cartella dati locale e nella nuova cartella non è ancora presente `store.db`, il programma lo copia automaticamente nella nuova posizione.
 
