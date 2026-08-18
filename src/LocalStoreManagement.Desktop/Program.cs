@@ -8,6 +8,12 @@ internal static class Program
     [STAThread]
     public static void Main(string[] args)
     {
+        if (args.Contains("--database-smoke-test", StringComparer.Ordinal))
+        {
+            DatabaseSmokeTest.Run();
+            return;
+        }
+
         AppDomain.CurrentDomain.UnhandledException += (_, eventArgs) =>
         {
             if (eventArgs.ExceptionObject is Exception exception)
