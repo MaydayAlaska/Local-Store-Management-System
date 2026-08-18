@@ -20,6 +20,7 @@ public partial class MainWindow : Window
         Opened += (_, _) =>
         {
             RefreshDashboardCounters();
+            SetActiveNavigation(DashboardNavButton);
             DashboardSearchInput.Focus();
         };
     }
@@ -112,7 +113,9 @@ public partial class MainWindow : Window
 
     private void ShowDashboard()
     {
+        HideEmbeddedViews();
         HideAllPanels();
+        SetActiveNavigation(DashboardNavButton);
         DashboardPanel.IsVisible = true;
         PageTitle.Text = "Dashboard";
         PageSubtitle.Text = "Ricerca, scansione e giacenza rapida";
@@ -123,7 +126,9 @@ public partial class MainWindow : Window
 
     private void ShowProducts()
     {
+        HideEmbeddedViews();
         HideAllPanels();
+        SetActiveNavigation(ProductsNavButton);
         ProductsPanel.IsVisible = true;
         PageTitle.Text = "Prodotti";
         PageSubtitle.Text = "Anagrafica articoli, prezzi e attributi";
@@ -133,7 +138,9 @@ public partial class MainWindow : Window
 
     private void ShowWarehouse()
     {
+        HideEmbeddedViews();
         HideAllPanels();
+        SetActiveNavigation(WarehouseNavButton);
         WarehousePanel.IsVisible = true;
         PageTitle.Text = "Magazzino";
         PageSubtitle.Text = "Carico, scarico e rettifica delle giacenze";
@@ -143,12 +150,40 @@ public partial class MainWindow : Window
 
     private void ShowMovements()
     {
+        HideEmbeddedViews();
         HideAllPanels();
+        SetActiveNavigation(MovementsNavButton);
         MovementsPanel.IsVisible = true;
         PageTitle.Text = "Movimenti";
         PageSubtitle.Text = "Storico cronologico di tutte le variazioni di magazzino";
         ReloadMovements();
         MovementSearchInput.Focus();
+    }
+
+    private void SetActiveNavigation(Button activeButton)
+    {
+        var navigationButtons = new[]
+        {
+            DashboardNavButton,
+            ProductsNavButton,
+            WarehouseNavButton,
+            BrandsNavButton,
+            CategoriesNavButton,
+            LabelsNavButton,
+            MovementsNavButton,
+            ExportNavButton,
+            SettingsNavButton
+        };
+
+        foreach (var button in navigationButtons)
+        {
+            button.Classes.Remove("Selected");
+        }
+
+        if (!activeButton.Classes.Contains("Selected"))
+        {
+            activeButton.Classes.Add("Selected");
+        }
     }
 
     private void HideAllPanels()
