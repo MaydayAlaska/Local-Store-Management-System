@@ -1,5 +1,3 @@
-import 'dart:math' as math;
-
 import 'package:flutter/material.dart';
 
 import '../core/formatters.dart';
@@ -114,7 +112,8 @@ class _CashPageState extends State<CashPage> {
     final parsed = double.tryParse(_fixedDiscount.text.trim().replaceAll(',', '.'))?.abs() ?? 0;
     final cents = (parsed * 100).round();
     if (cents <= 0) return _cartMessage('Inserisci uno sconto maggiore di 0 euro e premi Invio.');
-    final remaining = math.max(0, _afterPercentCents - _fixedDiscounts.fold<int>(0, (sum, line) => sum + line.amountCents));
+    final rawRemaining = _afterPercentCents - _fixedDiscounts.fold<int>(0, (sum, line) => sum + line.amountCents);
+    final remaining = rawRemaining < 0 ? 0 : rawRemaining;
     if (cents > remaining) return _cartMessage('Lo sconto supera il totale residuo di ${formatMoney(remaining)}.');
     _fixedDiscounts.add(_FixedDiscountLine(id: _nextDiscountId++, amountCents: cents));
     _fixedDiscount.clear();
@@ -151,8 +150,15 @@ class _CashPageState extends State<CashPage> {
   int get _grossCents => _cart.fold(0, (sum, line) => sum + line.grossLineTotalCents);
   int get _subtotalCents => _cart.fold(0, (sum, line) => sum + line.lineTotalCents);
   int get _afterPercentCents => _applyPercent(_subtotalCents, _totalDiscountPercent);
-  int get _fixedCents => math.min(_fixedDiscounts.fold<int>(0, (sum, line) => sum + line.amountCents), _afterPercentCents);
-  int get _finalTotalCents => math.max(0, _afterPercentCents - _fixedCents);
+  int get _fixedCents {
+    final requested = _fixedDiscounts.fold<int>(0, (sum, line) => sum + line.amountCents);
+    return requested > _afterPercentCents ? _afterPercentCents : requested;
+  }
+
+  int get _finalTotalCents {
+    final total = _afterPercentCents - _fixedCents;
+    return total < 0 ? 0 : total;
+  }
 
   int _applyPercent(int cents, double percent) => (cents * (1 - _clampPercent(percent) / 100)).round();
   double _clampPercent(double value) => value.clamp(0, 100).toDouble();
@@ -161,8 +167,10 @@ class _CashPageState extends State<CashPage> {
   @override
   Widget build(BuildContext context) {
     final results = _results;
-    final itemDiscount = math.max(0, _grossCents - _subtotalCents);
-    final totalPercentDiscount = math.max(0, _subtotalCents - _afterPercentCents);
+    final itemDiscountRaw = _grossCents - _subtotalCents;
+    final itemDiscount = itemDiscountRaw < 0 ? 0 : itemDiscountRaw;
+    final totalPercentDiscountRaw = _subtotalCents - _afterPercentCents;
+    final totalPercentDiscount = totalPercentDiscountRaw < 0 ? 0 : totalPercentDiscountRaw;
     final count = _cart.fold<int>(0, (sum, line) => sum + line.quantity);
 
     return Padding(
