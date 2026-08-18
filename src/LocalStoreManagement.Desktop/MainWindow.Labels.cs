@@ -11,6 +11,7 @@ public partial class MainWindow
 {
     private bool _secondaryNavigationAttached;
     private CategoriesView? _categoriesView;
+    private ExportView? _exportView;
 
     protected override void OnOpened(EventArgs e)
     {
@@ -200,15 +201,53 @@ public partial class MainWindow
         }
     }
 
+    private void ExportButton_OnClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        ShowExport();
+    }
+
+    private void ShowExport()
+    {
+        HideEmbeddedViews();
+        HideAllPanels();
+        EnsureExportView();
+
+        _exportView!.Reload();
+        _exportView.IsVisible = true;
+        PageTitle.Text = "Esportazione";
+        PageSubtitle.Text = "Backup ed esportazione dell'inventario in Excel o PDF";
+    }
+
+    private void EnsureExportView()
+    {
+        if (_exportView is not null)
+        {
+            return;
+        }
+
+        if (DashboardPanel.Parent is not Grid contentGrid)
+        {
+            throw new InvalidOperationException("Impossibile inizializzare il pannello Esportazione.");
+        }
+
+        _exportView = new ExportView(_productRepository, _appSettingsService)
+        {
+            IsVisible = false
+        };
+        contentGrid.Children.Add(_exportView);
+    }
+
+    private void HideExportView()
+    {
+        if (_exportView is not null)
+        {
+            _exportView.IsVisible = false;
+        }
+    }
+
     private async void LabelsButton_OnClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
         var window = new LabelsWindow(_productRepository);
-        await window.ShowDialog(this);
-    }
-
-    private async void ExportButton_OnClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
-    {
-        var window = new ExportWindow(_productRepository, _appSettingsService);
         await window.ShowDialog(this);
     }
 }
