@@ -94,11 +94,12 @@ public partial class MainWindow
     {
         HideEmbeddedViews();
         HideAllPanels();
+        SetActiveNavigation(SettingsNavButton);
         EnsureSettingsView();
         _settingsView!.Reload();
         _settingsView.IsVisible = true;
         PageTitle.Text = "Impostazioni";
-        PageSubtitle.Text = "Nome negozio, icona, logo e dati dell'applicazione";
+        PageSubtitle.Text = "Nome negozio, branding, aggiornamenti e dati dell'applicazione";
         _settingsView.FocusPrimaryField();
     }
 
