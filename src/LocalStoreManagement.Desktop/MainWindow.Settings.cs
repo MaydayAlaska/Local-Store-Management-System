@@ -1,4 +1,5 @@
 using Avalonia.Controls;
+using Avalonia.Input;
 using Avalonia.Layout;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
@@ -14,6 +15,7 @@ public partial class MainWindow
     private Image? _sidebarLogoImage;
     private Bitmap? _sidebarLogoBitmap;
     private TextBlock? _sidebarSubtitleText;
+    private long? _dashboardSelectedProductId;
 
     private void ApplySavedSettings()
     {
@@ -122,48 +124,242 @@ public partial class MainWindow
         HideExportView();
     }
 
-    private void DashboardProductSearchInput_OnTextChanged(object? sender, TextChangedEventArgs e) => ReloadDashboardProductSearch();
+    private void DashboardSearchInput_OnTextChanged(object? sender, TextChangedEventArgs e)
+        => ReloadDashboardSearch();
 
-    private async void DashboardOpenProductButton_OnClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e) => await OpenDashboardSelectedProductAsync();
-
-    private async void DashboardProductsList_OnDoubleTapped(object? sender, Avalonia.Interactivity.RoutedEventArgs e) => await OpenDashboardSelectedProductAsync();
-
-    private void ReloadDashboardProductSearch()
+    private void DashboardSearchInput_OnKeyDown(object? sender, KeyEventArgs e)
     {
-        var query = DashboardProductSearchInput.Text?.Trim();
-        if (string.IsNullOrWhiteSpace(query))
+        if (e.Key != Key.Enter)
         {
-            DashboardProductsList.ItemsSource = null;
-            DashboardSearchStatusText.Text = "Cerca un prodotto per nome, SKU o barcode.";
             return;
         }
 
-        var products = _productRepository.Search(query).Take(12).ToList();
+        e.Handled = true;
+        var query = DashboardSearchInput.Text?.Trim();
+        if (string.IsNullOrWhiteSpace(query))
+        {
+            DashboardSearchInput.Focus();
+            return;
+        }
+
+        var exact = _productRepository.FindByBarcode(query);
+        if (exact is not null)
+        {
+            SelectDashboardProduct(exact);
+            DashboardSearchStatusText.Text = $"Prodotto trovato: {exact.Name}.";
+            DashboardSearchInput.Focus();
+            return;
+        }
+
+        if (DashboardProductsList.SelectedItem is Product selected)
+        {
+            ShowDashboardProduct(selected);
+            DashboardSearchInput.Focus();
+            return;
+        }
+
+        DashboardSearchStatusText.Text = "Nessuna corrispondenza esatta per il codice inserito.";
+        DashboardSearchInput.Focus();
+    }
+
+    private void DashboardProductsList_OnSelectionChanged(object? sender, SelectionChangedEventArgs e)
+    {
+        if (DashboardProductsList.SelectedItem is Product product)
+        {
+            ShowDashboardProduct(product);
+        }
+    }
+
+    private async void DashboardProductsList_OnDoubleTapped(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+        => await OpenDashboardSelectedProductAsync();
+
+    private async void DashboardEditProductButton_OnClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+        => await OpenDashboardSelectedProductAsync();
+
+    private void DashboardIncomingButton_OnClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+        => ApplyDashboardMovement(StockMovementKind.Incoming);
+
+    private void DashboardOutgoingButton_OnClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+        => ApplyDashboardMovement(StockMovementKind.Outgoing);
+
+    private void ReloadDashboardSearch()
+    {
+        var query = DashboardSearchInput.Text?.Trim();
+        if (string.IsNullOrWhiteSpace(query))
+        {
+            DashboardProductsList.ItemsSource = null;
+            DashboardSearchStatusText.Text = "Scansiona un codice oppure cerca un prodotto per nome, SKU o barcode.";
+
+            if (_dashboardSelectedProductId.HasValue)
+            {
+                var latest = _productRepository.GetById(_dashboardSelectedProductId.Value);
+                if (latest is not null)
+                {
+                    ShowDashboardProduct(latest);
+                    return;
+                }
+            }
+
+            DashboardProductDetailsPanel.IsVisible = false;
+            return;
+        }
+
+        var products = _productRepository.Search(query).Take(20).ToList();
         DashboardProductsList.ItemsSource = products;
+
+        var exact = _productRepository.FindByBarcode(query);
+        Product? selected = null;
+        if (exact is not null)
+        {
+            selected = products.FirstOrDefault(product => product.Id == exact.Id) ?? exact;
+        }
+        else if (_dashboardSelectedProductId.HasValue)
+        {
+            selected = products.FirstOrDefault(product => product.Id == _dashboardSelectedProductId.Value);
+        }
+
+        if (selected is null && products.Count == 1)
+        {
+            selected = products[0];
+        }
+
+        DashboardProductsList.SelectedItem = selected;
+        if (selected is not null)
+        {
+            ShowDashboardProduct(selected);
+        }
+        else
+        {
+            _dashboardSelectedProductId = null;
+            DashboardProductDetailsPanel.IsVisible = false;
+        }
+
         DashboardSearchStatusText.Text = products.Count switch
         {
             0 => "Nessun prodotto trovato.",
-            1 => "1 prodotto trovato. Doppio clic per aprirlo.",
-            _ => $"{products.Count} prodotti mostrati. Doppio clic per aprire quello desiderato."
+            1 => "1 prodotto trovato.",
+            _ => $"{products.Count} prodotti trovati. Seleziona quello desiderato."
         };
+    }
+
+    private void SelectDashboardProduct(Product product)
+    {
+        var items = (DashboardProductsList.ItemsSource as IEnumerable<Product>)?.ToList() ?? new List<Product>();
+        var matching = items.FirstOrDefault(item => item.Id == product.Id);
+        if (matching is null)
+        {
+            DashboardProductsList.ItemsSource = new[] { product };
+            matching = product;
+        }
+
+        DashboardProductsList.SelectedItem = matching;
+        ShowDashboardProduct(product);
+    }
+
+    private void ShowDashboardProduct(Product product)
+    {
+        var latest = _productRepository.GetById(product.Id) ?? product;
+        _dashboardSelectedProductId = latest.Id;
+
+        DashboardProductNameText.Text = latest.Name;
+        DashboardProductCodeSummaryText.Text = string.IsNullOrWhiteSpace(latest.Barcode)
+            ? latest.Sku
+            : $"{latest.Sku}  •  {latest.Barcode}";
+        DashboardStockText.Text = latest.StockQuantity.ToString();
+        DashboardStatusText.Text = latest.StatusDisplay;
+        DashboardBrandText.Text = DisplayValue(latest.Brand);
+        DashboardCategoryText.Text = DisplayValue(latest.Category);
+        DashboardSkuText.Text = latest.Sku;
+        DashboardBarcodeText.Text = DisplayValue(latest.Barcode);
+        DashboardVariantText.Text = DisplayValue(latest.Variant);
+        DashboardSizeText.Text = DisplayValue(latest.Size);
+        DashboardPurchasePriceText.Text = latest.PurchasePriceDisplay;
+        DashboardSalePriceText.Text = latest.SalePriceDisplay;
+        DashboardProductIdText.Text = latest.Id.ToString();
+        DashboardNotesText.Text = DisplayValue(latest.Notes);
+        DashboardOutgoingButton.IsEnabled = latest.StockQuantity > 0;
+        DashboardMovementStatusText.Text = string.Empty;
+        DashboardProductDetailsPanel.IsVisible = true;
+    }
+
+    private void ApplyDashboardMovement(StockMovementKind kind)
+    {
+        if (!_dashboardSelectedProductId.HasValue)
+        {
+            return;
+        }
+
+        var product = _productRepository.GetById(_dashboardSelectedProductId.Value);
+        if (product is null)
+        {
+            _dashboardSelectedProductId = null;
+            DashboardProductDetailsPanel.IsVisible = false;
+            DashboardSearchStatusText.Text = "Il prodotto selezionato non esiste più.";
+            return;
+        }
+
+        try
+        {
+            var note = kind == StockMovementKind.Incoming
+                ? "Carico rapido da Dashboard"
+                : "Scarico rapido da Dashboard";
+            _stockMovementRepository.AddMovement(product.Id, kind, 1, note);
+
+            ReloadProducts();
+            ReloadWarehouseProducts();
+            ReloadMovements();
+            RefreshDashboardCounters();
+
+            var updated = _productRepository.GetById(product.Id);
+            if (updated is not null)
+            {
+                ShowDashboardProduct(updated);
+                DashboardMovementStatusText.Text = kind == StockMovementKind.Incoming
+                    ? $"+1 registrato. Nuova giacenza: {updated.StockQuantity}."
+                    : $"-1 registrato. Nuova giacenza: {updated.StockQuantity}.";
+            }
+        }
+        catch (Exception ex)
+        {
+            DashboardMovementStatusText.Text = $"Movimento non eseguito: {ex.Message}";
+        }
+        finally
+        {
+            DashboardSearchInput.Focus();
+        }
     }
 
     private async Task OpenDashboardSelectedProductAsync()
     {
-        if (DashboardProductsList.SelectedItem is not Product product) return;
-        var latest = _productRepository.GetById(product.Id);
+        if (!_dashboardSelectedProductId.HasValue)
+        {
+            return;
+        }
+
+        var latest = _productRepository.GetById(_dashboardSelectedProductId.Value);
         if (latest is null)
         {
-            ReloadDashboardProductSearch();
+            _dashboardSelectedProductId = null;
+            DashboardProductDetailsPanel.IsVisible = false;
+            ReloadDashboardSearch();
             return;
         }
 
         var editor = new ProductEditorWindow(_productRepository, latest);
         var saved = await editor.ShowDialog<bool>(this);
-        if (saved)
+        if (!saved)
         {
-            RefreshAllData();
-            ReloadDashboardProductSearch();
+            return;
+        }
+
+        RefreshAllData();
+        var updated = _productRepository.GetById(latest.Id);
+        if (updated is not null)
+        {
+            ShowDashboardProduct(updated);
         }
     }
+
+    private static string DisplayValue(string? value)
+        => string.IsNullOrWhiteSpace(value) ? "—" : value.Trim();
 }
