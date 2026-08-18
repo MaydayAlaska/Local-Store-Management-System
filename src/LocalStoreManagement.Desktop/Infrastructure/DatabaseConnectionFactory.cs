@@ -67,20 +67,48 @@ public static class DatabaseConnectionFactory
 
     private static bool HasRequiredSchema(SqliteConnection connection)
     {
+        using (var command = connection.CreateCommand())
+        {
+            command.CommandText = """
+                SELECT COUNT(*)
+                FROM sqlite_master
+                WHERE type = 'table'
+                  AND name IN (
+                      'categories',
+                      'brands',
+                      'products',
+                      'product_variants',
+                      'product_barcodes',
+                      'stock_movements');
+                """;
+            var count = Convert.ToInt32(command.ExecuteScalar() ?? 0);
+            if (count != ExpectedSchemaTableCount) return false;
+        }
+
+        return HasColumn(connection, "products", "name")
+            && HasColumn(connection, "products", "category_id")
+            && HasColumn(connection, "products", "brand_id")
+            && HasColumn(connection, "product_variants", "product_id")
+            && HasColumn(connection, "product_variants", "sku")
+            && HasColumn(connection, "product_barcodes", "variant_id")
+            && HasColumn(connection, "product_barcodes", "barcode")
+            && HasColumn(connection, "stock_movements", "variant_id")
+            && HasColumn(connection, "stock_movements", "quantity_delta");
+    }
+
+    private static bool HasColumn(SqliteConnection connection, string tableName, string columnName)
+    {
         using var command = connection.CreateCommand();
-        command.CommandText = """
-            SELECT COUNT(*)
-            FROM sqlite_master
-            WHERE type = 'table'
-              AND name IN (
-                  'categories',
-                  'brands',
-                  'products',
-                  'product_variants',
-                  'product_barcodes',
-                  'stock_movements');
-            """;
-        var count = Convert.ToInt32(command.ExecuteScalar() ?? 0);
-        return count == ExpectedSchemaTableCount;
+        command.CommandText = $"PRAGMA table_info({tableName});";
+        using var reader = command.ExecuteReader();
+        while (reader.Read())
+        {
+            if (string.Equals(reader.GetString(1), columnName, StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 }
