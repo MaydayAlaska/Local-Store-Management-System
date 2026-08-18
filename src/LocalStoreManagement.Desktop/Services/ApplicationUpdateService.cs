@@ -1,5 +1,4 @@
 using System.Diagnostics;
-using System.IO.Compression;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Reflection;
@@ -15,6 +14,7 @@ public sealed class ApplicationUpdateService
     private const string Repository = "Local-Store-Management-System";
     private const string StableBranch = "main";
     private const string TokenEnvironmentVariable = "LOCAL_STORE_GITHUB_TOKEN";
+    private const string AppImageEnvironmentVariable = "APPIMAGE";
 
     private readonly HttpClient _httpClient;
     private readonly LocalBuildInfo? _localBuildInfo;
@@ -23,7 +23,7 @@ public sealed class ApplicationUpdateService
     {
         _httpClient = new HttpClient
         {
-            Timeout = TimeSpan.FromMinutes(5)
+            Timeout = TimeSpan.FromMinutes(8)
         };
         _httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("LocalStoreManagementSystem-Updater/1.0");
         _httpClient.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/vnd.github+json"));
@@ -52,7 +52,7 @@ public sealed class ApplicationUpdateService
         {
             return new UpdateCheckResult(
                 UpdateAvailable: false,
-                CanInstall: true,
+                CanInstall: CanInstallOnCurrentPackaging(),
                 CurrentVersion,
                 currentCommit,
                 latestCommit,
@@ -73,7 +73,7 @@ public sealed class ApplicationUpdateService
                 latestCommit,
                 AssetApiUrl: null,
                 Message: IsInstalledBuild
-                    ? "È disponibile una nuova revisione su main, ma il pacchetto OTA è ancora in preparazione. Riprova tra poco."
+                    ? "È disponibile una nuova revisione su main, ma il pacchetto di aggiornamento è ancora in preparazione. Riprova tra poco."
                     : "Build di sviluppo rilevata. L'aggiornamento automatico è disponibile sulle versioni pubblicate/installate.");
         }
 
@@ -86,7 +86,21 @@ public sealed class ApplicationUpdateService
                 currentCommit,
                 latestCommit,
                 asset.Value.ApiUrl,
-                "Su main è presente una versione più recente. Questa esecuzione è una build di sviluppo: usa una release installata per provare l'OTA.");
+                "Su main è presente una versione più recente. Questa esecuzione è una build di sviluppo: usa l'installer Windows o l'AppImage pubblicata per provare l'OTA.");
+        }
+
+        if (!CanInstallOnCurrentPackaging())
+        {
+            return new UpdateCheckResult(
+                UpdateAvailable: true,
+                CanInstall: false,
+                CurrentVersion,
+                currentCommit,
+                latestCommit,
+                asset.Value.ApiUrl,
+                OperatingSystem.IsLinux()
+                    ? "Aggiornamento disponibile, ma questa esecuzione Linux non proviene da un'AppImage. Scarica l'AppImage pubblicata per usare gli aggiornamenti automatici."
+                    : "Aggiornamento disponibile, ma il formato di installazione corrente non supporta l'aggiornamento automatico.");
         }
 
         return new UpdateCheckResult(
@@ -107,54 +121,68 @@ public sealed class ApplicationUpdateService
         }
 
         var updateRoot = Path.Combine(Path.GetTempPath(), "LocalStoreManagementSystem", "updates", update.LatestCommit);
-        var packagePath = Path.Combine(updateRoot, "package.zip");
-        var stagingDirectory = Path.Combine(updateRoot, "staging");
-
         if (Directory.Exists(updateRoot))
         {
             Directory.Delete(updateRoot, recursive: true);
         }
-
         Directory.CreateDirectory(updateRoot);
-
-        using (var request = new HttpRequestMessage(HttpMethod.Get, update.AssetApiUrl))
-        {
-            request.Headers.Accept.Clear();
-            request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/octet-stream"));
-            using var response = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
-            await EnsureGitHubSuccessAsync(response, "scaricare il pacchetto di aggiornamento", cancellationToken);
-
-            await using var input = await response.Content.ReadAsStreamAsync(cancellationToken);
-            await using var output = File.Create(packagePath);
-            await input.CopyToAsync(output, cancellationToken);
-        }
-
-        Directory.CreateDirectory(stagingDirectory);
-        ZipFile.ExtractToDirectory(packagePath, stagingDirectory, overwriteFiles: true);
-
-        var executableName = GetExecutableName();
-        var stagedExecutable = Path.Combine(stagingDirectory, executableName);
-        if (!File.Exists(stagedExecutable))
-        {
-            throw new InvalidDataException($"Il pacchetto OTA non contiene {executableName}.");
-        }
-
-        var installDirectory = AppContext.BaseDirectory.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-        var processId = Environment.ProcessId;
 
         if (OperatingSystem.IsWindows())
         {
-            LaunchWindowsUpdater(stagingDirectory, installDirectory, executableName, processId, updateRoot);
+            var installerPath = Path.Combine(updateRoot, "LocalStoreManagement-Setup-win-x64.exe");
+            await DownloadAssetAsync(update.AssetApiUrl, installerPath, cancellationToken);
+
+            var installDirectory = AppContext.BaseDirectory.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            LaunchWindowsInstallerUpdater(
+                installerPath,
+                installDirectory,
+                GetExecutableName(),
+                Environment.ProcessId,
+                updateRoot);
             return;
         }
 
         if (OperatingSystem.IsLinux())
         {
-            LaunchLinuxUpdater(stagingDirectory, installDirectory, executableName, processId, updateRoot);
+            var currentAppImage = GetCurrentAppImagePath()
+                ?? throw new InvalidOperationException("L'applicazione non è stata avviata da un'AppImage.");
+            EnsureDirectoryWritable(Path.GetDirectoryName(currentAppImage)
+                ?? throw new InvalidOperationException("Impossibile determinare la cartella dell'AppImage."));
+
+            var newAppImagePath = Path.Combine(updateRoot, "LocalStoreManagement-linux-x64.AppImage");
+            await DownloadAssetAsync(update.AssetApiUrl, newAppImagePath, cancellationToken);
+            File.SetUnixFileMode(
+                newAppImagePath,
+                UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute |
+                UnixFileMode.GroupRead | UnixFileMode.GroupExecute |
+                UnixFileMode.OtherRead | UnixFileMode.OtherExecute);
+
+            LaunchLinuxAppImageUpdater(
+                newAppImagePath,
+                currentAppImage,
+                Environment.ProcessId,
+                updateRoot);
             return;
         }
 
         throw new PlatformNotSupportedException("L'aggiornamento automatico è disponibile solo su Windows e Linux.");
+    }
+
+    private async Task DownloadAssetAsync(string assetApiUrl, string destinationPath, CancellationToken cancellationToken)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Get, assetApiUrl);
+        request.Headers.Accept.Clear();
+        request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/octet-stream"));
+
+        using var response = await _httpClient.SendAsync(
+            request,
+            HttpCompletionOption.ResponseHeadersRead,
+            cancellationToken);
+        await EnsureGitHubSuccessAsync(response, "scaricare il pacchetto di aggiornamento", cancellationToken);
+
+        await using var input = await response.Content.ReadAsStreamAsync(cancellationToken);
+        await using var output = File.Create(destinationPath);
+        await input.CopyToAsync(output, cancellationToken);
     }
 
     private async Task<string> GetMainCommitAsync(CancellationToken cancellationToken)
@@ -215,7 +243,10 @@ public sealed class ApplicationUpdateService
 
         var body = await response.Content.ReadAsStringAsync(cancellationToken);
         var hasToken = _httpClient.DefaultRequestHeaders.Authorization is not null;
-        if ((response.StatusCode == HttpStatusCode.NotFound || response.StatusCode == HttpStatusCode.Unauthorized || response.StatusCode == HttpStatusCode.Forbidden) && !hasToken)
+        if ((response.StatusCode == HttpStatusCode.NotFound ||
+             response.StatusCode == HttpStatusCode.Unauthorized ||
+             response.StatusCode == HttpStatusCode.Forbidden) &&
+            !hasToken)
         {
             throw new InvalidOperationException(
                 $"Impossibile {operation}: il repository GitHub non è accessibile senza autenticazione. " +
@@ -226,20 +257,105 @@ public sealed class ApplicationUpdateService
             $"Impossibile {operation}. GitHub ha risposto {(int)response.StatusCode} {response.ReasonPhrase}. {TrimBody(body)}");
     }
 
-    private static string GetAssetName()
+    private static bool CanInstallOnCurrentPackaging()
     {
-        if (RuntimeInformation.ProcessArchitecture != Architecture.X64)
+        if (!IsSupportedArchitecture())
         {
-            throw new PlatformNotSupportedException("I pacchetti OTA sono attualmente predisposti per sistemi x64.");
+            return false;
         }
 
-        if (OperatingSystem.IsWindows()) return "LocalStoreManagement-win-x64.zip";
-        if (OperatingSystem.IsLinux()) return "LocalStoreManagement-linux-x64.zip";
+        if (OperatingSystem.IsWindows())
+        {
+            return true;
+        }
+
+        if (OperatingSystem.IsLinux())
+        {
+            return GetCurrentAppImagePath() is not null;
+        }
+
+        return false;
+    }
+
+    private static bool IsSupportedArchitecture()
+        => RuntimeInformation.ProcessArchitecture == Architecture.X64;
+
+    private static string GetAssetName()
+    {
+        if (!IsSupportedArchitecture())
+        {
+            throw new PlatformNotSupportedException("I pacchetti sono attualmente predisposti per sistemi x64.");
+        }
+
+        if (OperatingSystem.IsWindows())
+        {
+            return "LocalStoreManagement-Setup-win-x64.exe";
+        }
+
+        if (OperatingSystem.IsLinux())
+        {
+            return "LocalStoreManagement-linux-x64.AppImage";
+        }
+
         throw new PlatformNotSupportedException("Gli aggiornamenti OTA sono disponibili solo su Windows e Linux.");
     }
 
     private static string GetExecutableName()
         => OperatingSystem.IsWindows() ? "LocalStoreManagement.Desktop.exe" : "LocalStoreManagement.Desktop";
+
+    private static string? GetCurrentAppImagePath()
+    {
+        if (!OperatingSystem.IsLinux())
+        {
+            return null;
+        }
+
+        var value = Environment.GetEnvironmentVariable(AppImageEnvironmentVariable)?.Trim();
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return null;
+        }
+
+        try
+        {
+            var fullPath = Path.GetFullPath(value);
+            return File.Exists(fullPath) ? fullPath : null;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private static void EnsureDirectoryWritable(string directory)
+    {
+        var probe = Path.Combine(directory, $".lsms-update-{Guid.NewGuid():N}.tmp");
+        try
+        {
+            using (File.Create(probe))
+            {
+            }
+        }
+        catch (Exception ex)
+        {
+            throw new InvalidOperationException(
+                $"L'AppImage si trova in una cartella non scrivibile ({directory}). Spostala in una cartella dell'utente e riprova.",
+                ex);
+        }
+        finally
+        {
+            try
+            {
+                if (File.Exists(probe))
+                {
+                    File.Delete(probe);
+                }
+            }
+            catch
+            {
+            }
+        }
+    }
 
     private static LocalBuildInfo? ReadLocalBuildInfo()
     {
@@ -265,7 +381,11 @@ public sealed class ApplicationUpdateService
 
     private static string FormatVersion(Version? version)
     {
-        if (version is null) return "0.0.0";
+        if (version is null)
+        {
+            return "0.0.0";
+        }
+
         var build = Math.Max(0, version.Build);
         return $"{version.Major}.{version.Minor}.{build}";
     }
@@ -276,9 +396,15 @@ public sealed class ApplicationUpdateService
         return value.Length <= 180 ? value : value[..180] + "…";
     }
 
-    private static void LaunchWindowsUpdater(string source, string destination, string executableName, int processId, string updateRoot)
+    private static void LaunchWindowsInstallerUpdater(
+        string installerPath,
+        string installDirectory,
+        string executableName,
+        int processId,
+        string updateRoot)
     {
         var scriptPath = Path.Combine(updateRoot, "apply-update.cmd");
+        var executablePath = Path.Combine(installDirectory, executableName);
         var script = $"""
 @echo off
 setlocal
@@ -287,8 +413,9 @@ for /f "tokens=2" %%p in ('tasklist /FI "PID eq {processId}" /NH 2^>NUL') do if 
   timeout /t 1 /nobreak >NUL
   goto wait
 )
-robocopy "{source}" "{destination}" /E /COPY:DAT /R:3 /W:1 >NUL
-start "" "{Path.Combine(destination, executableName)}"
+"{installerPath}" /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SP- /DIR="{installDirectory}"
+if errorlevel 1 exit /b %errorlevel%
+start "" "{executablePath}"
 del "%~f0"
 """;
         File.WriteAllText(scriptPath, script, Encoding.UTF8);
@@ -301,21 +428,30 @@ del "%~f0"
         });
     }
 
-    private static void LaunchLinuxUpdater(string source, string destination, string executableName, int processId, string updateRoot)
+    private static void LaunchLinuxAppImageUpdater(
+        string sourceAppImage,
+        string targetAppImage,
+        int processId,
+        string updateRoot)
     {
         var scriptPath = Path.Combine(updateRoot, "apply-update.sh");
-        var executablePath = Path.Combine(destination, executableName);
+        var stagedTarget = targetAppImage + ".new";
         var script = $"""
 #!/bin/sh
+set -eu
 while kill -0 {processId} 2>/dev/null; do
   sleep 1
 done
-cp -a "{source}/." "{destination}/"
-chmod +x "{executablePath}"
-nohup "{executablePath}" >/dev/null 2>&1 &
+cp "{sourceAppImage}" "{stagedTarget}"
+chmod +x "{stagedTarget}"
+mv -f "{stagedTarget}" "{targetAppImage}"
+nohup "{targetAppImage}" >/dev/null 2>&1 &
 rm -f "$0"
 """;
-        File.WriteAllText(scriptPath, script, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
+        File.WriteAllText(
+            scriptPath,
+            script,
+            new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
         Process.Start(new ProcessStartInfo
         {
             FileName = "/bin/sh",

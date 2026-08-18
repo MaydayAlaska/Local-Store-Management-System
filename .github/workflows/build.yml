@@ -1,4 +1,4 @@
-name: Build desktop app
+name: Build and package desktop app
 
 on:
   push:
@@ -9,6 +9,9 @@ on:
     branches:
       - test
       - main
+
+env:
+  PROJECT: src/LocalStoreManagement.Desktop/LocalStoreManagement.Desktop.csproj
 
 jobs:
   build:
@@ -27,23 +30,15 @@ jobs:
           dotnet-version: 10.0.x
 
       - name: Restore
-        run: dotnet restore src/LocalStoreManagement.Desktop/LocalStoreManagement.Desktop.csproj
+        run: dotnet restore ${{ env.PROJECT }}
 
       - name: Build
-        run: dotnet build src/LocalStoreManagement.Desktop/LocalStoreManagement.Desktop.csproj --configuration Release --no-restore
+        run: dotnet build ${{ env.PROJECT }} --configuration Release --no-restore
 
-  publish-main:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    strategy:
-      matrix:
-        include:
-          - os: windows-latest
-            rid: win-x64
-            asset: LocalStoreManagement-win-x64.zip
-          - os: ubuntu-latest
-            rid: linux-x64
-            asset: LocalStoreManagement-linux-x64.zip
-    runs-on: ${{ matrix.os }}
+  package-windows:
+    name: Windows installer
+    needs: build
+    runs-on: windows-latest
 
     steps:
       - name: Checkout
@@ -54,51 +49,141 @@ jobs:
         with:
           dotnet-version: 10.0.x
 
-      - name: Restore
-        run: dotnet restore src/LocalStoreManagement.Desktop/LocalStoreManagement.Desktop.csproj
+      - name: Publish Windows x64
+        run: dotnet publish ${{ env.PROJECT }} --configuration Release --runtime win-x64 --self-contained true --output publish/win-x64
 
-      - name: Publish self-contained package
-        run: dotnet publish src/LocalStoreManagement.Desktop/LocalStoreManagement.Desktop.csproj --configuration Release --runtime ${{ matrix.rid }} --self-contained true --output publish/${{ matrix.rid }}
-
-      - name: Write OTA build information
+      - name: Write build information
         shell: pwsh
         run: |
-          [xml]$project = Get-Content "src/LocalStoreManagement.Desktop/LocalStoreManagement.Desktop.csproj"
+          [xml]$project = Get-Content "${{ env.PROJECT }}"
           $version = $project.Project.PropertyGroup.Version | Select-Object -First 1
+          $branch = if ("${{ github.head_ref }}") { "${{ github.head_ref }}" } else { "${{ github.ref_name }}" }
+          $commit = if ("${{ github.event.pull_request.head.sha }}") { "${{ github.event.pull_request.head.sha }}" } else { "${{ github.sha }}" }
           $info = [ordered]@{
             version = "$version"
-            commit = "${{ github.sha }}"
-            branch = "main"
+            commit = "$commit"
+            branch = "$branch"
           }
-          $info | ConvertTo-Json | Set-Content -Encoding utf8 "publish/${{ matrix.rid }}/build-info.json"
+          $info | ConvertTo-Json | Set-Content -Encoding utf8 "publish/win-x64/build-info.json"
 
-      - name: Create OTA archive
+      - name: Build installer
         shell: pwsh
-        run: Compress-Archive -Path "publish/${{ matrix.rid }}/*" -DestinationPath "${{ matrix.asset }}" -Force
+        run: |
+          New-Item -ItemType Directory -Force -Path dist | Out-Null
+          [xml]$project = Get-Content "${{ env.PROJECT }}"
+          $version = $project.Project.PropertyGroup.Version | Select-Object -First 1
+          $publishDir = (Resolve-Path "publish/win-x64").Path
+          $outputDir = (Resolve-Path "dist").Path
 
-      - name: Upload OTA package
+          $iscc = (Get-Command ISCC.exe -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty Source)
+          if (-not $iscc) {
+            $iscc = Get-ChildItem "C:\Program Files*\Inno Setup *\ISCC.exe" -ErrorAction SilentlyContinue |
+              Select-Object -First 1 -ExpandProperty FullName
+          }
+          if (-not $iscc) {
+            throw "ISCC.exe (Inno Setup) non trovato nel runner Windows."
+          }
+
+          & $iscc "/DPublishDir=$publishDir" "/DOutputDir=$outputDir" "/DAppVersion=$version" "packaging/windows/installer.iss"
+          if ($LASTEXITCODE -ne 0) {
+            exit $LASTEXITCODE
+          }
+
+      - name: Upload Windows installer
         uses: actions/upload-artifact@v4
         with:
-          name: ota-${{ matrix.rid }}
-          path: ${{ matrix.asset }}
+          name: package-win-x64
+          path: dist/LocalStoreManagement-Setup-win-x64.exe
+          if-no-files-found: error
+
+  package-linux:
+    name: Linux AppImage
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Publish Linux x64
+        run: dotnet publish ${{ env.PROJECT }} --configuration Release --runtime linux-x64 --self-contained true --output publish/linux-x64
+
+      - name: Write build information
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION="$(sed -n 's:.*<Version>\(.*\)</Version>.*:\1:p' "${PROJECT}" | head -n 1)"
+          BRANCH="${GITHUB_HEAD_REF:-${GITHUB_REF_NAME}}"
+          COMMIT="${{ github.event.pull_request.head.sha }}"
+          if [ -z "${COMMIT}" ]; then
+            COMMIT="${GITHUB_SHA}"
+          fi
+          printf '{"version":"%s","commit":"%s","branch":"%s"}\n' \
+            "${VERSION}" "${COMMIT}" "${BRANCH}" \
+            > publish/linux-x64/build-info.json
+
+      - name: Build AppDir
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf AppDir dist
+          mkdir -p AppDir/usr/bin dist
+          cp -a publish/linux-x64/. AppDir/usr/bin/
+          cp packaging/linux/AppRun AppDir/AppRun
+          cp packaging/linux/local-store-management.desktop AppDir/local-store-management.desktop
+          cp packaging/linux/local-store-management.svg AppDir/local-store-management.svg
+          ln -s local-store-management.svg AppDir/.DirIcon
+          chmod +x AppDir/AppRun AppDir/usr/bin/LocalStoreManagement.Desktop
+
+      - name: Install AppImage build dependency
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y squashfs-tools
+
+      - name: Build AppImage
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --location --retry 3 \
+            --output appimagetool-x86_64.AppImage \
+            https://github.com/AppImage/appimagetool/releases/download/1.9.1/appimagetool-x86_64.AppImage
+          chmod +x appimagetool-x86_64.AppImage
+          APPIMAGE_EXTRACT_AND_RUN=1 ARCH=x86_64 \
+            ./appimagetool-x86_64.AppImage \
+            AppDir \
+            dist/LocalStoreManagement-linux-x64.AppImage
+          chmod +x dist/LocalStoreManagement-linux-x64.AppImage
+
+      - name: Upload Linux AppImage
+        uses: actions/upload-artifact@v4
+        with:
+          name: package-linux-x64
+          path: dist/LocalStoreManagement-linux-x64.AppImage
           if-no-files-found: error
 
   release-main:
+    name: Publish main release assets
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    needs: [build, publish-main]
+    needs: [build, package-windows, package-linux]
     runs-on: ubuntu-latest
     permissions:
       contents: write
 
     steps:
-      - name: Download OTA packages
+      - name: Download packaged applications
         uses: actions/download-artifact@v4
         with:
-          pattern: ota-*
+          pattern: package-*
           path: dist
           merge-multiple: true
 
-      - name: Publish OTA release for main commit
+      - name: Publish release for main commit
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -106,8 +191,8 @@ jobs:
           if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             gh release delete "$TAG" --repo "$GITHUB_REPOSITORY" --cleanup-tag --yes
           fi
-          gh release create "$TAG" dist/*.zip \
+          gh release create "$TAG" dist/* \
             --repo "$GITHUB_REPOSITORY" \
             --target "$GITHUB_SHA" \
-            --title "OTA ${GITHUB_SHA::7}" \
-            --notes "Pacchetti automatici Windows/Linux generati dal branch main per l'aggiornamento in-app."
+            --title "Local Store Management ${GITHUB_SHA::7}" \
+            --notes "Pacchetti Windows/Linux generati automaticamente dal branch main. Il client usa questi stessi file per gli aggiornamenti OTA."
