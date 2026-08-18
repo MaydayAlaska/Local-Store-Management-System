@@ -7,6 +7,7 @@ namespace LocalStoreManagement.Desktop;
 public partial class MainWindow
 {
     private readonly AppSettingsService _appSettingsService = new();
+    private SettingsView? _settingsView;
 
     private void ApplySavedSettings()
     {
@@ -32,13 +33,49 @@ public partial class MainWindow
         }
     }
 
-    private async void SettingsButton_OnClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    private void SettingsButton_OnClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
-        var settingsWindow = new SettingsWindow(_appSettingsService);
-        var saved = await settingsWindow.ShowDialog<bool>(this);
-        if (saved)
+        ShowSettings();
+    }
+
+    private void ShowSettings()
+    {
+        HideSettingsView();
+        HideAllPanels();
+        EnsureSettingsView();
+
+        _settingsView!.Reload();
+        _settingsView.IsVisible = true;
+        PageTitle.Text = "Impostazioni";
+        PageSubtitle.Text = "Nome negozio, icona, logo e dati dell'applicazione";
+        _settingsView.FocusPrimaryField();
+    }
+
+    private void EnsureSettingsView()
+    {
+        if (_settingsView is not null)
         {
-            ApplySavedSettings();
+            return;
+        }
+
+        if (DashboardPanel.Parent is not Grid contentGrid)
+        {
+            throw new InvalidOperationException("Impossibile inizializzare il pannello Impostazioni.");
+        }
+
+        _settingsView = new SettingsView(_appSettingsService)
+        {
+            IsVisible = false
+        };
+        _settingsView.SettingsSaved += (_, _) => ApplySavedSettings();
+        contentGrid.Children.Add(_settingsView);
+    }
+
+    private void HideSettingsView()
+    {
+        if (_settingsView is not null)
+        {
+            _settingsView.IsVisible = false;
         }
     }
 

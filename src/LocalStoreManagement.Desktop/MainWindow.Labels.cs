@@ -43,6 +43,8 @@ public partial class MainWindow
             exportButton.Click += ExportButton_OnClick;
         }
 
+        ApplySidebarPresentation();
+        AttachSettingsHideToMainNavigation();
         _secondaryNavigationAttached = true;
     }
 
@@ -65,8 +67,65 @@ public partial class MainWindow
         {
             Content = "Categorie"
         };
+        categoriesButton.Classes.Add("SidebarNav");
         categoriesButton.Click += CategoriesButton_OnClick;
         navigationPanel.Children.Insert(index, categoriesButton);
+    }
+
+    private void ApplySidebarPresentation()
+    {
+        var navigationLabels = new HashSet<string>(StringComparer.Ordinal)
+        {
+            "Dashboard",
+            "Prodotti",
+            "Magazzino",
+            "Categorie",
+            "Etichette",
+            "Movimenti",
+            "Esportazione"
+        };
+
+        var buttons = this
+            .GetVisualDescendants()
+            .OfType<Button>()
+            .ToList();
+
+        foreach (var button in buttons)
+        {
+            if (button.Content is string text && navigationLabels.Contains(text))
+            {
+                button.Classes.Add("SidebarNav");
+            }
+        }
+
+        var settingsButton = buttons.FirstOrDefault(button =>
+            button.Content is string text
+            && text.Contains("Impostazioni", StringComparison.Ordinal));
+        if (settingsButton is not null)
+        {
+            settingsButton.Content = "⚙";
+            settingsButton.Classes.Add("SidebarIcon");
+            ToolTip.SetTip(settingsButton, "Impostazioni");
+        }
+    }
+
+    private void AttachSettingsHideToMainNavigation()
+    {
+        var mainPages = new HashSet<string>(StringComparer.Ordinal)
+        {
+            "Dashboard",
+            "Prodotti",
+            "Magazzino",
+            "Movimenti"
+        };
+
+        foreach (var button in this.GetVisualDescendants().OfType<Button>())
+        {
+            if (button.Content is string text && mainPages.Contains(text))
+            {
+                button.Click += (_, _) => HideSettingsView();
+            }
+        }
     }
 
     private async void CategoriesButton_OnClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)

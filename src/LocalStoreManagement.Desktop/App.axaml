@@ -4,5 +4,44 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
     <Application.Styles>
         <FluentTheme />
+
+        <!-- Navigazione laterale: resta leggibile sia col tema chiaro sia con quello scuro. -->
+        <Style Selector="Button.SidebarNav">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Foreground" Value="#F5F7FA" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="CornerRadius" Value="7" />
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+            <Setter Property="HorizontalContentAlignment" Value="Left" />
+            <Setter Property="MinHeight" Value="38" />
+            <Setter Property="Padding" Value="12,8" />
+        </Style>
+        <Style Selector="Button.SidebarNav:pointerover">
+            <Setter Property="Background" Value="#2A2E34" />
+        </Style>
+        <Style Selector="Button.SidebarNav:pressed">
+            <Setter Property="Background" Value="#343941" />
+        </Style>
+
+        <!-- Impostazioni: sola icona, senza riquadro permanente. -->
+        <Style Selector="Button.SidebarIcon">
+            <Setter Property="Width" Value="40" />
+            <Setter Property="Height" Value="40" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Foreground" Value="#F5F7FA" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="CornerRadius" Value="20" />
+            <Setter Property="FontSize" Value="18" />
+            <Setter Property="HorizontalAlignment" Value="Left" />
+            <Setter Property="HorizontalContentAlignment" Value="Center" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+        </Style>
+        <Style Selector="Button.SidebarIcon:pointerover">
+            <Setter Property="Background" Value="#2A2E34" />
+        </Style>
+        <Style Selector="Button.SidebarIcon:pressed">
+            <Setter Property="Background" Value="#343941" />
+        </Style>
     </Application.Styles>
 </Application>
