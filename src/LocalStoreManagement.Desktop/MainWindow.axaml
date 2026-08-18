@@ -46,75 +46,118 @@
             <ScrollViewer x:Name="DashboardPanel">
                 <StackPanel Margin="28" Spacing="18">
                     <Border Padding="22" CornerRadius="10" BorderBrush="#D8DDE3" BorderThickness="1">
-                        <StackPanel Spacing="12">
-                            <TextBlock FontSize="18" FontWeight="SemiBold" Text="Scansione rapida" />
-                            <TextBlock Foreground="#66707A" Text="Lo scanner USB viene letto come tastiera HID. Scegli l'azione e poi scansiona il codice." />
-
-                            <Grid ColumnDefinitions="240,*" ColumnSpacing="12">
-                                <StackPanel Spacing="6">
-                                    <TextBlock FontWeight="SemiBold" Text="Modalità scanner" />
-                                    <ComboBox x:Name="ScannerModeInput" SelectedIndex="0">
-                                        <ComboBoxItem Content="Cerca / apri prodotto" />
-                                        <ComboBoxItem Content="Carico rapido (+1)" />
-                                        <ComboBoxItem Content="Scarico rapido (-1)" />
-                                    </ComboBox>
-                                </StackPanel>
-
-                                <StackPanel Grid.Column="1" Spacing="6">
-                                    <TextBlock FontWeight="SemiBold" Text="Codice" />
-                                    <TextBox
-                                        x:Name="BarcodeInput"
-                                        FontSize="20"
-                                        KeyDown="BarcodeInput_OnKeyDown"
-                                        PlaceholderText="Scansiona barcode/SKU e premi Invio" />
-                                </StackPanel>
-                            </Grid>
-
-                            <TextBlock FontSize="12" Foreground="#66707A" Text="In Carico/Scarico rapido ogni scansione vale 1 pezzo. Se il codice non esiste, si apre la scheda di creazione con il barcode già compilato." />
-
-                            <Border Padding="12" CornerRadius="8" Background="#F5F7F9">
-                                <TextBlock x:Name="LastScanText" TextWrapping="Wrap" Foreground="#44515E" Text="Nessun codice scansionato." />
-                            </Border>
-                        </StackPanel>
-                    </Border>
-
-                    <Border Padding="22" CornerRadius="10" BorderBrush="#D8DDE3" BorderThickness="1">
-                        <StackPanel Spacing="12">
-                            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
-                                <StackPanel Spacing="4">
-                                    <TextBlock FontSize="18" FontWeight="SemiBold" Text="Cerca prodotto" />
-                                    <TextBlock Foreground="#66707A" Text="Ricerca manuale anche per nome, oltre a SKU e barcode." />
-                                </StackPanel>
-                                <Button Grid.Column="1" VerticalAlignment="Bottom" Click="DashboardOpenProductButton_OnClick" Content="Apri selezionato" />
-                            </Grid>
+                        <StackPanel Spacing="14">
+                            <StackPanel Spacing="4">
+                                <TextBlock FontSize="18" FontWeight="SemiBold" Text="Cerca o scansiona prodotto" />
+                                <TextBlock Opacity="0.62" TextWrapping="Wrap" Text="Scansiona barcode/SKU oppure cerca manualmente per nome. La scansione mostra la scheda senza modificare automaticamente la giacenza." />
+                            </StackPanel>
 
                             <TextBox
-                                x:Name="DashboardProductSearchInput"
-                                TextChanged="DashboardProductSearchInput_OnTextChanged"
-                                PlaceholderText="Digita nome prodotto, SKU o barcode..." />
+                                x:Name="DashboardSearchInput"
+                                FontSize="18"
+                                TextChanged="DashboardSearchInput_OnTextChanged"
+                                KeyDown="DashboardSearchInput_OnKeyDown"
+                                PlaceholderText="Scansiona barcode/SKU o digita il nome del prodotto..." />
+
+                            <TextBlock x:Name="DashboardSearchStatusText" FontSize="12" Opacity="0.62" Text="Scansiona un codice oppure cerca un prodotto per nome, SKU o barcode." />
 
                             <ListBox
                                 x:Name="DashboardProductsList"
-                                Height="180"
+                                Height="150"
+                                SelectionChanged="DashboardProductsList_OnSelectionChanged"
                                 DoubleTapped="DashboardProductsList_OnDoubleTapped">
                                 <ListBox.ItemTemplate>
                                     <DataTemplate>
-                                        <Grid Margin="10,7" ColumnDefinitions="*,150,90">
+                                        <Grid Margin="10,7" ColumnDefinitions="*,160,130,70">
                                             <StackPanel>
                                                 <TextBlock FontWeight="SemiBold" Text="{Binding Name}" />
-                                                <TextBlock FontSize="11" Foreground="#66707A" Text="{Binding DetailsDisplay}" />
+                                                <TextBlock FontSize="11" Opacity="0.62" Text="{Binding DetailsDisplay}" />
                                             </StackPanel>
                                             <StackPanel Grid.Column="1">
-                                                <TextBlock HorizontalAlignment="Right" Text="{Binding Sku}" />
-                                                <TextBlock HorizontalAlignment="Right" FontSize="11" Foreground="#66707A" Text="{Binding Barcode}" />
+                                                <TextBlock Text="{Binding Brand}" />
+                                                <TextBlock FontSize="11" Opacity="0.62" Text="{Binding Category}" />
                                             </StackPanel>
-                                            <TextBlock Grid.Column="2" VerticalAlignment="Center" HorizontalAlignment="Right" FontWeight="Bold" Text="{Binding StockQuantity}" />
+                                            <StackPanel Grid.Column="2">
+                                                <TextBlock HorizontalAlignment="Right" Text="{Binding Sku}" />
+                                                <TextBlock HorizontalAlignment="Right" FontSize="11" Opacity="0.62" Text="{Binding Barcode}" />
+                                            </StackPanel>
+                                            <TextBlock Grid.Column="3" VerticalAlignment="Center" HorizontalAlignment="Right" FontSize="18" FontWeight="Bold" Text="{Binding StockQuantity}" />
                                         </Grid>
                                     </DataTemplate>
                                 </ListBox.ItemTemplate>
                             </ListBox>
 
-                            <TextBlock x:Name="DashboardSearchStatusText" FontSize="12" Foreground="#66707A" Text="Cerca un prodotto per nome, SKU o barcode." />
+                            <Border x:Name="DashboardProductDetailsPanel" IsVisible="False" Padding="18" CornerRadius="10" BorderBrush="#D8DDE3" BorderThickness="1">
+                                <StackPanel Spacing="16">
+                                    <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
+                                        <StackPanel Spacing="2">
+                                            <TextBlock x:Name="DashboardProductNameText" FontSize="22" FontWeight="SemiBold" />
+                                            <TextBlock x:Name="DashboardProductCodeSummaryText" FontSize="12" Opacity="0.62" />
+                                        </StackPanel>
+                                        <Button Grid.Column="1" MinWidth="72" FontSize="17" FontWeight="Bold" Click="DashboardIncomingButton_OnClick" Content="+1" />
+                                        <Button x:Name="DashboardOutgoingButton" Grid.Column="2" MinWidth="72" FontSize="17" FontWeight="Bold" Click="DashboardOutgoingButton_OnClick" Content="-1" />
+                                    </Grid>
+
+                                    <Grid ColumnDefinitions="*,*,*,*" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="20" RowSpacing="14">
+                                        <StackPanel>
+                                            <TextBlock FontSize="11" Opacity="0.55" Text="GIACENZA" />
+                                            <TextBlock x:Name="DashboardStockText" FontSize="28" FontWeight="Bold" />
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="1">
+                                            <TextBlock FontSize="11" Opacity="0.55" Text="STATO" />
+                                            <TextBlock x:Name="DashboardStatusText" FontWeight="SemiBold" />
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="2">
+                                            <TextBlock FontSize="11" Opacity="0.55" Text="MARCA" />
+                                            <TextBlock x:Name="DashboardBrandText" />
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="3">
+                                            <TextBlock FontSize="11" Opacity="0.55" Text="CATEGORIA" />
+                                            <TextBlock x:Name="DashboardCategoryText" />
+                                        </StackPanel>
+
+                                        <StackPanel Grid.Row="1">
+                                            <TextBlock FontSize="11" Opacity="0.55" Text="SKU" />
+                                            <TextBlock x:Name="DashboardSkuText" />
+                                        </StackPanel>
+                                        <StackPanel Grid.Row="1" Grid.Column="1">
+                                            <TextBlock FontSize="11" Opacity="0.55" Text="BARCODE / EAN" />
+                                            <TextBlock x:Name="DashboardBarcodeText" />
+                                        </StackPanel>
+                                        <StackPanel Grid.Row="1" Grid.Column="2">
+                                            <TextBlock FontSize="11" Opacity="0.55" Text="VARIANTE" />
+                                            <TextBlock x:Name="DashboardVariantText" />
+                                        </StackPanel>
+                                        <StackPanel Grid.Row="1" Grid.Column="3">
+                                            <TextBlock FontSize="11" Opacity="0.55" Text="TAGLIA" />
+                                            <TextBlock x:Name="DashboardSizeText" />
+                                        </StackPanel>
+
+                                        <StackPanel Grid.Row="2">
+                                            <TextBlock FontSize="11" Opacity="0.55" Text="PREZZO ACQUISTO" />
+                                            <TextBlock x:Name="DashboardPurchasePriceText" />
+                                        </StackPanel>
+                                        <StackPanel Grid.Row="2" Grid.Column="1">
+                                            <TextBlock FontSize="11" Opacity="0.55" Text="PREZZO VENDITA" />
+                                            <TextBlock x:Name="DashboardSalePriceText" FontWeight="SemiBold" />
+                                        </StackPanel>
+                                        <StackPanel Grid.Row="2" Grid.Column="2">
+                                            <TextBlock FontSize="11" Opacity="0.55" Text="ID PRODOTTO" />
+                                            <TextBlock x:Name="DashboardProductIdText" />
+                                        </StackPanel>
+                                    </Grid>
+
+                                    <StackPanel Spacing="4">
+                                        <TextBlock FontSize="11" Opacity="0.55" Text="NOTE" />
+                                        <TextBlock x:Name="DashboardNotesText" TextWrapping="Wrap" />
+                                    </StackPanel>
+
+                                    <Grid ColumnDefinitions="*,Auto">
+                                        <TextBlock x:Name="DashboardMovementStatusText" VerticalAlignment="Center" FontSize="12" Opacity="0.7" />
+                                        <Button Grid.Column="1" Click="DashboardEditProductButton_OnClick" Content="Modifica scheda" />
+                                    </Grid>
+                                </StackPanel>
+                            </Border>
                         </StackPanel>
                     </Border>
 
