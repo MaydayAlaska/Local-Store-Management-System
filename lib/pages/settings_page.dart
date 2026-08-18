@@ -1,6 +1,7 @@
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
 
+import '../core/app_paths.dart';
 import '../models/app_settings.dart';
 import '../services/app_services.dart';
 import '../services/update_service.dart';
@@ -44,10 +45,9 @@ class _SettingsPageState extends State<SettingsPage> {
     super.dispose();
   }
 
-  Future<String?> _pickImage() async {
-    final file = await openFile(acceptedTypeGroups: const [
-      XTypeGroup(label: 'Immagini', extensions: ['png', 'jpg', 'jpeg', 'bmp', 'ico']),
-    ]);
+  Future<String?> _pickImage({required bool allowIco}) async {
+    final extensions = allowIco ? ['png', 'jpg', 'jpeg', 'bmp', 'ico'] : ['png', 'jpg', 'jpeg', 'bmp'];
+    final file = await openFile(acceptedTypeGroups: [XTypeGroup(label: 'Immagini', extensions: extensions)]);
     return file?.path;
   }
 
@@ -112,10 +112,12 @@ class _SettingsPageState extends State<SettingsPage> {
                 SwitchListTile(contentPadding: EdgeInsets.zero, value: _showLogo, onChanged: (v) => setState(() => _showLogo = v), title: const Text('Mostra logo nel menu')),
                 const SizedBox(height: 8),
                 Wrap(spacing: 8, runSpacing: 8, children: [
-                  OutlinedButton.icon(onPressed: () async { final path = await _pickImage(); if (path != null) setState(() => _iconSource = path); }, icon: const Icon(Icons.app_shortcut), label: Text(_iconSource == null ? 'Cambia icona applicazione' : 'Icona selezionata')),
-                  OutlinedButton.icon(onPressed: () async { final path = await _pickImage(); if (path != null) setState(() => _logoSource = path); }, icon: const Icon(Icons.image_outlined), label: Text(_logoSource == null ? 'Cambia logo negozio' : 'Logo selezionato')),
+                  OutlinedButton.icon(onPressed: () async { final path = await _pickImage(allowIco: true); if (path != null) setState(() => _iconSource = path); }, icon: const Icon(Icons.app_shortcut), label: Text(_iconSource == null ? 'Cambia icona applicazione' : 'Icona selezionata')),
+                  OutlinedButton.icon(onPressed: () async { final path = await _pickImage(allowIco: false); if (path != null) setState(() => _logoSource = path); }, icon: const Icon(Icons.image_outlined), label: Text(_logoSource == null ? 'Cambia logo negozio' : 'Logo selezionato')),
                   FilledButton.icon(onPressed: _save, icon: const Icon(Icons.save), label: const Text('Salva impostazioni')),
                 ]),
+                const SizedBox(height: 8),
+                Text('Dati: ${AppPaths.dataDirectory}', style: Theme.of(context).textTheme.bodySmall),
               ]),
             ),
           ),
@@ -126,11 +128,21 @@ class _SettingsPageState extends State<SettingsPage> {
               child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
                 Text('Aggiornamenti', style: Theme.of(context).textTheme.titleMedium),
                 const SizedBox(height: 6),
-                const Text('Versione Flutter 0.1.3+10'),
+                Text('Versione v${UpdateService.currentVersion}${UpdateService.isBetaBuild ? ' BETA' : ''}'),
                 if (UpdateService.currentCommit.isNotEmpty) Text('Commit: ${UpdateService.currentCommit.substring(0, 7)}'),
+                const SizedBox(height: 6),
+                Text(UpdateService.isBetaBuild
+                    ? 'Build BETA/TEST dal branch test. Gli aggiornamenti OTA stabili sono disattivati.'
+                    : UpdateService.isInstalledBuild
+                        ? 'Canale aggiornamenti: GitHub, branch main.'
+                        : 'Build di sviluppo: il controllo è disponibile, l’installazione OTA richiede una release pubblicata.'),
                 const SizedBox(height: 10),
                 Wrap(spacing: 8, children: [
-                  OutlinedButton.icon(onPressed: _checking ? null : _checkUpdates, icon: const Icon(Icons.system_update), label: Text(_checking ? 'Controllo…' : 'Controlla aggiornamenti')),
+                  OutlinedButton.icon(
+                    onPressed: _checking || UpdateService.isBetaBuild ? null : _checkUpdates,
+                    icon: const Icon(Icons.system_update),
+                    label: Text(_checking ? 'Controllo…' : 'Controlla aggiornamenti'),
+                  ),
                   if (_update?.canInstall == true) FilledButton.icon(onPressed: _checking ? null : _installUpdate, icon: const Icon(Icons.download), label: const Text('Installa aggiornamento')),
                 ]),
               ]),

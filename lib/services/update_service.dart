@@ -22,11 +22,24 @@ class UpdateService {
   static const owner = 'MaydayAlaska';
   static const repository = 'Local-Store-Management-System';
   static const stableBranch = 'main';
-  static const currentVersion = '0.1.3';
+  static const currentVersion = '0.1.3+10';
   static const currentCommit = String.fromEnvironment('GIT_COMMIT');
+  static const currentBranch = String.fromEnvironment('BUILD_BRANCH');
   static const tokenEnvironmentVariable = 'LOCAL_STORE_GITHUB_TOKEN';
 
+  static bool get isBetaBuild => currentBranch.toLowerCase() == 'test';
+  static bool get isInstalledBuild => currentCommit.isNotEmpty;
+
   Future<UpdateCheckResult> check() async {
+    if (isBetaBuild) {
+      return UpdateCheckResult(
+        updateAvailable: false,
+        canInstall: false,
+        latestCommit: currentCommit,
+        message: 'Build BETA/TEST: gli aggiornamenti OTA stabili sono disattivati. Usa la prerelease test-latest.',
+      );
+    }
+
     final latest = await _readLatestCommit();
     if (currentCommit.isNotEmpty && currentCommit.toLowerCase() == latest.toLowerCase()) {
       return UpdateCheckResult(
@@ -78,6 +91,7 @@ class UpdateService {
   }
 
   Future<void> install(UpdateCheckResult update) async {
+    if (isBetaBuild) throw StateError('Gli aggiornamenti OTA stabili sono disattivati nelle build BETA/TEST.');
     if (!update.updateAvailable || !update.canInstall || update.assetUrl == null) {
       throw StateError('Nessun aggiornamento installabile selezionato.');
     }
