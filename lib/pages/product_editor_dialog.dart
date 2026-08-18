@@ -24,6 +24,8 @@ class ProductEditorDialog extends StatefulWidget {
 class _ProductEditorDialogState extends State<ProductEditorDialog> {
   late final TextEditingController _name;
   late final TextEditingController _notes;
+  late final TextEditingController _purchase;
+  late final TextEditingController _sale;
   late List<_VariantForm> _variants;
   int? _brandId;
   int? _categoryId;
@@ -36,17 +38,29 @@ class _ProductEditorDialogState extends State<ProductEditorDialog> {
     final product = widget.product;
     _name = TextEditingController(text: product?.name ?? '');
     _notes = TextEditingController(text: product?.notes ?? '');
+    _purchase = TextEditingController(text: _moneyInput(product?.purchasePriceCents));
+    _sale = TextEditingController(text: _moneyInput(product?.salePriceCents));
     _brandId = product?.brandId;
     _categoryId = product?.categoryId;
     _active = product?.isActive ?? true;
+
+    final scannedBarcode = widget.initialBarcode?.trim();
     if (product != null) {
       _variants = widget.services.products.getVariants(product.id).map(_VariantForm.fromDraft).toList();
+      if (scannedBarcode?.isNotEmpty == true &&
+          !_variants.any((variant) => variant.containsBarcode(scannedBarcode!))) {
+        _variants.add(_VariantForm(
+          id: null,
+          sku: widget.services.products.generateSku(),
+          barcodes: scannedBarcode!,
+        ));
+      }
     } else {
       _variants = [
         _VariantForm(
           id: null,
           sku: widget.services.products.generateSku(),
-          barcodes: widget.initialBarcode?.trim().isNotEmpty == true ? widget.initialBarcode!.trim() : '',
+          barcodes: scannedBarcode?.isNotEmpty == true ? scannedBarcode! : '',
         ),
       ];
     }
@@ -56,6 +70,8 @@ class _ProductEditorDialogState extends State<ProductEditorDialog> {
   void dispose() {
     _name.dispose();
     _notes.dispose();
+    _purchase.dispose();
+    _sale.dispose();
     for (final variant in _variants) {
       variant.dispose();
     }
@@ -93,6 +109,8 @@ class _ProductEditorDialogState extends State<ProductEditorDialog> {
         name: _name.text,
         categoryId: _categoryId,
         brandId: _brandId,
+        purchasePriceCents: parseEuroCents(_purchase.text),
+        salePriceCents: parseEuroCents(_sale.text),
         notes: _notes.text,
         isActive: _active,
         variants: _variants.map((v) => v.toDraft()).toList(),
@@ -108,9 +126,11 @@ class _ProductEditorDialogState extends State<ProductEditorDialog> {
   Widget build(BuildContext context) {
     final brands = widget.services.lookups.getAll(LookupKind.brand);
     final categories = widget.services.lookups.getAll(LookupKind.category);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Dialog(
+      backgroundColor: isDark ? const Color(0xFA1E2430) : const Color(0xFAFFFFFF),
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 1080, maxHeight: 760),
+        constraints: const BoxConstraints(maxWidth: 1080, maxHeight: 780),
         child: Padding(
           padding: const EdgeInsets.all(20),
           child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
@@ -118,6 +138,15 @@ class _ProductEditorDialogState extends State<ProductEditorDialog> {
               Expanded(child: Text(widget.product == null ? 'Nuovo prodotto' : 'Modifica prodotto', style: Theme.of(context).textTheme.headlineSmall)),
               IconButton(onPressed: () => Navigator.pop(context, false), icon: const Icon(Icons.close)),
             ]),
+            if (widget.initialBarcode?.trim().isNotEmpty == true) ...[
+              const SizedBox(height: 8),
+              Text(
+                widget.product == null
+                    ? 'Barcode scansionato: ${widget.initialBarcode!.trim()}'
+                    : 'Nuova variante precompilata con barcode: ${widget.initialBarcode!.trim()}',
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+              ),
+            ],
             const SizedBox(height: 12),
             Row(children: [
               Expanded(flex: 2, child: TextField(controller: _name, decoration: const InputDecoration(border: OutlineInputBorder(), labelText: 'Nome *'))),
@@ -138,12 +167,29 @@ class _ProductEditorDialogState extends State<ProductEditorDialog> {
             ]),
             const SizedBox(height: 10),
             Row(children: [
-              Expanded(child: TextField(controller: _notes, decoration: const InputDecoration(border: OutlineInputBorder(), labelText: 'Note'))),
-              const SizedBox(width: 16),
+              Expanded(child: TextField(
+                controller: _purchase,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                decoration: const InputDecoration(border: OutlineInputBorder(), labelText: 'Prezzo acquisto prodotto €'),
+              )),
+              const SizedBox(width: 10),
+              Expanded(child: TextField(
+                controller: _sale,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                decoration: const InputDecoration(border: OutlineInputBorder(), labelText: 'Prezzo vendita prodotto €'),
+              )),
+              const SizedBox(width: 10),
+              Expanded(flex: 2, child: TextField(controller: _notes, decoration: const InputDecoration(border: OutlineInputBorder(), labelText: 'Note'))),
+              const SizedBox(width: 12),
               Switch(value: _active, onChanged: (v) => setState(() => _active = v)),
-              const Text('Prodotto attivo'),
+              const Text('Attivo'),
             ]),
-            const SizedBox(height: 16),
+            const SizedBox(height: 8),
+            Text(
+              'I prezzi del prodotto vengono usati da tutte le varianti. Compila un prezzo nella variante solo se deve sovrascrivere quello del prodotto.',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+            const SizedBox(height: 14),
             Row(children: [
               Expanded(child: Text('Varianti', style: Theme.of(context).textTheme.titleMedium)),
               OutlinedButton.icon(onPressed: _addVariant, icon: const Icon(Icons.add), label: const Text('Aggiungi variante')),
@@ -152,7 +198,7 @@ class _ProductEditorDialogState extends State<ProductEditorDialog> {
             Expanded(
               child: ListView.separated(
                 itemCount: _variants.length,
-                separatorBuilder: (_, __) => const SizedBox(height: 10),
+                separatorBuilder: (_, _) => const SizedBox(height: 10),
                 itemBuilder: (context, index) => _VariantEditor(
                   form: _variants[index],
                   canRemove: _variants[index].id == null && _variants.length > 1,
@@ -172,6 +218,9 @@ class _ProductEditorDialogState extends State<ProductEditorDialog> {
       ),
     );
   }
+
+  static String _moneyInput(int? cents) =>
+      cents == null ? '' : (cents / 100).toStringAsFixed(2).replaceAll('.', ',');
 }
 
 class _VariantEditor extends StatelessWidget {
@@ -199,9 +248,17 @@ class _VariantEditor extends StatelessWidget {
             Row(children: [
               Expanded(flex: 2, child: TextField(controller: form.barcodes, decoration: const InputDecoration(border: OutlineInputBorder(), labelText: 'Barcode (uno per riga o separati da virgola)'))),
               const SizedBox(width: 8),
-              Expanded(child: TextField(controller: form.purchase, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(border: OutlineInputBorder(), labelText: 'Prezzo acquisto €'))),
+              Expanded(child: TextField(
+                controller: form.purchase,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                decoration: const InputDecoration(border: OutlineInputBorder(), labelText: 'Override acquisto €', hintText: 'Eredita prodotto'),
+              )),
               const SizedBox(width: 8),
-              Expanded(child: TextField(controller: form.sale, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(border: OutlineInputBorder(), labelText: 'Prezzo vendita €'))),
+              Expanded(child: TextField(
+                controller: form.sale,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                decoration: const InputDecoration(border: OutlineInputBorder(), labelText: 'Override vendita €', hintText: 'Eredita prodotto'),
+              )),
               const SizedBox(width: 12),
               StatefulBuilder(builder: (context, setLocal) => Row(children: [
                 Switch(value: form.active, onChanged: (v) => setLocal(() => form.active = v)),
@@ -254,6 +311,11 @@ class _VariantForm {
   final TextEditingController barcodes;
   bool active;
   final int stock;
+
+  bool containsBarcode(String value) => barcodes.text
+      .split(RegExp(r'[,;\n\r]+'))
+      .map((e) => e.trim())
+      .any((e) => e == value.trim());
 
   ProductVariantDraft toDraft() => ProductVariantDraft(
         id: id,
