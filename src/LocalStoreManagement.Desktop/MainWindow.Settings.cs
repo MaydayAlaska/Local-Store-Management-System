@@ -147,19 +147,26 @@ public partial class MainWindow
         if (exact is not null)
         {
             SelectDashboardProduct(exact);
-            DashboardSearchStatusText.Text = $"Prodotto trovato: {exact.Name}.";
-            DashboardSearchInput.Focus();
+            PrepareDashboardSearchForNextScan();
+            DashboardSearchStatusText.Text = $"Prodotto trovato: {exact.Name}. Pronto per la prossima scansione.";
             return;
         }
 
         if (DashboardProductsList.SelectedItem is Product selected)
         {
             ShowDashboardProduct(selected);
-            DashboardSearchInput.Focus();
+            PrepareDashboardSearchForNextScan();
+            DashboardSearchStatusText.Text = $"Prodotto selezionato: {selected.Name}. Pronto per la prossima ricerca o scansione.";
             return;
         }
 
-        DashboardSearchStatusText.Text = "Nessuna corrispondenza esatta per il codice inserito.";
+        PrepareDashboardSearchForNextScan();
+        DashboardSearchStatusText.Text = $"Nessun prodotto trovato per «{query}». Pronto per una nuova scansione.";
+    }
+
+    private void PrepareDashboardSearchForNextScan()
+    {
+        DashboardSearchInput.Clear();
         DashboardSearchInput.Focus();
     }
 
