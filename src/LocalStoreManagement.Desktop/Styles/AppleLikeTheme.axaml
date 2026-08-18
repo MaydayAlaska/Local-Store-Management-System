@@ -1,9 +1,13 @@
 <Styles xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
 
+  <!-- Window-level acrylic: supported platforms render the desktop/app behind the UI blurred.
+       Unsupported compositors fall back to the opaque theme background. -->
   <Style Selector="Window">
     <Setter Property="Background" Value="{DynamicResource AppBackgroundBrush}" />
     <Setter Property="Foreground" Value="{DynamicResource AppTextBrush}" />
+    <Setter Property="TransparencyLevelHint" Value="AcrylicBlur, Blur" />
+    <Setter Property="TransparencyBackgroundFallback" Value="{DynamicResource AppFallbackBackgroundBrush}" />
   </Style>
 
   <Style Selector="UserControl">
@@ -11,21 +15,23 @@
     <Setter Property="Foreground" Value="{DynamicResource AppTextBrush}" />
   </Style>
 
+  <!-- Frosted controls -->
   <Style Selector="Button">
-    <Setter Property="MinHeight" Value="36" />
-    <Setter Property="Padding" Value="14,7" />
-    <Setter Property="CornerRadius" Value="10" />
-    <Setter Property="Background" Value="{DynamicResource AppSurfaceBrush}" />
+    <Setter Property="MinHeight" Value="38" />
+    <Setter Property="Padding" Value="15,8" />
+    <Setter Property="CornerRadius" Value="14" />
+    <Setter Property="Background" Value="{DynamicResource AppSurfaceMutedBrush}" />
     <Setter Property="Foreground" Value="{DynamicResource AppTextBrush}" />
-    <Setter Property="BorderBrush" Value="{DynamicResource AppBorderBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource AppControlBorderBrush}" />
     <Setter Property="BorderThickness" Value="1" />
     <Setter Property="FontWeight" Value="SemiBold" />
   </Style>
   <Style Selector="Button:pointerover">
-    <Setter Property="Background" Value="{DynamicResource AppSurfaceMutedBrush}" />
+    <Setter Property="Background" Value="{DynamicResource AppSurfaceBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource AppBorderBrush}" />
   </Style>
   <Style Selector="Button:pressed">
-    <Setter Property="Opacity" Value="0.78" />
+    <Setter Property="Opacity" Value="0.72" />
   </Style>
 
   <Style Selector="Button.Primary">
@@ -57,34 +63,52 @@
   </Style>
 
   <Style Selector="TextBox">
-    <Setter Property="MinHeight" Value="38" />
-    <Setter Property="Padding" Value="12,8" />
-    <Setter Property="CornerRadius" Value="10" />
-    <Setter Property="Background" Value="{DynamicResource AppSurfaceBrush}" />
+    <Setter Property="MinHeight" Value="40" />
+    <Setter Property="Padding" Value="13,8" />
+    <Setter Property="CornerRadius" Value="14" />
+    <Setter Property="Background" Value="{DynamicResource AppSurfaceMutedBrush}" />
     <Setter Property="Foreground" Value="{DynamicResource AppTextBrush}" />
     <Setter Property="BorderBrush" Value="{DynamicResource AppControlBorderBrush}" />
     <Setter Property="BorderThickness" Value="1" />
   </Style>
+  <Style Selector="TextBox:focus">
+    <Setter Property="Background" Value="{DynamicResource AppSurfaceBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource AppAccentBrush}" />
+  </Style>
 
   <Style Selector="TextBox.SearchBox">
-    <Setter Property="MinHeight" Value="44" />
-    <Setter Property="Padding" Value="14,9" />
+    <Setter Property="MinHeight" Value="46" />
+    <Setter Property="Padding" Value="15,10" />
     <Setter Property="FontSize" Value="15" />
-    <Setter Property="CornerRadius" Value="12" />
+    <Setter Property="CornerRadius" Value="16" />
   </Style>
 
   <Style Selector="ComboBox">
-    <Setter Property="MinHeight" Value="38" />
-    <Setter Property="CornerRadius" Value="10" />
-    <Setter Property="Background" Value="{DynamicResource AppSurfaceBrush}" />
+    <Setter Property="MinHeight" Value="40" />
+    <Setter Property="CornerRadius" Value="14" />
+    <Setter Property="Background" Value="{DynamicResource AppSurfaceMutedBrush}" />
     <Setter Property="Foreground" Value="{DynamicResource AppTextBrush}" />
     <Setter Property="BorderBrush" Value="{DynamicResource AppControlBorderBrush}" />
+    <Setter Property="BorderThickness" Value="1" />
+  </Style>
+  <Style Selector="ComboBox:pointerover">
+    <Setter Property="Background" Value="{DynamicResource AppSurfaceBrush}" />
+  </Style>
+
+  <Style Selector="NumericUpDown">
+    <Setter Property="MinHeight" Value="40" />
+    <Setter Property="CornerRadius" Value="14" />
+    <Setter Property="Background" Value="{DynamicResource AppSurfaceMutedBrush}" />
+    <Setter Property="Foreground" Value="{DynamicResource AppTextBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource AppControlBorderBrush}" />
+    <Setter Property="BorderThickness" Value="1" />
   </Style>
 
   <Style Selector="CheckBox">
     <Setter Property="Foreground" Value="{DynamicResource AppTextBrush}" />
   </Style>
 
+  <!-- Lists float directly over the glass panels. -->
   <Style Selector="ListBox">
     <Setter Property="Background" Value="Transparent" />
     <Setter Property="BorderThickness" Value="0" />
@@ -101,18 +125,21 @@
     <Setter Property="Background" Value="{DynamicResource AppAccentSoftBrush}" />
   </Style>
 
+  <!-- Main glass layers: translucency + bright edge + soft depth. -->
   <Style Selector="Border.Card">
     <Setter Property="Background" Value="{DynamicResource AppSurfaceBrush}" />
     <Setter Property="BorderBrush" Value="{DynamicResource AppBorderBrush}" />
     <Setter Property="BorderThickness" Value="1" />
-    <Setter Property="CornerRadius" Value="18" />
+    <Setter Property="CornerRadius" Value="22" />
+    <Setter Property="BoxShadow" Value="0 16 40 -12 #3308172E, inset 0 1 0 0 #35FFFFFF" />
   </Style>
 
   <Style Selector="Border.InsetCard">
     <Setter Property="Background" Value="{DynamicResource AppSurfaceMutedBrush}" />
     <Setter Property="BorderBrush" Value="{DynamicResource AppBorderBrush}" />
     <Setter Property="BorderThickness" Value="1" />
-    <Setter Property="CornerRadius" Value="14" />
+    <Setter Property="CornerRadius" Value="17" />
+    <Setter Property="BoxShadow" Value="inset 0 1 0 0 #2EFFFFFF" />
   </Style>
 
   <Style Selector="Border.StatusPill">
@@ -120,7 +147,8 @@
     <Setter Property="BorderBrush" Value="{DynamicResource AppGreenBorderBrush}" />
     <Setter Property="BorderThickness" Value="1" />
     <Setter Property="CornerRadius" Value="999" />
-    <Setter Property="Padding" Value="11,5" />
+    <Setter Property="Padding" Value="12,6" />
+    <Setter Property="BoxShadow" Value="0 8 22 -12 #2608172E" />
   </Style>
 
   <Style Selector="TextBlock.Muted">
@@ -141,11 +169,12 @@
     <Setter Property="Foreground" Value="{DynamicResource AppSecondaryTextBrush}" />
   </Style>
 
+  <!-- Sidebar becomes a floating glass rail. -->
   <Style Selector="Button.SidebarNav">
-    <Setter Property="MinHeight" Value="42" />
+    <Setter Property="MinHeight" Value="43" />
     <Setter Property="Margin" Value="0,2" />
     <Setter Property="Padding" Value="12,8" />
-    <Setter Property="CornerRadius" Value="11" />
+    <Setter Property="CornerRadius" Value="14" />
     <Setter Property="Background" Value="Transparent" />
     <Setter Property="Foreground" Value="{DynamicResource AppTextBrush}" />
     <Setter Property="BorderThickness" Value="0" />
@@ -159,16 +188,18 @@
   <Style Selector="Button.SidebarNav.Selected">
     <Setter Property="Background" Value="{DynamicResource AppSurfaceBrush}" />
     <Setter Property="Foreground" Value="{DynamicResource AppAccentBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource AppBorderBrush}" />
+    <Setter Property="BorderThickness" Value="1" />
     <Setter Property="FontWeight" Value="SemiBold" />
   </Style>
 
   <Style Selector="Button.SidebarIcon">
-    <Setter Property="Width" Value="40" />
-    <Setter Property="Height" Value="40" />
-    <Setter Property="MinWidth" Value="40" />
-    <Setter Property="MinHeight" Value="40" />
+    <Setter Property="Width" Value="42" />
+    <Setter Property="Height" Value="42" />
+    <Setter Property="MinWidth" Value="42" />
+    <Setter Property="MinHeight" Value="42" />
     <Setter Property="Padding" Value="0" />
-    <Setter Property="CornerRadius" Value="20" />
+    <Setter Property="CornerRadius" Value="21" />
     <Setter Property="Background" Value="Transparent" />
     <Setter Property="Foreground" Value="{DynamicResource AppTextBrush}" />
     <Setter Property="BorderThickness" Value="0" />
@@ -182,8 +213,11 @@
   <Style Selector="Button.SidebarIcon.Selected">
     <Setter Property="Background" Value="{DynamicResource AppSurfaceBrush}" />
     <Setter Property="Foreground" Value="{DynamicResource AppAccentBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource AppBorderBrush}" />
+    <Setter Property="BorderThickness" Value="1" />
   </Style>
 
+  <!-- Custom title bar stays visually light so the acrylic backdrop remains visible. -->
   <Style Selector="Button.TitleBarButton">
     <Setter Property="Width" Value="46" />
     <Setter Property="Height" Value="46" />
@@ -207,7 +241,7 @@
     <Setter Property="Opacity" Value="0.72" />
   </Style>
   <Style Selector="Button.TitleBarButton.TitleBarClose:pointerover">
-    <Setter Property="Background" Value="#C42B1C" />
+    <Setter Property="Background" Value="#D93A2B" />
     <Setter Property="Foreground" Value="White" />
   </Style>
 </Styles>
