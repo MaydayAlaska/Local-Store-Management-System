@@ -13,6 +13,7 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        ApplySidebarPresentationTweaks();
         InitializeCustomTitleBar();
         ApplySavedSettings();
 
@@ -23,6 +24,29 @@ public partial class MainWindow : Window
             SetActiveNavigation(DashboardNavButton);
             DashboardSearchInput.Focus();
         };
+    }
+
+    private void ApplySidebarPresentationTweaks()
+    {
+        DashboardNavButton.Content = "Dashboard";
+        ProductsNavButton.Content = "Prodotti";
+        WarehouseNavButton.Content = "Magazzino";
+        BrandsNavButton.Content = "Marche";
+        CategoriesNavButton.Content = "Categorie";
+        LabelsNavButton.Content = "Etichette";
+        MovementsNavButton.Content = "Movimenti";
+        ExportNavButton.Content = "Esportazione";
+
+        if (SettingsNavButton.Parent is Grid footer)
+        {
+            foreach (var child in footer.Children)
+            {
+                if (!ReferenceEquals(child, SettingsNavButton))
+                {
+                    child.IsVisible = false;
+                }
+            }
+        }
     }
 
     private void DashboardButton_OnClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e) => ShowDashboard();
