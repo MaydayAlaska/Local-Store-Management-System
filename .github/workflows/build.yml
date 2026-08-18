@@ -10,6 +10,10 @@ on:
       - test
       - main
 
+concurrency:
+  group: build-package-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: true
+
 env:
   PROJECT: src/LocalStoreManagement.Desktop/LocalStoreManagement.Desktop.csproj
   ICON_BASE64: src/LocalStoreManagement.Desktop/Assets/app-icon.base64
@@ -223,6 +227,51 @@ jobs:
           name: package-linux-x64
           path: dist/LocalStoreManagement-linux-x64.AppImage
           if-no-files-found: error
+
+  release-test:
+    name: Publish test beta assets
+    if: github.event_name == 'push' && github.ref == 'refs/heads/test'
+    needs: [build, package-windows, package-linux]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download packaged applications
+        uses: actions/download-artifact@v4
+        with:
+          pattern: package-*
+          path: dist
+          merge-multiple: true
+
+      - name: Publish beta prerelease for test
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION="$(sed -n 's:.*<Version>\(.*\)</Version>.*:\1:p' "${PROJECT}" | head -n 1)"
+          TAG="test-latest"
+
+          mv dist/LocalStoreManagement-Setup-win-x64.exe \
+            "dist/LocalStoreManagement-${VERSION}-BETA-Setup-win-x64.exe"
+          mv dist/LocalStoreManagement-linux-x64.AppImage \
+            "dist/LocalStoreManagement-${VERSION}-BETA-linux-x64.AppImage"
+
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release delete "$TAG" --repo "$GITHUB_REPOSITORY" --cleanup-tag --yes
+          fi
+
+          gh release create "$TAG" dist/* \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$GITHUB_SHA" \
+            --prerelease \
+            --latest=false \
+            --title "Local Store Management v${VERSION} BETA / TEST (${GITHUB_SHA::7})" \
+            --notes "Versione BETA/TEST generata automaticamente dal branch test. Non è una release stabile. Usa questi pacchetti solo per verificare le modifiche prima della promozione su main."
 
   release-main:
     name: Publish main release assets
