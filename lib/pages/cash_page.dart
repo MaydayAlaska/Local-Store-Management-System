@@ -3,10 +3,12 @@ import 'package:flutter/material.dart';
 import '../core/formatters.dart';
 import '../models/catalog.dart';
 import '../services/app_services.dart';
+import '../widgets/hid_barcode_listener.dart';
 
 class CashPage extends StatefulWidget {
-  const CashPage({super.key, required this.services});
+  const CashPage({super.key, required this.services, required this.isActive});
   final AppServices services;
+  final bool isActive;
 
   @override
   State<CashPage> createState() => _CashPageState();
@@ -40,13 +42,15 @@ class _CashPageState extends State<CashPage> {
     final exact = widget.services.products.findByBarcode(query);
     if (exact != null) {
       _add(exact);
-    } else if (_results.length == 1) {
-      _add(_results.first);
     } else {
-      setState(() => _searchStatus = 'Nessun prodotto univoco trovato per «$query».');
+      final matches = widget.services.products.search(query).take(2).toList();
+      if (matches.length == 1) {
+        _add(matches.first);
+      } else {
+        setState(() => _searchStatus = 'Nessun prodotto univoco trovato per «$query».');
+      }
     }
     _search.clear();
-    _searchFocus.requestFocus();
     setState(() {});
   }
 
@@ -173,128 +177,136 @@ class _CashPageState extends State<CashPage> {
     final totalPercentDiscount = totalPercentDiscountRaw < 0 ? 0 : totalPercentDiscountRaw;
     final count = _cart.fold<int>(0, (sum, line) => sum + line.quantity);
 
-    return Padding(
-      padding: const EdgeInsets.all(24),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        Text('Cassa', style: Theme.of(context).textTheme.headlineMedium),
-        const SizedBox(height: 14),
-        Expanded(
-          child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-            Expanded(
-              child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-                TextField(
-                  controller: _search,
-                  focusNode: _searchFocus,
-                  autofocus: true,
-                  onChanged: (_) => setState(() {}),
-                  onSubmitted: _submitSearch,
-                  decoration: const InputDecoration(border: OutlineInputBorder(), prefixIcon: Icon(Icons.qr_code_scanner), labelText: 'Scansiona barcode/SKU o cerca prodotto'),
-                ),
-                const SizedBox(height: 8),
-                Text(_searchStatus),
-                const SizedBox(height: 8),
-                Expanded(
-                  child: Card(
-                    clipBehavior: Clip.antiAlias,
-                    child: results.isEmpty
-                        ? const Center(child: Text('Nessun prodotto trovato.'))
-                        : ListView.separated(
-                            itemCount: results.length,
-                            separatorBuilder: (_, __) => const Divider(height: 1),
-                            itemBuilder: (context, index) {
-                              final p = results[index];
-                              return ListTile(
-                                title: Text(p.name),
-                                subtitle: Text('${p.variantDisplay} · SKU ${p.sku} · giacenza ${p.stockQuantity}'),
-                                trailing: Text(p.salePriceDisplay),
-                                onTap: () => _add(p),
-                              );
-                            },
-                          ),
+    return HidBarcodeListener(
+      enabled: widget.isActive,
+      onBarcode: _submitSearch,
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          Text('Cassa', style: Theme.of(context).textTheme.headlineMedium),
+          const SizedBox(height: 14),
+          Expanded(
+            child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+              Expanded(
+                child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                  TextField(
+                    controller: _search,
+                    focusNode: _searchFocus,
+                    onChanged: (_) => setState(() {}),
+                    onSubmitted: _submitSearch,
+                    decoration: const InputDecoration(
+                      border: OutlineInputBorder(),
+                      prefixIcon: Icon(Icons.qr_code_scanner),
+                      labelText: 'Scansiona barcode/SKU o cerca prodotto',
+                      hintText: 'Puoi scansionare anche senza cliccare questo campo',
+                    ),
                   ),
-                ),
-              ]),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Card(
-                clipBehavior: Clip.antiAlias,
-                child: Column(children: [
-                  Padding(
-                    padding: const EdgeInsets.all(14),
-                    child: Row(children: [
-                      Expanded(child: Text('Carrello · $count ${count == 1 ? 'articolo' : 'articoli'}', style: Theme.of(context).textTheme.titleLarge)),
-                      TextButton.icon(onPressed: _cart.isEmpty && _fixedDiscounts.isEmpty ? null : _clear, icon: const Icon(Icons.delete_sweep), label: const Text('Svuota')),
-                    ]),
-                  ),
-                  const Divider(height: 1),
+                  const SizedBox(height: 8),
+                  Text(_searchStatus),
+                  const SizedBox(height: 8),
                   Expanded(
-                    child: _cart.isEmpty && _fixedDiscounts.isEmpty
-                        ? const Center(child: Text('Carrello vuoto.'))
-                        : ListView(children: [
-                            ..._cart.map((line) => _CartTile(
-                                  line: line,
-                                  onDecrease: () => _changeQuantity(line, -1),
-                                  onIncrease: () => _changeQuantity(line, 1),
-                                  onDiscount: (value) => _setLineDiscount(line, value),
-                                  onRemove: () => _removeLine(line),
-                                )),
-                            ..._fixedDiscounts.map((line) => ListTile(
-                                  leading: const Icon(Icons.discount_outlined),
-                                  title: const Text('Sconto fisso'),
-                                  trailing: Row(mainAxisSize: MainAxisSize.min, children: [
-                                    Text('−${formatMoney(line.amountCents)}'),
-                                    IconButton(onPressed: () => _removeFixed(line), icon: const Icon(Icons.close)),
-                                  ]),
-                                )),
-                          ]),
-                  ),
-                  const Divider(height: 1),
-                  Padding(
-                    padding: const EdgeInsets.all(14),
-                    child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-                      Row(children: [
-                        Expanded(child: TextField(
-                          controller: _totalPercent,
-                          enabled: _cart.isNotEmpty,
-                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                          onChanged: (_) => setState(() {}),
-                          decoration: const InputDecoration(border: OutlineInputBorder(), labelText: 'Sconto totale %', suffixText: '%'),
-                        )),
-                        const SizedBox(width: 8),
-                        Expanded(child: TextField(
-                          controller: _fixedDiscount,
-                          enabled: _cart.isNotEmpty,
-                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                          onSubmitted: (_) => _addFixedDiscount(),
-                          decoration: const InputDecoration(border: OutlineInputBorder(), labelText: 'Sconto €', prefixText: '− € '),
-                        )),
-                      ]),
-                      const SizedBox(height: 10),
-                      if (itemDiscount > 0) Text('Sconti articoli: −${formatMoney(itemDiscount)}'),
-                      if (totalPercentDiscount > 0) Text('Sconto totale ${_percentText(_totalDiscountPercent)}%: −${formatMoney(totalPercentDiscount)}'),
-                      if (_fixedCents > 0) Text('Sconti fissi: −${formatMoney(_fixedCents)}'),
-                      const SizedBox(height: 4),
-                      Row(children: [
-                        Expanded(child: Text('Totale', style: Theme.of(context).textTheme.titleLarge)),
-                        Text(formatMoney(_finalTotalCents), style: Theme.of(context).textTheme.headlineMedium),
-                      ]),
-                      const SizedBox(height: 8),
-                      Text(_cartStatus, style: Theme.of(context).textTheme.bodySmall),
-                      const SizedBox(height: 8),
-                      FilledButton.icon(
-                        onPressed: null,
-                        icon: const Icon(Icons.receipt_long),
-                        label: const Text('Emetti documento commerciale (RT non integrato)'),
-                      ),
-                    ]),
+                    child: Card(
+                      clipBehavior: Clip.antiAlias,
+                      child: results.isEmpty
+                          ? const Center(child: Text('Nessun prodotto trovato.'))
+                          : ListView.separated(
+                              itemCount: results.length,
+                              separatorBuilder: (_, _) => const Divider(height: 1),
+                              itemBuilder: (context, index) {
+                                final p = results[index];
+                                return ListTile(
+                                  title: Text(p.name),
+                                  subtitle: Text('${p.variantDisplay} · SKU ${p.sku} · giacenza ${p.stockQuantity}'),
+                                  trailing: Text(p.salePriceDisplay),
+                                  onTap: () => _add(p),
+                                );
+                              },
+                            ),
+                    ),
                   ),
                 ]),
               ),
-            ),
-          ]),
-        ),
-      ]),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Card(
+                  clipBehavior: Clip.antiAlias,
+                  child: Column(children: [
+                    Padding(
+                      padding: const EdgeInsets.all(14),
+                      child: Row(children: [
+                        Expanded(child: Text('Carrello · $count ${count == 1 ? 'articolo' : 'articoli'}', style: Theme.of(context).textTheme.titleLarge)),
+                        TextButton.icon(onPressed: _cart.isEmpty && _fixedDiscounts.isEmpty ? null : _clear, icon: const Icon(Icons.delete_sweep), label: const Text('Svuota')),
+                      ]),
+                    ),
+                    const Divider(height: 1),
+                    Expanded(
+                      child: _cart.isEmpty && _fixedDiscounts.isEmpty
+                          ? const Center(child: Text('Carrello vuoto.'))
+                          : ListView(children: [
+                              ..._cart.map((line) => _CartTile(
+                                    line: line,
+                                    onDecrease: () => _changeQuantity(line, -1),
+                                    onIncrease: () => _changeQuantity(line, 1),
+                                    onDiscount: (value) => _setLineDiscount(line, value),
+                                    onRemove: () => _removeLine(line),
+                                  )),
+                              ..._fixedDiscounts.map((line) => ListTile(
+                                    leading: const Icon(Icons.discount_outlined),
+                                    title: const Text('Sconto fisso'),
+                                    trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+                                      Text('−${formatMoney(line.amountCents)}'),
+                                      IconButton(onPressed: () => _removeFixed(line), icon: const Icon(Icons.close)),
+                                    ]),
+                                  )),
+                            ]),
+                    ),
+                    const Divider(height: 1),
+                    Padding(
+                      padding: const EdgeInsets.all(14),
+                      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                        Row(children: [
+                          Expanded(child: TextField(
+                            controller: _totalPercent,
+                            enabled: _cart.isNotEmpty,
+                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                            onChanged: (_) => setState(() {}),
+                            decoration: const InputDecoration(border: OutlineInputBorder(), labelText: 'Sconto totale %', suffixText: '%'),
+                          )),
+                          const SizedBox(width: 8),
+                          Expanded(child: TextField(
+                            controller: _fixedDiscount,
+                            enabled: _cart.isNotEmpty,
+                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                            onSubmitted: (_) => _addFixedDiscount(),
+                            decoration: const InputDecoration(border: OutlineInputBorder(), labelText: 'Sconto €', prefixText: '− € '),
+                          )),
+                        ]),
+                        const SizedBox(height: 10),
+                        if (itemDiscount > 0) Text('Sconti articoli: −${formatMoney(itemDiscount)}'),
+                        if (totalPercentDiscount > 0) Text('Sconto totale ${_percentText(_totalDiscountPercent)}%: −${formatMoney(totalPercentDiscount)}'),
+                        if (_fixedCents > 0) Text('Sconti fissi: −${formatMoney(_fixedCents)}'),
+                        const SizedBox(height: 4),
+                        Row(children: [
+                          Expanded(child: Text('Totale', style: Theme.of(context).textTheme.titleLarge)),
+                          Text(formatMoney(_finalTotalCents), style: Theme.of(context).textTheme.headlineMedium),
+                        ]),
+                        const SizedBox(height: 8),
+                        Text(_cartStatus, style: Theme.of(context).textTheme.bodySmall),
+                        const SizedBox(height: 8),
+                        FilledButton.icon(
+                          onPressed: null,
+                          icon: const Icon(Icons.receipt_long),
+                          label: const Text('Emetti documento commerciale (RT non integrato)'),
+                        ),
+                      ]),
+                    ),
+                  ]),
+                ),
+              ),
+            ]),
+          ),
+        ]),
+      ),
     );
   }
 }
