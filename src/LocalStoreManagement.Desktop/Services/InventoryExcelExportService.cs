@@ -371,7 +371,9 @@ public sealed class InventoryExcelExportService
             worksheetDrawing.Append(anchor);
             worksheetDrawing.Save();
 
-            worksheetPart.Worksheet.Append(new Drawing
+            var targetWorksheet = worksheetPart.Worksheet
+                ?? throw new InvalidOperationException("Il foglio Excel non è stato inizializzato.");
+            targetWorksheet.Append(new Drawing
             {
                 Id = worksheetPart.GetIdOfPart(drawingsPart)
             });
