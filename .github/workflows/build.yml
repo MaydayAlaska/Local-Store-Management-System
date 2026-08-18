@@ -31,3 +31,83 @@ jobs:
 
       - name: Build
         run: dotnet build src/LocalStoreManagement.Desktop/LocalStoreManagement.Desktop.csproj --configuration Release --no-restore
+
+  publish-main:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    strategy:
+      matrix:
+        include:
+          - os: windows-latest
+            rid: win-x64
+            asset: LocalStoreManagement-win-x64.zip
+          - os: ubuntu-latest
+            rid: linux-x64
+            asset: LocalStoreManagement-linux-x64.zip
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Restore
+        run: dotnet restore src/LocalStoreManagement.Desktop/LocalStoreManagement.Desktop.csproj
+
+      - name: Publish self-contained package
+        run: dotnet publish src/LocalStoreManagement.Desktop/LocalStoreManagement.Desktop.csproj --configuration Release --runtime ${{ matrix.rid }} --self-contained true --output publish/${{ matrix.rid }}
+
+      - name: Write OTA build information
+        shell: pwsh
+        run: |
+          [xml]$project = Get-Content "src/LocalStoreManagement.Desktop/LocalStoreManagement.Desktop.csproj"
+          $version = $project.Project.PropertyGroup.Version | Select-Object -First 1
+          $info = [ordered]@{
+            version = "$version"
+            commit = "${{ github.sha }}"
+            branch = "main"
+          }
+          $info | ConvertTo-Json | Set-Content -Encoding utf8 "publish/${{ matrix.rid }}/build-info.json"
+
+      - name: Create OTA archive
+        shell: pwsh
+        run: Compress-Archive -Path "publish/${{ matrix.rid }}/*" -DestinationPath "${{ matrix.asset }}" -Force
+
+      - name: Upload OTA package
+        uses: actions/upload-artifact@v4
+        with:
+          name: ota-${{ matrix.rid }}
+          path: ${{ matrix.asset }}
+          if-no-files-found: error
+
+  release-main:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [build, publish-main]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download OTA packages
+        uses: actions/download-artifact@v4
+        with:
+          pattern: ota-*
+          path: dist
+          merge-multiple: true
+
+      - name: Publish OTA release for main commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="ota-${GITHUB_SHA}"
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release delete "$TAG" --repo "$GITHUB_REPOSITORY" --cleanup-tag --yes
+          fi
+          gh release create "$TAG" dist/*.zip \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$GITHUB_SHA" \
+            --title "OTA ${GITHUB_SHA::7}" \
+            --notes "Pacchetti automatici Windows/Linux generati dal branch main per l'aggiornamento in-app."
