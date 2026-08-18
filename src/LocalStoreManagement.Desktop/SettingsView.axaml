@@ -56,6 +56,17 @@
                 <TextBlock x:Name="StatusText" VerticalAlignment="Center" Opacity="0.65" />
             </StackPanel>
             <TextBlock Opacity="0.55" FontSize="12" Text="Immagini supportate: PNG, JPG, BMP; per l'icona è supportato anche ICO." />
+
+            <Border BorderBrush="#808080" BorderThickness="0,1,0,0" Padding="0,18,0,0" Opacity="0.95">
+                <StackPanel Spacing="8">
+                    <StackPanel Orientation="Horizontal" Spacing="12">
+                        <TextBlock VerticalAlignment="Center" FontWeight="SemiBold" Text="Versione" />
+                        <TextBlock x:Name="VersionText" VerticalAlignment="Center" />
+                        <Button x:Name="CheckUpdatesButton" Click="CheckUpdatesButton_OnClick" Content="Controlla aggiornamenti" />
+                    </StackPanel>
+                    <TextBlock x:Name="UpdateStatusText" MaxWidth="760" FontSize="12" Opacity="0.72" TextWrapping="Wrap" />
+                </StackPanel>
+            </Border>
         </StackPanel>
     </ScrollViewer>
 </UserControl>
