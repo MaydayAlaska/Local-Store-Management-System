@@ -14,7 +14,7 @@ class GlassTheme {
     );
 
     final glass = isDark ? const Color(0x1FFFFFFF) : const Color(0x8FFFFFFF);
-    final glassStrong = isDark ? const Color(0x2BFFFFFF) : const Color(0xB8FFFFFF);
+    final glassStrong = isDark ? const Color(0xD9232936) : const Color(0xEFFFFFFF);
     final glassSubtle = isDark ? const Color(0x14FFFFFF) : const Color(0x70FFFFFF);
     final border = isDark ? const Color(0x38FFFFFF) : const Color(0xA8FFFFFF);
     final softBorder = isDark ? const Color(0x24FFFFFF) : const Color(0x72FFFFFF);
@@ -66,10 +66,10 @@ class GlassTheme {
         space: 1,
       ),
       dialogTheme: DialogThemeData(
-        backgroundColor: glassStrong,
+        backgroundColor: isDark ? const Color(0xFA1E2430) : const Color(0xFAFFFFFF),
         surfaceTintColor: Colors.transparent,
-        shadowColor: Colors.black.withValues(alpha: isDark ? 0.35 : 0.14),
-        elevation: 0,
+        shadowColor: Colors.black.withValues(alpha: isDark ? 0.42 : 0.18),
+        elevation: 10,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(24),
           side: BorderSide(color: border),
@@ -78,7 +78,7 @@ class GlassTheme {
       popupMenuTheme: PopupMenuThemeData(
         color: glassStrong,
         surfaceTintColor: Colors.transparent,
-        elevation: 0,
+        elevation: 4,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
           side: BorderSide(color: border),
@@ -86,7 +86,7 @@ class GlassTheme {
       ),
       snackBarTheme: SnackBarThemeData(
         behavior: SnackBarBehavior.floating,
-        backgroundColor: isDark ? const Color(0xD9232936) : const Color(0xEFFFFFFF),
+        backgroundColor: isDark ? const Color(0xE9232936) : const Color(0xF7FFFFFF),
         contentTextStyle: TextStyle(color: scheme.onSurface),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
