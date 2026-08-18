@@ -13,6 +13,7 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        EnsureCashNavigationButton();
         ApplySidebarPresentationTweaks();
         InitializeCustomTitleBar();
         ApplySavedSettings();
@@ -166,6 +167,7 @@ public partial class MainWindow : Window
         var navigationButtons = new[]
         {
             DashboardNavButton,
+            _cashNavButton,
             ProductsNavButton,
             WarehouseNavButton,
             BrandsNavButton,
@@ -186,6 +188,7 @@ public partial class MainWindow : Window
         ProductsPanel.IsVisible = false;
         WarehousePanel.IsVisible = false;
         MovementsPanel.IsVisible = false;
+        HideCashView();
     }
 
     private void ReloadProducts()

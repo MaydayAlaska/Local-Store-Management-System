@@ -19,6 +19,7 @@ Gestionale desktop multipiattaforma per negozio, pensato per funzionare **offlin
 4. **Etichette**: selezione prodotto, anteprima, EAN-13 quando il codice è valido (Code 128 negli altri casi), numero copie, dimensioni etichetta e stampa tramite le code di sistema Windows/Linux.
 5. **Backup ed esportazione**: backup locale del database; esportazione completa dell'inventario in Excel o PDF, raggruppata per marca in ordine alfabetico, oppure esportazione parziale filtrando una o più marche e/o una o più categorie. L'Excel completo usa un unico foglio diviso in sezioni per marca.
 6. **Impostazioni**: nome negozio, icona dell'applicazione e logo del negozio da riutilizzare nelle esportazioni Excel/PDF.
+7. **Cassa**: pannello di vendita con ricerca/scansione SKU o barcode, carrello temporaneo, quantità e totale. L'emissione del documento commerciale e lo scarico automatico di magazzino restano disattivati finché non viene integrato un registratore telematico supportato.
 
 Non è previsto un modulo separato di inventario fisico/conteggio sessioni.
 
@@ -28,6 +29,7 @@ Non è previsto un modulo separato di inventario fisico/conteggio sessioni.
 - magazzino: carico, scarico, rettifica e storico movimenti implementati;
 - scanner: integrazione HID implementata con ricerca/apertura prodotto, creazione da codice sconosciuto, carico rapido +1 e scarico rapido -1;
 - Dashboard: ricerca manuale prodotti per nome, SKU e barcode implementata;
+- Cassa: pannello base implementato con scanner HID, ricerca prodotti, carrello temporaneo, controllo della disponibilità, modifica quantità e calcolo del totale; pagamento, documento commerciale e scarico magazzino restano volutamente disattivati fino all'integrazione RT;
 - etichette: generazione/anteprima e backend di stampa Windows GDI + Linux CUPS implementati; resta da calibrare e verificare fisicamente la ApiX110 con le etichette reali;
 - impostazioni: nome negozio, icona programma e logo negozio persistenti implementati;
 - backup database: implementato;
@@ -44,7 +46,8 @@ src/LocalStoreManagement.Desktop/
 ├── Models/                # modelli applicativi
 ├── Services/              # barcode, stampa etichette, backup ed esportazioni
 ├── App.axaml              # bootstrap Avalonia
-├── MainWindow.axaml       # shell desktop, Dashboard e flusso scanner
+├── MainWindow.axaml       # shell desktop, Dashboard e navigazione principale
+├── CashView.*             # pannello Cassa e carrello di vendita temporaneo
 ├── LabelsWindow.*         # anteprima e stampa etichette
 ├── ExportWindow.*         # backup ed esportazioni Excel/PDF
 ├── SettingsWindow.*       # impostazioni negozio
@@ -78,9 +81,9 @@ Gli stessi sorgenti vengono compilati su Windows e Linux.
 
 ## Hardware previsto
 
-Lo scanner di codici a barre viene trattato come dispositivo HID/tastiera: il codice scansionato termina con `Enter` e viene acquisito dal gestionale. Dalla dashboard si può scegliere tra ricerca/apertura prodotto, carico rapido e scarico rapido. Nelle modalità rapide ogni scansione corrisponde a un singolo pezzo.
+Lo scanner di codici a barre viene trattato come dispositivo HID/tastiera: il codice scansionato termina con `Enter` e viene acquisito dal gestionale. Dalla Dashboard si può scegliere tra ricerca/apertura prodotto, carico rapido e scarico rapido. Nel pannello Cassa ogni scansione di una variante vendibile aggiunge un pezzo al carrello, fino alla giacenza disponibile.
 
-Se un codice scansionato non è presente, viene aperta la scheda di creazione prodotto con il barcode già compilato; l'utente può completarla oppure annullare.
+Se un codice scansionato non è presente, dalla Dashboard viene aperta la scheda di creazione prodotto con il barcode già compilato; l'utente può completarla oppure annullare. In Cassa il codice sconosciuto viene segnalato senza modificare il carrello.
 
 La stampa delle etichette resta isolata dietro `ILabelPrinter`:
 
@@ -88,3 +91,5 @@ La stampa delle etichette resta isolata dietro `ILabelPrinter`:
 - su **Linux** genera una pagina PDF della misura scelta e la invia tramite `lp` alla coda **CUPS**.
 
 La schermata Etichette rileva le stampanti installate, permette di scegliere il prodotto, il numero di copie e la misura dell'etichetta. La prova fisica con la ApiX110 serve per confermare driver, orientamento, sensore, margini e calibrazione prima di considerare chiusa la parte hardware.
+
+L'integrazione con il registratore telematico è prevista dietro un livello dedicato: finché non sono disponibili protocollo/SDK compatibili, il pulsante di emissione scontrino nel pannello Cassa rimane disabilitato e nessun movimento di magazzino viene generato dal carrello.

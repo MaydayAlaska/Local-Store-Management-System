@@ -1,0 +1,173 @@
+<UserControl
+    x:Class="LocalStoreManagement.Desktop.CashView"
+    xmlns="https://github.com/avaloniaui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    x:CompileBindings="False">
+
+    <Grid Margin="24,8,24,24" RowDefinitions="Auto,*" RowSpacing="14">
+        <Grid ColumnDefinitions="*,Auto">
+            <TextBlock
+                Classes="Muted"
+                VerticalAlignment="Center"
+                FontSize="12"
+                TextWrapping="Wrap"
+                Text="Scansiona gli articoli o cercali manualmente. Il carrello non modifica la giacenza finché la vendita non viene completata." />
+            <Border Grid.Column="1" Padding="11,5" Background="{DynamicResource AppOrangeSoftBrush}" BorderBrush="{DynamicResource AppOrangeBorderBrush}" BorderThickness="1" CornerRadius="999">
+                <TextBlock FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource AppOrangeTextBrush}" Text="RT non configurato" />
+            </Border>
+        </Grid>
+
+        <Grid Grid.Row="1" ColumnDefinitions="390,*" ColumnSpacing="16">
+            <Border Classes="Card" Padding="14">
+                <Grid RowDefinitions="Auto,Auto,*,Auto" RowSpacing="10">
+                    <TextBox
+                        x:Name="CashSearchInput"
+                        Classes="SearchBox"
+                        FontSize="16"
+                        TextChanged="CashSearchInput_OnTextChanged"
+                        KeyDown="CashSearchInput_OnKeyDown"
+                        PlaceholderText="Scansiona barcode/SKU o cerca un prodotto..." />
+
+                    <TextBlock
+                        x:Name="CashSearchStatusText"
+                        Grid.Row="1"
+                        Classes="Muted"
+                        FontSize="11"
+                        TextWrapping="Wrap"
+                        Text="Scanner HID pronto. Premi Invio dopo un codice oppure seleziona un prodotto." />
+
+                    <Border Grid.Row="2" Classes="InsetCard" Padding="4">
+                        <Grid>
+                            <ListBox
+                                x:Name="CashProductsList"
+                                SelectionChanged="CashProductsList_OnSelectionChanged"
+                                DoubleTapped="CashProductsList_OnDoubleTapped">
+                                <ListBox.ItemTemplate>
+                                    <DataTemplate>
+                                        <Grid Margin="10,8" ColumnDefinitions="*,74,86">
+                                            <StackPanel Spacing="2">
+                                                <TextBlock FontWeight="SemiBold" Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
+                                                <TextBlock Classes="Muted" FontSize="11" Text="{Binding DetailsDisplay}" TextTrimming="CharacterEllipsis" />
+                                            </StackPanel>
+                                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                                <TextBlock HorizontalAlignment="Right" FontWeight="SemiBold" Text="{Binding StockQuantity}" />
+                                                <TextBlock Classes="Muted" HorizontalAlignment="Right" FontSize="10" Text="disp." />
+                                            </StackPanel>
+                                            <TextBlock Grid.Column="2" VerticalAlignment="Center" HorizontalAlignment="Right" FontWeight="SemiBold" Text="{Binding SalePriceDisplay}" />
+                                        </Grid>
+                                    </DataTemplate>
+                                </ListBox.ItemTemplate>
+                            </ListBox>
+                            <TextBlock
+                                x:Name="CashEmptyProductsText"
+                                IsVisible="False"
+                                HorizontalAlignment="Center"
+                                VerticalAlignment="Center"
+                                Classes="Muted"
+                                Text="Nessun prodotto trovato." />
+                        </Grid>
+                    </Border>
+
+                    <Button
+                        x:Name="CashAddSelectedButton"
+                        Grid.Row="3"
+                        Classes="Primary"
+                        HorizontalAlignment="Stretch"
+                        Click="CashAddSelectedButton_OnClick"
+                        Content="Aggiungi selezionato"
+                        IsEnabled="False" />
+                </Grid>
+            </Border>
+
+            <Border Grid.Column="1" Classes="Card" Padding="0">
+                <Grid RowDefinitions="Auto,*,Auto">
+                    <Border Padding="16,12" Background="{DynamicResource AppSurfaceMutedBrush}" CornerRadius="18,18,0,0">
+                        <Grid ColumnDefinitions="*,82,56,100">
+                            <TextBlock Classes="ColumnHeader" Text="ARTICOLO" />
+                            <TextBlock Grid.Column="1" Classes="ColumnHeader" HorizontalAlignment="Right" Text="PREZZO" />
+                            <TextBlock Grid.Column="2" Classes="ColumnHeader" HorizontalAlignment="Right" Text="Q.TÀ" />
+                            <TextBlock Grid.Column="3" Classes="ColumnHeader" HorizontalAlignment="Right" Text="TOTALE" />
+                        </Grid>
+                    </Border>
+
+                    <Grid Grid.Row="1">
+                        <ListBox
+                            x:Name="CashCartList"
+                            Margin="4"
+                            SelectionChanged="CashCartList_OnSelectionChanged">
+                            <ListBox.ItemTemplate>
+                                <DataTemplate>
+                                    <Grid Margin="12,10" ColumnDefinitions="*,82,56,100">
+                                        <StackPanel Spacing="2">
+                                            <TextBlock FontWeight="SemiBold" Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
+                                            <TextBlock Classes="Muted" FontSize="11" Text="{Binding DetailsDisplay}" TextTrimming="CharacterEllipsis" />
+                                        </StackPanel>
+                                        <TextBlock Grid.Column="1" VerticalAlignment="Center" HorizontalAlignment="Right" Text="{Binding UnitPriceDisplay}" />
+                                        <TextBlock Grid.Column="2" VerticalAlignment="Center" HorizontalAlignment="Right" FontWeight="SemiBold" Text="{Binding QuantityDisplay}" />
+                                        <TextBlock Grid.Column="3" VerticalAlignment="Center" HorizontalAlignment="Right" FontWeight="SemiBold" Text="{Binding LineTotalDisplay}" />
+                                    </Grid>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
+
+                        <StackPanel
+                            x:Name="CashEmptyCartText"
+                            HorizontalAlignment="Center"
+                            VerticalAlignment="Center"
+                            Spacing="5">
+                            <TextBlock HorizontalAlignment="Center" FontSize="18" FontWeight="SemiBold" Text="Carrello vuoto" />
+                            <TextBlock Classes="Muted" HorizontalAlignment="Center" FontSize="12" Text="Scansiona il primo articolo per iniziare." />
+                        </StackPanel>
+                    </Grid>
+
+                    <Border Grid.Row="2" Padding="16" BorderBrush="{DynamicResource AppBorderBrush}" BorderThickness="0,1,0,0">
+                        <StackPanel Spacing="12">
+                            <Grid ColumnDefinitions="Auto,Auto,Auto,*,Auto" ColumnSpacing="8">
+                                <Button x:Name="CashDecreaseButton" Click="CashDecreaseButton_OnClick" Content="−1" IsEnabled="False" />
+                                <Button x:Name="CashIncreaseButton" Grid.Column="1" Click="CashIncreaseButton_OnClick" Content="+1" IsEnabled="False" />
+                                <Button x:Name="CashRemoveButton" Grid.Column="2" Classes="Danger" Click="CashRemoveButton_OnClick" Content="Rimuovi" IsEnabled="False" />
+                                <Button x:Name="CashClearButton" Grid.Column="4" Click="CashClearButton_OnClick" Content="Svuota carrello" IsEnabled="False" />
+                            </Grid>
+
+                            <TextBlock
+                                x:Name="CashCartStatusText"
+                                Classes="Muted"
+                                FontSize="11"
+                                TextWrapping="Wrap"
+                                Text="Il carrello è locale e temporaneo. Nessun movimento di magazzino viene ancora registrato." />
+
+                            <Border Classes="InsetCard" Padding="16">
+                                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="20">
+                                    <StackPanel Spacing="3">
+                                        <TextBlock Classes="FieldLabel" Text="TOTALE VENDITA" />
+                                        <TextBlock x:Name="CashTotalText" FontSize="38" FontWeight="SemiBold" Text="0,00 €" />
+                                        <TextBlock x:Name="CashItemsCountText" Classes="Muted" FontSize="11" Text="0 articoli" />
+                                    </StackPanel>
+
+                                    <StackPanel Grid.Column="1" MinWidth="220" VerticalAlignment="Center" Spacing="8">
+                                        <TextBlock Classes="FieldLabel" Text="PAGAMENTO" />
+                                        <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+                                            <Button IsEnabled="False" Content="Contanti" />
+                                            <Button Grid.Column="1" IsEnabled="False" Content="Carta" />
+                                        </Grid>
+                                        <Button
+                                            x:Name="CashCheckoutButton"
+                                            Classes="Primary"
+                                            HorizontalAlignment="Stretch"
+                                            IsEnabled="False"
+                                            Content="Emetti scontrino" />
+                                        <TextBlock
+                                            Classes="Muted"
+                                            HorizontalAlignment="Center"
+                                            FontSize="10"
+                                            Text="Disponibile dopo l'integrazione con il registratore telematico." />
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
+                        </StackPanel>
+                    </Border>
+                </Grid>
+            </Border>
+        </Grid>
+    </Grid>
+</UserControl>
