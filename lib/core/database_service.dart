@@ -26,14 +26,23 @@ class DatabaseService {
       _ensureLegacyColumns();
       _migrateLegacyCategories();
       _migrateLegacyBrands();
-      await _createPreMigrationBackup();
+      await _createPreMigrationBackup('variants');
       _migrateToProductVariantSchema();
     } else {
       _createCatalogSchema();
+      final needsPriceMigration =
+          !_hasColumn('products', 'purchase_price_cents') || !_hasColumn('products', 'sale_price_cents');
+      if (needsPriceMigration) {
+        await _createPreMigrationBackup('prices');
+        _ensureProductPriceColumns();
+        _migrateExistingVariantPricesToProducts();
+      } else {
+        _ensureProductPriceColumns();
+      }
     }
 
     _createIndexes();
-    _database.execute('PRAGMA user_version = 2;');
+    _database.execute('PRAGMA user_version = 3;');
   }
 
   void dispose() => _database.dispose();
@@ -58,6 +67,8 @@ class DatabaseService {
         name TEXT NOT NULL,
         category_id INTEGER,
         brand_id INTEGER,
+        purchase_price_cents INTEGER,
+        sale_price_cents INTEGER,
         notes TEXT,
         is_active INTEGER NOT NULL DEFAULT 1,
         created_at_utc TEXT NOT NULL,
@@ -95,6 +106,11 @@ class DatabaseService {
         FOREIGN KEY (variant_id) REFERENCES product_variants(id) ON DELETE RESTRICT
       );
     ''');
+  }
+
+  void _ensureProductPriceColumns() {
+    _ensureColumn('products', 'purchase_price_cents', 'INTEGER');
+    _ensureColumn('products', 'sale_price_cents', 'INTEGER');
   }
 
   void _ensureLegacyColumns() {
@@ -142,10 +158,10 @@ class DatabaseService {
     });
   }
 
-  Future<void> _createPreMigrationBackup() async {
+  Future<void> _createPreMigrationBackup(String reason) async {
     final destination = p.join(
       AppPaths.backupsDirectory,
-      'store-pre-variants-${_timestamp(DateTime.now())}.db',
+      'store-pre-$reason-${_timestamp(DateTime.now())}.db',
     );
     _database.dispose();
     await File(path).copy(destination);
@@ -165,15 +181,18 @@ class DatabaseService {
         }
         _createCatalogSchema();
         _database.execute('''
-          INSERT INTO products (id, name, category_id, brand_id, notes, is_active, created_at_utc, updated_at_utc)
-          SELECT id, name, category_id, brand_id, notes, COALESCE(is_active, 1), created_at_utc, updated_at_utc
+          INSERT INTO products (
+            id, name, category_id, brand_id, purchase_price_cents, sale_price_cents,
+            notes, is_active, created_at_utc, updated_at_utc)
+          SELECT id, name, category_id, brand_id, purchase_price_cents, sale_price_cents,
+            notes, COALESCE(is_active, 1), created_at_utc, updated_at_utc
           FROM legacy_products;
         ''');
         _database.execute('''
           INSERT INTO product_variants (
             id, product_id, sku, variant, size, purchase_price_cents, sale_price_cents,
             is_active, created_at_utc, updated_at_utc)
-          SELECT id, id, sku, variant, size, purchase_price_cents, sale_price_cents,
+          SELECT id, id, sku, variant, size, NULL, NULL,
             COALESCE(is_active, 1), created_at_utc, updated_at_utc
           FROM legacy_products;
         ''');
@@ -195,6 +214,50 @@ class DatabaseService {
     } finally {
       _database.execute('PRAGMA foreign_keys = ON;');
     }
+  }
+
+  void _migrateExistingVariantPricesToProducts() {
+    _transaction(() {
+      _promoteCommonVariantPrice('purchase_price_cents');
+      _promoteCommonVariantPrice('sale_price_cents');
+    });
+  }
+
+  void _promoteCommonVariantPrice(String column) {
+    _database.execute('''
+      UPDATE products
+      SET $column = (
+        SELECT MIN(pv.$column)
+        FROM product_variants pv
+        WHERE pv.product_id = products.id
+      )
+      WHERE $column IS NULL
+        AND EXISTS (
+          SELECT 1 FROM product_variants pv
+          WHERE pv.product_id = products.id
+        )
+        AND NOT EXISTS (
+          SELECT 1 FROM product_variants pv
+          WHERE pv.product_id = products.id AND pv.$column IS NULL
+        )
+        AND (
+          SELECT COUNT(DISTINCT pv.$column)
+          FROM product_variants pv
+          WHERE pv.product_id = products.id
+        ) = 1;
+    ''');
+
+    _database.execute('''
+      UPDATE product_variants
+      SET $column = NULL
+      WHERE $column IS NOT NULL
+        AND EXISTS (
+          SELECT 1 FROM products p
+          WHERE p.id = product_variants.product_id
+            AND p.$column IS NOT NULL
+            AND p.$column = product_variants.$column
+        );
+    ''');
   }
 
   void _createIndexes() {
