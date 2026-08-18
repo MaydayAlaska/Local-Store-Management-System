@@ -12,7 +12,7 @@ class ApplicationIconService {
 
   Future<void> apply(AppSettings appSettings) async {
     try {
-      await windowManager.setTitle(appSettings.shopName);
+      await windowManager.setTitle('Local Store Management System');
     } catch (_) {
       // Il titolo nativo è accessorio alla barra Flutter.
     }
