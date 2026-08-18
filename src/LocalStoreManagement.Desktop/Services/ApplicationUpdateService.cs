@@ -387,7 +387,10 @@ public sealed class ApplicationUpdateService
         }
 
         var build = Math.Max(0, version.Build);
-        return $"{version.Major}.{version.Minor}.{build}";
+        var revision = Math.Max(0, version.Revision);
+        return revision > 0
+            ? $"{version.Major}.{version.Minor}.{build}.{revision}"
+            : $"{version.Major}.{version.Minor}.{build}";
     }
 
     private static string TrimBody(string body)

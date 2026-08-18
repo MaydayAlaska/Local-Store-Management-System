@@ -11,7 +11,10 @@ public partial class StockMovementWindow : Window
     private readonly StockMovementKind _kind;
 
     public StockMovementWindow()
-        : this(new StockMovementRepository(), new Product(0, "", null, "", null, null, null, null, null, null, null, null, null, true, 0), StockMovementKind.Incoming)
+        : this(
+            new StockMovementRepository(),
+            new Product(0, 0, "", null, "", null, null, null, null, null, null, null, null, null, true, 0, null),
+            StockMovementKind.Incoming)
     {
     }
 
@@ -23,7 +26,7 @@ public partial class StockMovementWindow : Window
 
         InitializeComponent();
 
-        ProductNameText.Text = product.Name;
+        ProductNameText.Text = $"{product.Name} · {product.VariantDisplay}";
         ProductCodeText.Text = string.IsNullOrWhiteSpace(product.Barcode)
             ? product.Sku
             : $"{product.Sku}  •  {product.Barcode}";
@@ -33,7 +36,7 @@ public partial class StockMovementWindow : Window
         {
             case StockMovementKind.Incoming:
                 EditorTitle.Text = "Carico merce";
-                EditorSubtitle.Text = "Aggiunge pezzi alla giacenza del prodotto.";
+                EditorSubtitle.Text = "Aggiunge pezzi alla giacenza della variante selezionata.";
                 QuantityLabel.Text = "Quantità da caricare";
                 QuantityHelpText.Text = "Inserisci il numero di pezzi ricevuti.";
                 QuantityInput.Minimum = 1;
@@ -42,7 +45,7 @@ public partial class StockMovementWindow : Window
 
             case StockMovementKind.Outgoing:
                 EditorTitle.Text = "Scarico merce";
-                EditorSubtitle.Text = "Rimuove pezzi dalla giacenza del prodotto.";
+                EditorSubtitle.Text = "Rimuove pezzi dalla giacenza della variante selezionata.";
                 QuantityLabel.Text = "Quantità da scaricare";
                 QuantityHelpText.Text = "Non è possibile portare la giacenza sotto zero.";
                 QuantityInput.Minimum = 1;
@@ -52,7 +55,7 @@ public partial class StockMovementWindow : Window
 
             case StockMovementKind.Adjustment:
                 EditorTitle.Text = "Rettifica giacenza";
-                EditorSubtitle.Text = "Imposta la quantità reale registrando la differenza nello storico.";
+                EditorSubtitle.Text = "Imposta la quantità reale della variante registrando la differenza nello storico.";
                 QuantityLabel.Text = "Nuova giacenza";
                 QuantityHelpText.Text = "Indica quanti pezzi devono risultare dopo la rettifica.";
                 QuantityInput.Minimum = 0;

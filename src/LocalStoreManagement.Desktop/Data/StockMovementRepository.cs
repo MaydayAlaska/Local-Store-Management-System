@@ -7,12 +7,12 @@ namespace LocalStoreManagement.Desktop.Data;
 
 public sealed class StockMovementRepository
 {
-    public long GetCurrentStock(long productId)
+    public long GetCurrentStock(long variantId)
     {
         using var connection = OpenConnection();
         using var command = connection.CreateCommand();
-        command.CommandText = "SELECT COALESCE(SUM(quantity_delta), 0) FROM stock_movements WHERE product_id = @productId;";
-        command.Parameters.AddWithValue("@productId", productId);
+        command.CommandText = "SELECT COALESCE(SUM(quantity_delta), 0) FROM stock_movements WHERE variant_id = @variantId;";
+        command.Parameters.AddWithValue("@variantId", variantId);
         return Convert.ToInt64(command.ExecuteScalar() ?? 0L, CultureInfo.InvariantCulture);
     }
 
@@ -24,11 +24,11 @@ public sealed class StockMovementRepository
         return Convert.ToInt64(command.ExecuteScalar() ?? 0L, CultureInfo.InvariantCulture);
     }
 
-    public long AddMovement(long productId, StockMovementKind kind, long quantity, string? note)
+    public long AddMovement(long variantId, StockMovementKind kind, long quantity, string? note)
     {
         using var connection = OpenConnection();
         using var transaction = connection.BeginTransaction();
-        var currentStock = GetCurrentStock(connection, transaction, productId);
+        var currentStock = GetCurrentStock(connection, transaction, variantId);
         string movementType;
         long quantityDelta;
 
@@ -58,11 +58,11 @@ public sealed class StockMovementRepository
         using var command = connection.CreateCommand();
         command.Transaction = transaction;
         command.CommandText = """
-            INSERT INTO stock_movements (product_id, movement_type, quantity_delta, note, created_at_utc)
-            VALUES (@productId, @movementType, @quantityDelta, @note, @createdAtUtc);
+            INSERT INTO stock_movements (variant_id, movement_type, quantity_delta, note, created_at_utc)
+            VALUES (@variantId, @movementType, @quantityDelta, @note, @createdAtUtc);
             SELECT last_insert_rowid();
             """;
-        command.Parameters.AddWithValue("@productId", productId);
+        command.Parameters.AddWithValue("@variantId", variantId);
         command.Parameters.AddWithValue("@movementType", movementType);
         command.Parameters.AddWithValue("@quantityDelta", quantityDelta);
         command.Parameters.AddWithValue("@note", string.IsNullOrWhiteSpace(note) ? DBNull.Value : note.Trim());
@@ -80,30 +80,50 @@ public sealed class StockMovementRepository
         command.CommandText = """
             WITH movement_rows AS (
                 SELECT
-                    sm.id, sm.product_id, p.sku, p.barcode, p.name,
-                    b.name AS brand, c.name AS category,
-                    sm.movement_type, sm.quantity_delta, sm.note, sm.created_at_utc,
+                    sm.id,
+                    sm.variant_id,
+                    pv.sku,
+                    (SELECT pb.barcode FROM product_barcodes pb WHERE pb.variant_id = pv.id ORDER BY pb.is_primary DESC, pb.id LIMIT 1) AS barcode,
+                    p.name,
+                    pv.variant,
+                    pv.size,
+                    b.name AS brand,
+                    c.name AS category,
+                    sm.movement_type,
+                    sm.quantity_delta,
+                    sm.note,
+                    sm.created_at_utc,
                     SUM(sm.quantity_delta) OVER (
-                        PARTITION BY sm.product_id
+                        PARTITION BY sm.variant_id
                         ORDER BY sm.created_at_utc, sm.id
                         ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
                     ) AS stock_after
                 FROM stock_movements sm
-                INNER JOIN products p ON p.id = sm.product_id
+                INNER JOIN product_variants pv ON pv.id = sm.variant_id
+                INNER JOIN products p ON p.id = pv.product_id
                 LEFT JOIN brands b ON b.id = p.brand_id
                 LEFT JOIN categories c ON c.id = p.category_id
             )
-            SELECT id, product_id, sku, barcode, name, brand, category,
-                   movement_type, quantity_delta, note, created_at_utc, stock_after
+            SELECT id, variant_id, sku, barcode,
+                   name ||
+                       CASE WHEN COALESCE(variant, '') <> '' THEN ' · ' || variant ELSE '' END ||
+                       CASE WHEN COALESCE(size, '') <> '' THEN ' · Taglia ' || size ELSE '' END AS display_name,
+                   brand, category, movement_type, quantity_delta, note, created_at_utc, stock_after
             FROM movement_rows
             WHERE @search = ''
                OR sku LIKE @pattern COLLATE NOCASE
                OR COALESCE(barcode, '') LIKE @pattern COLLATE NOCASE
                OR name LIKE @pattern COLLATE NOCASE
+               OR COALESCE(variant, '') LIKE @pattern COLLATE NOCASE
+               OR COALESCE(size, '') LIKE @pattern COLLATE NOCASE
                OR COALESCE(brand, '') LIKE @pattern COLLATE NOCASE
                OR COALESCE(category, '') LIKE @pattern COLLATE NOCASE
                OR COALESCE(note, '') LIKE @pattern COLLATE NOCASE
                OR movement_type LIKE @pattern COLLATE NOCASE
+               OR EXISTS (
+                    SELECT 1 FROM product_barcodes search_pb
+                    WHERE search_pb.variant_id = movement_rows.variant_id
+                      AND search_pb.barcode LIKE @pattern COLLATE NOCASE)
             ORDER BY created_at_utc DESC, id DESC
             LIMIT @limit;
             """;
@@ -125,12 +145,12 @@ public sealed class StockMovementRepository
         return movements;
     }
 
-    private static long GetCurrentStock(SqliteConnection connection, SqliteTransaction transaction, long productId)
+    private static long GetCurrentStock(SqliteConnection connection, SqliteTransaction transaction, long variantId)
     {
         using var command = connection.CreateCommand();
         command.Transaction = transaction;
-        command.CommandText = "SELECT COALESCE(SUM(quantity_delta), 0) FROM stock_movements WHERE product_id = @productId;";
-        command.Parameters.AddWithValue("@productId", productId);
+        command.CommandText = "SELECT COALESCE(SUM(quantity_delta), 0) FROM stock_movements WHERE variant_id = @variantId;";
+        command.Parameters.AddWithValue("@variantId", variantId);
         return Convert.ToInt64(command.ExecuteScalar() ?? 0L, CultureInfo.InvariantCulture);
     }
 
@@ -146,12 +166,5 @@ public sealed class StockMovementRepository
         => reader.IsDBNull(ordinal) ? null : reader.GetString(ordinal);
 
     private static SqliteConnection OpenConnection()
-    {
-        var connection = new SqliteConnection($"Data Source={AppPaths.DatabasePath}");
-        connection.Open();
-        using var command = connection.CreateCommand();
-        command.CommandText = "PRAGMA foreign_keys = ON;";
-        command.ExecuteNonQuery();
-        return connection;
-    }
+        => DatabaseConnectionFactory.Open();
 }

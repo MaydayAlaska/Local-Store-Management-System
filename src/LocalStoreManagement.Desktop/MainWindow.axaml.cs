@@ -13,22 +13,44 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        EnsureCashNavigationButton();
+        ApplySidebarPresentationTweaks();
+        InitializeCustomTitleBar();
         ApplySavedSettings();
+        InitializeResponsiveLayout();
 
         DatabasePathText.Text = $"Database: {AppPaths.DatabasePath}";
         Opened += (_, _) =>
         {
             RefreshDashboardCounters();
+            SetActiveNavigation(DashboardNavButton);
             DashboardSearchInput.Focus();
         };
     }
 
+    private void ApplySidebarPresentationTweaks()
+    {
+        DashboardNavButton.Content = "Dashboard";
+        ProductsNavButton.Content = "Prodotti";
+        WarehouseNavButton.Content = "Magazzino";
+        BrandsNavButton.Content = "Marche";
+        CategoriesNavButton.Content = "Categorie";
+        LabelsNavButton.Content = "Etichette";
+        MovementsNavButton.Content = "Movimenti";
+        ExportNavButton.Content = "Esportazione";
+
+        if (SettingsNavButton.Parent is Grid footer)
+        {
+            foreach (var child in footer.Children)
+            {
+                if (!ReferenceEquals(child, SettingsNavButton)) child.IsVisible = false;
+            }
+        }
+    }
+
     private void DashboardButton_OnClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e) => ShowDashboard();
-
     private void ProductsButton_OnClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e) => ShowProducts();
-
     private void WarehouseButton_OnClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e) => ShowWarehouse();
-
     private void MovementsButton_OnClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e) => ShowMovements();
 
     private async void NewProductButton_OnClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
@@ -38,6 +60,7 @@ public partial class MainWindow : Window
         if (saved)
         {
             ReloadProducts();
+            ReloadWarehouseProducts();
             RefreshDashboardCounters();
             ReloadDashboardSearch();
         }
@@ -45,32 +68,22 @@ public partial class MainWindow : Window
 
     private async void EditProductButton_OnClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
-        if (ProductsList.SelectedItem is not Product product)
-        {
-            return;
-        }
+        if (ProductsList.SelectedItem is not ProductSummary product) return;
 
-        var latest = _productRepository.GetById(product.Id);
+        var latest = _productRepository.GetProduct(product.Id);
         if (latest is null)
         {
             ReloadProducts();
             return;
         }
 
-        var editor = new ProductEditorWindow(_productRepository, latest);
+        var editor = new ProductEditorWindow(_productRepository, latest.Id);
         var saved = await editor.ShowDialog<bool>(this);
-        if (saved)
-        {
-            ReloadProducts();
-            RefreshDashboardCounters();
-            ReloadDashboardSearch();
-        }
+        if (saved) RefreshAllData();
     }
 
     private void ProductSearchInput_OnTextChanged(object? sender, TextChangedEventArgs e) => ReloadProducts();
-
     private void WarehouseSearchInput_OnTextChanged(object? sender, TextChangedEventArgs e) => ReloadWarehouseProducts();
-
     private void MovementSearchInput_OnTextChanged(object? sender, TextChangedEventArgs e) => ReloadMovements();
 
     private async void IncomingButton_OnClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
@@ -87,10 +100,7 @@ public partial class MainWindow : Window
 
     private async Task OpenMovementEditorAsync(StockMovementKind kind)
     {
-        if (WarehouseProductsList.SelectedItem is not Product product)
-        {
-            return;
-        }
+        if (WarehouseProductsList.SelectedItem is not Product product) return;
 
         var latest = _productRepository.GetById(product.Id);
         if (latest is null)
@@ -101,17 +111,14 @@ public partial class MainWindow : Window
 
         var editor = new StockMovementWindow(_stockMovementRepository, latest, kind);
         var saved = await editor.ShowDialog<bool>(this);
-        if (!saved)
-        {
-            return;
-        }
-
-        RefreshAllData();
+        if (saved) RefreshAllData();
     }
 
     private void ShowDashboard()
     {
+        HideEmbeddedViews();
         HideAllPanels();
+        SetActiveNavigation(DashboardNavButton);
         DashboardPanel.IsVisible = true;
         PageTitle.Text = "Dashboard";
         PageSubtitle.Text = "Ricerca, scansione e giacenza rapida";
@@ -122,32 +129,58 @@ public partial class MainWindow : Window
 
     private void ShowProducts()
     {
+        HideEmbeddedViews();
         HideAllPanels();
+        SetActiveNavigation(ProductsNavButton);
         ProductsPanel.IsVisible = true;
         PageTitle.Text = "Prodotti";
-        PageSubtitle.Text = "Anagrafica articoli, prezzi e attributi";
+        PageSubtitle.Text = "Modelli prodotto e relative varianti colore/taglia";
         ReloadProducts();
         ProductSearchInput.Focus();
     }
 
     private void ShowWarehouse()
     {
+        HideEmbeddedViews();
         HideAllPanels();
+        SetActiveNavigation(WarehouseNavButton);
         WarehousePanel.IsVisible = true;
         PageTitle.Text = "Magazzino";
-        PageSubtitle.Text = "Carico, scarico e rettifica delle giacenze";
+        PageSubtitle.Text = "Giacenze per singola variante, SKU e barcode";
         ReloadWarehouseProducts();
         WarehouseSearchInput.Focus();
     }
 
     private void ShowMovements()
     {
+        HideEmbeddedViews();
         HideAllPanels();
+        SetActiveNavigation(MovementsNavButton);
         MovementsPanel.IsVisible = true;
         PageTitle.Text = "Movimenti";
-        PageSubtitle.Text = "Storico cronologico di tutte le variazioni di magazzino";
+        PageSubtitle.Text = "Storico cronologico delle variazioni per variante";
         ReloadMovements();
         MovementSearchInput.Focus();
+    }
+
+    private void SetActiveNavigation(Button activeButton)
+    {
+        var navigationButtons = new[]
+        {
+            DashboardNavButton,
+            _cashNavButton,
+            ProductsNavButton,
+            WarehouseNavButton,
+            BrandsNavButton,
+            CategoriesNavButton,
+            LabelsNavButton,
+            MovementsNavButton,
+            ExportNavButton,
+            SettingsNavButton
+        };
+
+        foreach (var button in navigationButtons) button.Classes.Remove("Selected");
+        if (!activeButton.Classes.Contains("Selected")) activeButton.Classes.Add("Selected");
     }
 
     private void HideAllPanels()
@@ -156,11 +189,12 @@ public partial class MainWindow : Window
         ProductsPanel.IsVisible = false;
         WarehousePanel.IsVisible = false;
         MovementsPanel.IsVisible = false;
+        HideCashView();
     }
 
     private void ReloadProducts()
     {
-        var products = _productRepository.Search(ProductSearchInput.Text);
+        var products = _productRepository.SearchProducts(ProductSearchInput.Text);
         ProductsList.ItemsSource = products;
         EmptyProductsPanel.IsVisible = products.Count == 0;
     }

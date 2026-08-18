@@ -68,6 +68,9 @@ jobs:
       - name: Build
         run: dotnet build ${{ env.PROJECT }} --configuration Release --no-restore
 
+      - name: Fresh database smoke test
+        run: dotnet run --project ${{ env.PROJECT }} --configuration Release --no-build -- --database-smoke-test
+
   package-windows:
     name: Windows installer
     needs: build
@@ -282,6 +285,9 @@ jobs:
       contents: write
 
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
       - name: Download packaged applications
         uses: actions/download-artifact@v4
         with:
@@ -289,16 +295,43 @@ jobs:
           path: dist
           merge-multiple: true
 
-      - name: Publish release for main commit
+      - name: Publish stable release and OTA compatibility bridge
         env:
           GH_TOKEN: ${{ github.token }}
+        shell: bash
         run: |
-          TAG="ota-${GITHUB_SHA}"
-          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            gh release delete "$TAG" --repo "$GITHUB_REPOSITORY" --cleanup-tag --yes
+          set -euo pipefail
+          VERSION="$(sed -n 's:.*<Version>\(.*\)</Version>.*:\1:p' "${PROJECT}" | head -n 1)"
+          STABLE_TAG="v${VERSION}"
+          LEGACY_TAG="ota-${GITHUB_SHA}"
+
+          # Manteniamo un solo bridge OTA legacy: i client già installati cercano ancora ota-<sha>.
+          while IFS= read -r old_tag; do
+            [ -z "$old_tag" ] && continue
+            gh release delete "$old_tag" --repo "$GITHUB_REPOSITORY" --cleanup-tag --yes
+          done < <(gh release list --repo "$GITHUB_REPOSITORY" --limit 100 --json tagName,name \
+            --jq '.[] | select(.name | startswith("Legacy OTA bridge")) | .tagName')
+
+          if gh release view "$STABLE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release delete "$STABLE_TAG" --repo "$GITHUB_REPOSITORY" --cleanup-tag --yes
           fi
-          gh release create "$TAG" dist/* \
+          if gh release view "$LEGACY_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release delete "$LEGACY_TAG" --repo "$GITHUB_REPOSITORY" --cleanup-tag --yes
+          fi
+
+          # Compatibilità con le versioni già distribuite, senza usare questo tag come release principale.
+          gh release create "$LEGACY_TAG" dist/* \
             --repo "$GITHUB_REPOSITORY" \
             --target "$GITHUB_SHA" \
-            --title "Local Store Management ${GITHUB_SHA::7}" \
-            --notes "Pacchetti Windows/Linux generati automaticamente dal branch main. Il client usa questi stessi file per gli aggiornamenti OTA."
+            --prerelease \
+            --latest=false \
+            --title "Legacy OTA bridge v${VERSION}" \
+            --notes "Release tecnica per mantenere compatibili gli aggiornamenti OTA delle versioni precedenti. Per il download manuale usa la release stabile v${VERSION}."
+
+          # Release pubblica principale con tag leggibile.
+          gh release create "$STABLE_TAG" dist/* \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$GITHUB_SHA" \
+            --latest=true \
+            --title "Local Store Management v${VERSION}" \
+            --notes "Release stabile v${VERSION}. Pacchetti Windows e Linux generati automaticamente dal branch main."

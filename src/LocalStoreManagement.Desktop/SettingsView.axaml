@@ -4,69 +4,54 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     x:CompileBindings="False">
 
-    <ScrollViewer>
-        <StackPanel Margin="28" Spacing="26" MaxWidth="860" HorizontalAlignment="Left">
-            <Grid ColumnDefinitions="220,*" ColumnSpacing="24">
-                <StackPanel Spacing="5">
-                    <StackPanel Orientation="Horizontal" Spacing="12">
-                        <TextBlock FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center" Text="Nome negozio" />
-                        <CheckBox x:Name="ShowShopNameInMenuInput" VerticalAlignment="Center" Content="Mostra in menù" />
+    <ScrollViewer HorizontalScrollBarVisibility="Auto">
+        <StackPanel Margin="16,8,16,20" Spacing="16" MaxWidth="980" HorizontalAlignment="Stretch">
+            <Border Classes="Card" Padding="20">
+                <StackPanel Spacing="18">
+                    <StackPanel Spacing="4">
+                        <TextBlock Classes="SectionTitle" Text="Negozio" />
+                        <TextBlock Classes="Muted" FontSize="12" TextWrapping="Wrap" Text="Identità mostrata nel gestionale e nelle esportazioni." />
                     </StackPanel>
-                    <TextBlock Opacity="0.62" TextWrapping="Wrap" Text="Usato nelle esportazioni e, se selezionato, nel menu laterale." />
-                </StackPanel>
-                <TextBox x:Name="ShopNameInput" Grid.Column="1" MinWidth="360" VerticalAlignment="Top" PlaceholderText="Negozio" />
-            </Grid>
-
-            <Grid ColumnDefinitions="220,*" ColumnSpacing="24">
-                <StackPanel Spacing="4">
-                    <TextBlock FontSize="16" FontWeight="SemiBold" Text="Icona programma" />
-                    <TextBlock Opacity="0.62" TextWrapping="Wrap" Text="Usata per la finestra e la barra delle applicazioni." />
-                </StackPanel>
-                <StackPanel Grid.Column="1" Spacing="8">
-                    <Button HorizontalAlignment="Left" Click="ChooseIconButton_OnClick" Content="Scegli immagine..." />
-                    <TextBlock x:Name="IconFileText" Opacity="0.72" TextWrapping="Wrap" Text="Nessuna icona personalizzata." />
-                </StackPanel>
-            </Grid>
-
-            <Grid ColumnDefinitions="220,*" ColumnSpacing="24">
-                <StackPanel Spacing="5">
-                    <StackPanel Orientation="Horizontal" Spacing="12">
-                        <TextBlock FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center" Text="Logo negozio" />
-                        <CheckBox x:Name="ShowLogoInMenuInput" VerticalAlignment="Center" Content="Mostra in menù" />
-                    </StackPanel>
-                    <TextBlock Opacity="0.62" TextWrapping="Wrap" Text="Usato nelle esportazioni e, se selezionato, ridimensionato nel menu laterale." />
-                </StackPanel>
-                <StackPanel Grid.Column="1" Spacing="8">
-                    <Button HorizontalAlignment="Left" Click="ChooseLogoButton_OnClick" Content="Scegli immagine..." />
-                    <TextBlock x:Name="LogoFileText" Opacity="0.72" TextWrapping="Wrap" Text="Nessun logo selezionato." />
-                </StackPanel>
-            </Grid>
-
-            <Grid ColumnDefinitions="220,*" ColumnSpacing="24">
-                <StackPanel Spacing="4">
-                    <TextBlock FontSize="16" FontWeight="SemiBold" Text="Cartella dati" />
-                    <TextBlock Opacity="0.62" Text="Percorso usato dal gestionale." />
-                </StackPanel>
-                <TextBlock x:Name="DataDirectoryText" Grid.Column="1" VerticalAlignment="Center" Opacity="0.72" TextWrapping="Wrap" />
-            </Grid>
-
-            <TextBlock x:Name="ErrorText" IsVisible="False" Foreground="#D14B43" FontWeight="SemiBold" TextWrapping="Wrap" />
-            <StackPanel Orientation="Horizontal" Spacing="14">
-                <Button Click="SaveButton_OnClick" Content="Salva impostazioni" />
-                <TextBlock x:Name="StatusText" VerticalAlignment="Center" Opacity="0.65" />
-            </StackPanel>
-            <TextBlock Opacity="0.55" FontSize="12" Text="Immagini supportate: PNG, JPG, BMP; per l'icona è supportato anche ICO." />
-
-            <Border BorderBrush="#808080" BorderThickness="0,1,0,0" Padding="0,18,0,0" Opacity="0.95">
-                <StackPanel Spacing="8">
-                    <StackPanel Orientation="Horizontal" Spacing="12">
-                        <TextBlock VerticalAlignment="Center" FontWeight="SemiBold" Text="Versione" />
-                        <TextBlock x:Name="VersionText" VerticalAlignment="Center" />
-                        <Button x:Name="CheckUpdatesButton" Click="CheckUpdatesButton_OnClick" Content="Controlla aggiornamenti" />
-                    </StackPanel>
-                    <TextBlock x:Name="UpdateStatusText" MaxWidth="760" FontSize="12" Opacity="0.72" TextWrapping="Wrap" />
+                    <Grid ColumnDefinitions="160,*" ColumnSpacing="16">
+                        <StackPanel Spacing="5"><TextBlock Classes="FieldLabel" Text="NOME NEGOZIO" /><CheckBox x:Name="ShowShopNameInMenuInput" Content="Mostra nel menu laterale" /></StackPanel>
+                        <TextBox x:Name="ShopNameInput" Grid.Column="1" VerticalAlignment="Top" PlaceholderText="Negozio" />
+                    </Grid>
                 </StackPanel>
             </Border>
+
+            <Border Classes="Card" Padding="20">
+                <StackPanel Spacing="20">
+                    <StackPanel Spacing="4"><TextBlock Classes="SectionTitle" Text="Branding" /><TextBlock Classes="Muted" FontSize="12" TextWrapping="Wrap" Text="Personalizza icona e logo senza modificare i pacchetti installati." /></StackPanel>
+                    <Grid ColumnDefinitions="160,*" ColumnSpacing="16">
+                        <StackPanel Spacing="4"><TextBlock Classes="FieldLabel" Text="ICONA PROGRAMMA" /><TextBlock Classes="Muted" FontSize="11" TextWrapping="Wrap" Text="Finestra, taskbar e collegamenti Windows." /></StackPanel>
+                        <Grid Grid.Column="1" ColumnDefinitions="Auto,*" ColumnSpacing="10"><Button Click="ChooseIconButton_OnClick" Content="Scegli immagine…" /><TextBlock x:Name="IconFileText" Grid.Column="1" Classes="Muted" VerticalAlignment="Center" TextWrapping="Wrap" Text="Nessuna icona personalizzata." /></Grid>
+                    </Grid>
+                    <Border Height="1" Background="{DynamicResource AppBorderBrush}" />
+                    <Grid ColumnDefinitions="160,*" ColumnSpacing="16">
+                        <StackPanel Spacing="5"><TextBlock Classes="FieldLabel" Text="LOGO NEGOZIO" /><CheckBox x:Name="ShowLogoInMenuInput" Content="Mostra nel menu laterale" /></StackPanel>
+                        <Grid Grid.Column="1" ColumnDefinitions="Auto,*" ColumnSpacing="10"><Button Click="ChooseLogoButton_OnClick" Content="Scegli immagine…" /><TextBlock x:Name="LogoFileText" Grid.Column="1" Classes="Muted" VerticalAlignment="Center" TextWrapping="Wrap" Text="Nessun logo selezionato." /></Grid>
+                    </Grid>
+                </StackPanel>
+            </Border>
+
+            <Border Classes="Card" Padding="20">
+                <StackPanel Spacing="18">
+                    <StackPanel Spacing="4"><TextBlock Classes="SectionTitle" Text="Dati e aggiornamenti" /><TextBlock Classes="Muted" FontSize="12" TextWrapping="Wrap" Text="Informazioni locali dell'installazione e canale software." /></StackPanel>
+                    <Grid ColumnDefinitions="160,*" ColumnSpacing="16"><TextBlock Classes="FieldLabel" Text="CARTELLA DATI" /><TextBlock x:Name="DataDirectoryText" Grid.Column="1" Classes="Muted" TextWrapping="Wrap" /></Grid>
+                    <Border Height="1" Background="{DynamicResource AppBorderBrush}" />
+                    <Grid ColumnDefinitions="160,*" ColumnSpacing="16">
+                        <TextBlock Classes="FieldLabel" Text="VERSIONE" />
+                        <StackPanel Grid.Column="1" Spacing="8">
+                            <WrapPanel><TextBlock x:Name="VersionText" Margin="0,0,12,8" VerticalAlignment="Center" FontSize="16" FontWeight="SemiBold" /><Button x:Name="CheckUpdatesButton" Margin="0,0,0,8" Click="CheckUpdatesButton_OnClick" Content="Controlla aggiornamenti" /></WrapPanel>
+                            <TextBlock x:Name="UpdateStatusText" MaxWidth="720" Classes="Muted" FontSize="11" TextWrapping="Wrap" />
+                        </StackPanel>
+                    </Grid>
+                </StackPanel>
+            </Border>
+
+            <TextBlock x:Name="ErrorText" IsVisible="False" Foreground="#C12820" FontWeight="SemiBold" TextWrapping="Wrap" />
+            <Grid ColumnDefinitions="Auto,*" ColumnSpacing="14"><Button Classes="Primary" Click="SaveButton_OnClick" Content="Salva impostazioni" /><TextBlock x:Name="StatusText" Grid.Column="1" Classes="Muted" VerticalAlignment="Center" TextWrapping="Wrap" /></Grid>
+            <TextBlock Classes="Muted" FontSize="11" TextWrapping="Wrap" Text="Immagini supportate: PNG, JPG, BMP; per l'icona è supportato anche ICO." />
         </StackPanel>
     </ScrollViewer>
 </UserControl>

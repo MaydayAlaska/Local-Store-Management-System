@@ -1,9 +1,6 @@
-using System.Globalization;
 using Avalonia.Controls;
-using Avalonia.Input;
 using LocalStoreManagement.Desktop.Data;
 using LocalStoreManagement.Desktop.Models;
-using Microsoft.Data.Sqlite;
 
 namespace LocalStoreManagement.Desktop;
 
@@ -16,47 +13,57 @@ public partial class ProductEditorWindow : Window
     private readonly CategoryRepository _categoryRepository = new();
     private readonly BrandRepository _brandRepository = new();
     private readonly long? _productId;
-    private readonly string? _initialBarcode;
     private readonly List<CategorySelectionOption> _categoryOptions = new();
     private readonly List<BrandSelectionOption> _brandOptions = new();
+    private readonly List<ProductVariantDraft> _variants = new();
 
     public ProductEditorWindow() : this(new ProductRepository(), null) { }
 
-    public ProductEditorWindow(ProductRepository repository, Product? product, string? initialBarcode = null)
+    public ProductEditorWindow(ProductRepository repository, long? productId, string? initialBarcode = null)
     {
         _repository = repository;
-        _productId = product?.Id;
-        _initialBarcode = string.IsNullOrWhiteSpace(initialBarcode) ? null : initialBarcode.Trim();
+        _productId = productId;
 
         InitializeComponent();
+
+        ProductSummary? product = null;
+        if (productId.HasValue)
+        {
+            product = _repository.GetProduct(productId.Value)
+                ?? throw new InvalidOperationException("Il prodotto da modificare non esiste più.");
+        }
+
         LoadBrands(product?.BrandId);
         LoadCategories(product?.CategoryId);
 
         if (product is null)
         {
-            SkuInput.Text = _repository.GenerateSku();
-            BarcodeInput.Text = _initialBarcode;
-            EditorTitle.Text = _initialBarcode is null ? "Nuovo prodotto" : "Nuovo prodotto da scansione";
+            EditorTitle.Text = string.IsNullOrWhiteSpace(initialBarcode) ? "Nuovo prodotto" : "Nuovo prodotto da scansione";
+            IsActiveInput.IsChecked = true;
+            if (!string.IsNullOrWhiteSpace(initialBarcode))
+            {
+                _variants.Add(new ProductVariantDraft(
+                    null,
+                    _repository.GenerateSku(),
+                    null,
+                    null,
+                    null,
+                    null,
+                    true,
+                    new[] { initialBarcode.Trim() }));
+            }
         }
         else
         {
             EditorTitle.Text = "Modifica prodotto";
-            SkuInput.Text = product.Sku;
-            BarcodeInput.Text = product.Barcode;
             NameInput.Text = product.Name;
-            VariantInput.Text = product.Variant;
-            SizeInput.Text = product.Size;
-            PurchasePriceInput.Text = FormatEditablePrice(product.PurchasePriceCents);
-            SalePriceInput.Text = FormatEditablePrice(product.SalePriceCents);
             NotesInput.Text = product.Notes;
             IsActiveInput.IsChecked = product.IsActive;
+            _variants.AddRange(_repository.GetVariants(product.Id));
         }
 
-        Opened += (_, _) =>
-        {
-            if (product is null && _initialBarcode is not null) NameInput.Focus();
-            else SkuInput.Focus();
-        };
+        RefreshVariantList();
+        Opened += (_, _) => NameInput.Focus();
     }
 
     private void LoadBrands(long? selectedBrandId)
@@ -77,70 +84,100 @@ public partial class ProductEditorWindow : Window
         CategoryInput.SelectedItem = _categoryOptions.FirstOrDefault(option => option.Id == selectedCategoryId) ?? _categoryOptions[0];
     }
 
-    private void GenerateSkuButton_OnClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    private async void AddVariantButton_OnClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
-        SkuInput.Text = _repository.GenerateSku();
-        SkuInput.Focus();
-        SkuInput.CaretIndex = SkuInput.Text?.Length ?? 0;
+        HideError();
+        var draft = new ProductVariantDraft(
+            null,
+            _repository.GenerateSku(),
+            null,
+            null,
+            null,
+            null,
+            true,
+            Array.Empty<string>());
+        var editor = new ProductVariantEditorWindow(_repository, CurrentProductName(), draft, _variants.ToList());
+        var result = await editor.ShowDialog<ProductVariantDraft?>(this);
+        if (result is null) return;
+        _variants.Add(result);
+        RefreshVariantList(result);
     }
 
-    private void BarcodeInput_OnKeyDown(object? sender, KeyEventArgs e)
+    private async void EditVariantButton_OnClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+        => await EditSelectedVariantAsync();
+
+    private async void VariantsList_OnDoubleTapped(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+        => await EditSelectedVariantAsync();
+
+    private async Task EditSelectedVariantAsync()
     {
-        if (e.Key == Key.Enter)
+        HideError();
+        if (VariantsList.SelectedItem is not ProductVariantDraft selected)
         {
-            NameInput.Focus();
-            e.Handled = true;
+            ShowError("Seleziona la variante da modificare.");
+            return;
         }
+
+        var index = _variants.IndexOf(selected);
+        if (index < 0) return;
+        var others = _variants.Where((_, itemIndex) => itemIndex != index).ToList();
+        var editor = new ProductVariantEditorWindow(_repository, CurrentProductName(), selected, others);
+        var result = await editor.ShowDialog<ProductVariantDraft?>(this);
+        if (result is null) return;
+        _variants[index] = result;
+        RefreshVariantList(result);
+    }
+
+    private void RemoveVariantButton_OnClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        HideError();
+        if (VariantsList.SelectedItem is not ProductVariantDraft selected)
+        {
+            ShowError("Seleziona la variante da rimuovere.");
+            return;
+        }
+
+        if (selected.Id.HasValue)
+        {
+            ShowError("Una variante già salvata non viene eliminata per preservare lo storico dei movimenti. Aprila con «Modifica» e disattivala.");
+            return;
+        }
+
+        _variants.Remove(selected);
+        RefreshVariantList();
     }
 
     private void SaveButton_OnClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
         HideError();
-        var sku = SkuInput.Text?.Trim() ?? string.Empty;
         var name = NameInput.Text?.Trim() ?? string.Empty;
-
-        if (string.IsNullOrWhiteSpace(sku))
+        if (name.Length == 0)
         {
-            ShowError("Il codice interno / SKU è obbligatorio.");
-            SkuInput.Focus();
-            return;
-        }
-        if (string.IsNullOrWhiteSpace(name))
-        {
-            ShowError("Il nome del prodotto è obbligatorio.");
+            ShowError("Il nome del prodotto / modello è obbligatorio.");
             NameInput.Focus();
             return;
         }
-        if (!TryParsePrice(PurchasePriceInput.Text, out var purchasePriceCents))
+        if (_variants.Count == 0)
         {
-            ShowError("Il prezzo di acquisto non è valido.");
-            PurchasePriceInput.Focus();
-            return;
-        }
-        if (!TryParsePrice(SalePriceInput.Text, out var salePriceCents))
-        {
-            ShowError("Il prezzo di vendita non è valido.");
-            SalePriceInput.Focus();
+            ShowError("Aggiungi almeno una variante con SKU e, se disponibile, barcode.");
             return;
         }
 
         var selectedCategoryId = (CategoryInput.SelectedItem as CategorySelectionOption)?.Id;
         var selectedBrandId = (BrandInput.SelectedItem as BrandSelectionOption)?.Id;
         var draft = new ProductDraft(
-            _productId, sku, NormalizeOptional(BarcodeInput.Text), name,
-            selectedCategoryId, selectedBrandId,
-            NormalizeOptional(VariantInput.Text), NormalizeOptional(SizeInput.Text),
-            purchasePriceCents, salePriceCents, NormalizeOptional(NotesInput.Text),
-            IsActiveInput.IsChecked ?? false);
+            _productId,
+            name,
+            selectedCategoryId,
+            selectedBrandId,
+            NormalizeOptional(NotesInput.Text),
+            IsActiveInput.IsChecked ?? false,
+            _variants.ToList());
 
         try
         {
             _repository.Save(draft);
             Close(true);
-        }
-        catch (SqliteException ex) when (ex.SqliteErrorCode == 19)
-        {
-            ShowError("SKU o barcode già presente, oppure la marca/categoria selezionata non è più disponibile.");
         }
         catch (Exception ex)
         {
@@ -150,24 +187,24 @@ public partial class ProductEditorWindow : Window
 
     private void CancelButton_OnClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e) => Close(false);
 
-    private static string? NormalizeOptional(string? value)
-        => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
-
-    private static bool TryParsePrice(string? text, out long? cents)
+    private void RefreshVariantList(ProductVariantDraft? selected = null)
     {
-        cents = null;
-        if (string.IsNullOrWhiteSpace(text)) return true;
-        var value = text.Trim();
-        if (!decimal.TryParse(value, NumberStyles.Number, CultureInfo.CurrentCulture, out var amount)
-            && !decimal.TryParse(value.Replace(',', '.'), NumberStyles.Number, CultureInfo.InvariantCulture, out amount))
-            return false;
-        if (amount < 0) return false;
-        cents = (long)Math.Round(amount * 100m, 0, MidpointRounding.AwayFromZero);
-        return true;
+        VariantsList.ItemsSource = null;
+        VariantsList.ItemsSource = _variants.ToList();
+        VariantsList.SelectedItem = selected;
+        VariantsHintText.Text = _variants.Count switch
+        {
+            0 => "Nessuna variante: aggiungine almeno una prima di salvare il prodotto.",
+            1 => "1 variante configurata. SKU e barcode identificano questa specifica combinazione.",
+            _ => $"{_variants.Count} varianti configurate. Ogni barcode identifica direttamente colore/taglia e relativa giacenza."
+        };
     }
 
-    private static string? FormatEditablePrice(long? cents)
-        => cents.HasValue ? (cents.Value / 100m).ToString("0.00", CultureInfo.CurrentCulture) : null;
+    private string CurrentProductName()
+        => string.IsNullOrWhiteSpace(NameInput.Text) ? "Nuovo prodotto" : NameInput.Text.Trim();
+
+    private static string? NormalizeOptional(string? value)
+        => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 
     private void ShowError(string message)
     {

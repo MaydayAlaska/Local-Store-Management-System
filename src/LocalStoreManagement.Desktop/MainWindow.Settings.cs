@@ -34,10 +34,7 @@ public partial class MainWindow
             _sidebarSubtitleText ??= shopHeader.Children
                 .OfType<TextBlock>()
                 .FirstOrDefault(text => !ReferenceEquals(text, ShopNameText));
-            if (_sidebarSubtitleText is not null)
-            {
-                _sidebarSubtitleText.IsVisible = showShopName;
-            }
+            if (_sidebarSubtitleText is not null) _sidebarSubtitleText.IsVisible = showShopName;
             EnsureSidebarLogoImage(shopHeader);
         }
 
@@ -94,11 +91,12 @@ public partial class MainWindow
     {
         HideEmbeddedViews();
         HideAllPanels();
+        SetActiveNavigation(SettingsNavButton);
         EnsureSettingsView();
         _settingsView!.Reload();
         _settingsView.IsVisible = true;
         PageTitle.Text = "Impostazioni";
-        PageSubtitle.Text = "Nome negozio, icona, logo e dati dell'applicazione";
+        PageSubtitle.Text = "Nome negozio, branding, aggiornamenti e dati dell'applicazione";
         _settingsView.FocusPrimaryField();
     }
 
@@ -130,10 +128,7 @@ public partial class MainWindow
 
     private void DashboardSearchInput_OnKeyDown(object? sender, KeyEventArgs e)
     {
-        if (e.Key != Key.Enter)
-        {
-            return;
-        }
+        if (e.Key != Key.Enter) return;
 
         e.Handled = true;
         var query = DashboardSearchInput.Text?.Trim();
@@ -148,7 +143,7 @@ public partial class MainWindow
         {
             SelectDashboardProduct(exact);
             PrepareDashboardSearchForNextScan();
-            DashboardSearchStatusText.Text = $"Prodotto trovato: {exact.Name}. Pronto per la prossima scansione.";
+            DashboardSearchStatusText.Text = $"Variante trovata: {exact.Name} · {exact.VariantDisplay}. Pronto per la prossima scansione.";
             return;
         }
 
@@ -156,7 +151,7 @@ public partial class MainWindow
         {
             ShowDashboardProduct(selected);
             PrepareDashboardSearchForNextScan();
-            DashboardSearchStatusText.Text = $"Prodotto selezionato: {selected.Name}. Pronto per la prossima ricerca o scansione.";
+            DashboardSearchStatusText.Text = $"Variante selezionata: {selected.Name} · {selected.VariantDisplay}. Pronto per la prossima ricerca o scansione.";
             return;
         }
 
@@ -172,10 +167,7 @@ public partial class MainWindow
 
     private void DashboardProductsList_OnSelectionChanged(object? sender, SelectionChangedEventArgs e)
     {
-        if (DashboardProductsList.SelectedItem is Product product)
-        {
-            ShowDashboardProduct(product);
-        }
+        if (DashboardProductsList.SelectedItem is Product product) ShowDashboardProduct(product);
     }
 
     private async void DashboardProductsList_OnDoubleTapped(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
@@ -196,7 +188,7 @@ public partial class MainWindow
         if (string.IsNullOrWhiteSpace(query))
         {
             DashboardProductsList.ItemsSource = null;
-            DashboardSearchStatusText.Text = "Scansiona un codice oppure cerca un prodotto per nome, SKU o barcode.";
+            DashboardSearchStatusText.Text = "Scansiona un codice oppure cerca un prodotto per nome, SKU, barcode, colore o taglia.";
 
             if (_dashboardSelectedProductId.HasValue)
             {
@@ -226,10 +218,7 @@ public partial class MainWindow
             selected = products.FirstOrDefault(product => product.Id == _dashboardSelectedProductId.Value);
         }
 
-        if (selected is null && products.Count == 1)
-        {
-            selected = products[0];
-        }
+        if (selected is null && products.Count == 1) selected = products[0];
 
         DashboardProductsList.SelectedItem = selected;
         if (selected is not null)
@@ -244,9 +233,9 @@ public partial class MainWindow
 
         DashboardSearchStatusText.Text = products.Count switch
         {
-            0 => "Nessun prodotto trovato.",
-            1 => "1 prodotto trovato.",
-            _ => $"{products.Count} prodotti trovati. Seleziona quello desiderato."
+            0 => "Nessuna variante trovata.",
+            1 => "1 variante trovata.",
+            _ => $"{products.Count} varianti trovate. Seleziona quella desiderata."
         };
     }
 
@@ -271,19 +260,19 @@ public partial class MainWindow
 
         DashboardProductNameText.Text = latest.Name;
         DashboardProductCodeSummaryText.Text = string.IsNullOrWhiteSpace(latest.Barcode)
-            ? latest.Sku
-            : $"{latest.Sku}  •  {latest.Barcode}";
+            ? $"{latest.Sku}  •  {latest.VariantDisplay}"
+            : $"{latest.Sku}  •  {latest.Barcode}  •  {latest.VariantDisplay}";
         DashboardStockText.Text = latest.StockQuantity.ToString();
         DashboardStatusText.Text = latest.StatusDisplay;
         DashboardBrandText.Text = DisplayValue(latest.Brand);
         DashboardCategoryText.Text = DisplayValue(latest.Category);
         DashboardSkuText.Text = latest.Sku;
-        DashboardBarcodeText.Text = DisplayValue(latest.Barcode);
+        DashboardBarcodeText.Text = DisplayValue(latest.BarcodesDisplay);
         DashboardVariantText.Text = DisplayValue(latest.Variant);
         DashboardSizeText.Text = DisplayValue(latest.Size);
         DashboardPurchasePriceText.Text = latest.PurchasePriceDisplay;
         DashboardSalePriceText.Text = latest.SalePriceDisplay;
-        DashboardProductIdText.Text = latest.Id.ToString();
+        DashboardProductIdText.Text = $"{latest.ProductId} / var. {latest.Id}";
         DashboardNotesText.Text = DisplayValue(latest.Notes);
         DashboardOutgoingButton.IsEnabled = latest.StockQuantity > 0;
         DashboardMovementStatusText.Text = string.Empty;
@@ -292,17 +281,14 @@ public partial class MainWindow
 
     private void ApplyDashboardMovement(StockMovementKind kind)
     {
-        if (!_dashboardSelectedProductId.HasValue)
-        {
-            return;
-        }
+        if (!_dashboardSelectedProductId.HasValue) return;
 
         var product = _productRepository.GetById(_dashboardSelectedProductId.Value);
         if (product is null)
         {
             _dashboardSelectedProductId = null;
             DashboardProductDetailsPanel.IsVisible = false;
-            DashboardSearchStatusText.Text = "Il prodotto selezionato non esiste più.";
+            DashboardSearchStatusText.Text = "La variante selezionata non esiste più.";
             return;
         }
 
@@ -339,10 +325,7 @@ public partial class MainWindow
 
     private async Task OpenDashboardSelectedProductAsync()
     {
-        if (!_dashboardSelectedProductId.HasValue)
-        {
-            return;
-        }
+        if (!_dashboardSelectedProductId.HasValue) return;
 
         var latest = _productRepository.GetById(_dashboardSelectedProductId.Value);
         if (latest is null)
@@ -353,19 +336,13 @@ public partial class MainWindow
             return;
         }
 
-        var editor = new ProductEditorWindow(_productRepository, latest);
+        var editor = new ProductEditorWindow(_productRepository, latest.ProductId);
         var saved = await editor.ShowDialog<bool>(this);
-        if (!saved)
-        {
-            return;
-        }
+        if (!saved) return;
 
         RefreshAllData();
         var updated = _productRepository.GetById(latest.Id);
-        if (updated is not null)
-        {
-            ShowDashboardProduct(updated);
-        }
+        if (updated is not null) ShowDashboardProduct(updated);
     }
 
     private static string DisplayValue(string? value)
