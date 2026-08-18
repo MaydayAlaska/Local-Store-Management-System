@@ -12,6 +12,7 @@ public partial class MainWindow
     private bool _secondaryNavigationAttached;
     private BrandsView? _brandsView;
     private CategoriesView? _categoriesView;
+    private LabelsView? _labelsView;
     private ExportView? _exportView;
 
     protected override void OnOpened(EventArgs e)
@@ -183,6 +184,34 @@ public partial class MainWindow
         if (_categoriesView is not null) _categoriesView.IsVisible = false;
     }
 
+    private async void LabelsButton_OnClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+        => await ShowLabelsAsync();
+
+    private async Task ShowLabelsAsync()
+    {
+        HideEmbeddedViews();
+        HideAllPanels();
+        EnsureLabelsView();
+        _labelsView!.IsVisible = true;
+        PageTitle.Text = "Etichette";
+        PageSubtitle.Text = "Anteprima barcode e stampa tramite la coda di sistema Windows/Linux";
+        await _labelsView.ReloadAsync();
+        _labelsView.FocusPrimaryField();
+    }
+
+    private void EnsureLabelsView()
+    {
+        if (_labelsView is not null) return;
+        if (DashboardPanel.Parent is not Grid contentGrid) throw new InvalidOperationException("Impossibile inizializzare il pannello Etichette.");
+        _labelsView = new LabelsView(_productRepository) { IsVisible = false };
+        contentGrid.Children.Add(_labelsView);
+    }
+
+    private void HideLabelsView()
+    {
+        if (_labelsView is not null) _labelsView.IsVisible = false;
+    }
+
     private void ExportButton_OnClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e) => ShowExport();
 
     private void ShowExport()
@@ -207,11 +236,5 @@ public partial class MainWindow
     private void HideExportView()
     {
         if (_exportView is not null) _exportView.IsVisible = false;
-    }
-
-    private async void LabelsButton_OnClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
-    {
-        var window = new LabelsWindow(_productRepository);
-        await window.ShowDialog(this);
     }
 }
