@@ -53,7 +53,7 @@ L'emissione del documento commerciale resta volutamente disabilitata finché non
 
 ### Backup ed export
 
-- backup locale del database
+- backup SQLite consistente tramite API di backup del database
 - salvataggio backup in un percorso scelto dall'utente
 - export inventario Excel e PDF
 - filtri per marche/categorie
@@ -66,8 +66,14 @@ L'emissione del documento commerciale resta volutamente disabilitata finché non
 - icona applicazione personalizzata
 - logo negozio
 - visibilità nome/logo nel menu
+- su Windows l'icona personalizzata viene applicata anche a finestra/taskbar e ai collegamenti dell'app, in modalità best effort
 - controllo aggiornamenti su GitHub
 - installazione OTA delle release Windows e delle AppImage Linux quando l'app è eseguita da un pacchetto pubblicato
+
+### Diagnostica
+
+- `Logs/application.log` registra errori Flutter non gestiti e problemi di avvio
+- se l'inizializzazione del database fallisce viene mostrata una schermata di errore con il percorso del log invece di terminare senza spiegazioni
 
 ## Compatibilità dati
 
@@ -81,6 +87,7 @@ Contenuto principale:
 - `settings.json`
 - `assets/`
 - `Backups/`
+- `Logs/`
 
 Lo schema SQLite resta alla versione `2` con le tabelle:
 
@@ -125,7 +132,7 @@ flutter build windows --release
 
 ## CI e pacchetti
 
-GitHub Actions esegue `flutter analyze`, compila Windows e Linux e produce:
+GitHub Actions esegue `flutter analyze`, `flutter test`, compila Windows e Linux e produce:
 
 - `LocalStoreManagement-Setup-win-x64.exe`
 - `LocalStoreManagement-linux-x64.AppImage`

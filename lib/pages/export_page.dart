@@ -48,14 +48,7 @@ class _ExportPageState extends State<ExportPage> {
               const SizedBox(height: 8),
               Wrap(spacing: 8, children: [
                 FilledButton.icon(
-                  onPressed: _busy ? null : () {
-                    try {
-                      final path = widget.services.backup.createAutomaticBackup();
-                      setState(() => _status = 'Backup creato: $path');
-                    } catch (error) {
-                      setState(() => _status = 'Errore backup: $error');
-                    }
-                  },
+                  onPressed: _busy ? null : () => _run(() async => widget.services.backup.createAutomaticBackup()),
                   icon: const Icon(Icons.backup),
                   label: const Text('Crea backup in Backups'),
                 ),
@@ -82,7 +75,7 @@ class _ExportPageState extends State<ExportPage> {
                   label: Text(c.name), selected: _categories.contains(c.id), onSelected: (v) => setState(() => v ? _categories.add(c.id) : _categories.remove(c.id)),
                 )).toList()),
                 const Spacer(),
-                Text('Nessun filtro selezionato = inventario completo. I dati vengono raggruppati per marca in ordine alfabetico.'),
+                const Text('Nessun filtro selezionato = inventario completo. I dati vengono raggruppati per marca in ordine alfabetico.'),
                 const SizedBox(height: 12),
                 Wrap(spacing: 8, children: [
                   FilledButton.icon(

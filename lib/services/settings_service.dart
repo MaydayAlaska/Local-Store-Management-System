@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:image/image.dart' as img;
 import 'package:path/path.dart' as p;
 
 import '../core/app_paths.dart';
@@ -38,12 +39,75 @@ class SettingsService {
       showLogoInMenu: showLogoInMenu,
     );
     const encoder = JsonEncoder.withIndent('  ');
-    File(AppPaths.settingsPath).writeAsStringSync(encoder.convert(settings.toJson()));
+    File(AppPaths.settingsPath).writeAsStringSync(encoder.convert(settings.toJson()), flush: true);
+    if (icon != null) _ensureDerivedIconFiles(settings);
     return settings;
   }
 
   String? resolveIconPath([AppSettings? settings]) => _resolveAsset((settings ?? load()).iconFileName);
   String? resolveLogoPath([AppSettings? settings]) => _resolveAsset((settings ?? load()).logoFileName);
+
+  String? resolveIconPreviewPath([AppSettings? settings]) {
+    final value = settings ?? load();
+    final source = resolveIconPath(value);
+    if (source == null) return null;
+    try {
+      return _ensureDerivedIconFiles(value).previewPath;
+    } catch (_) {
+      return source.toLowerCase().endsWith('.ico') ? null : source;
+    }
+  }
+
+  String? resolveWindowsShellIconPath([AppSettings? settings]) {
+    final value = settings ?? load();
+    final source = resolveIconPath(value);
+    if (source == null) return null;
+    try {
+      return _ensureDerivedIconFiles(value).shellIconPath;
+    } catch (_) {
+      return source.toLowerCase().endsWith('.ico') ? source : null;
+    }
+  }
+
+  ({String previewPath, String shellIconPath}) _ensureDerivedIconFiles(AppSettings settings) {
+    final sourcePath = resolveIconPath(settings);
+    if (sourcePath == null) throw StateError('Icona applicazione non disponibile.');
+    final source = File(sourcePath);
+    final stamp = source.lastModifiedSync().millisecondsSinceEpoch;
+    final previewPath = p.join(AppPaths.assetsDirectory, 'app-icon-preview-$stamp.png');
+    final shellIconPath = p.join(AppPaths.assetsDirectory, 'app-shell-$stamp.ico');
+
+    final needsPreview = !File(previewPath).existsSync();
+    final needsShell = !File(shellIconPath).existsSync();
+    if (needsPreview || needsShell) {
+      final decoded = img.decodeImage(source.readAsBytesSync());
+      if (decoded == null) throw StateError('Il file scelto non contiene un’immagine valida.');
+      final longest = decoded.width > decoded.height ? decoded.width : decoded.height;
+      final normalized = longest > 256
+          ? img.copyResize(decoded, width: decoded.width >= decoded.height ? 256 : null, height: decoded.height > decoded.width ? 256 : null)
+          : decoded;
+      if (needsPreview) File(previewPath).writeAsBytesSync(img.encodePng(normalized), flush: true);
+      if (needsShell) File(shellIconPath).writeAsBytesSync(img.encodeIco(normalized), flush: true);
+    }
+
+    _cleanDerivedIcons(previewPath, shellIconPath);
+    return (previewPath: previewPath, shellIconPath: shellIconPath);
+  }
+
+  void _cleanDerivedIcons(String keepPreview, String keepShell) {
+    try {
+      for (final entity in Directory(AppPaths.assetsDirectory).listSync()) {
+        if (entity is! File) continue;
+        final name = p.basename(entity.path).toLowerCase();
+        final derived = name.startsWith('app-icon-preview-') || name.startsWith('app-shell-');
+        if (derived && entity.path != keepPreview && entity.path != keepShell) {
+          entity.deleteSync();
+        }
+      }
+    } catch (_) {
+      // Pulizia best effort.
+    }
+  }
 
   String? _resolveAsset(String? relative) {
     if (relative == null || relative.trim().isEmpty) return null;
@@ -60,7 +124,8 @@ class SettingsService {
     }
     Directory(AppPaths.assetsDirectory).createSync(recursive: true);
     final relative = p.join('assets', '$baseName$extension');
-    File(sourcePath).copySync(p.join(AppPaths.dataDirectory, relative));
+    final destination = File(p.join(AppPaths.dataDirectory, relative));
+    File(sourcePath).copySync(destination.path);
     return relative;
   }
 }

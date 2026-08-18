@@ -15,7 +15,7 @@ class AppTitleBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
-    final iconPath = settingsService.resolveIconPath(settings);
+    final iconPath = settingsService.resolveIconPreviewPath(settings);
     return ColoredBox(
       color: colors.surfaceContainer,
       child: SizedBox(
@@ -78,7 +78,7 @@ class _AppIcon extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (path != null && !path!.toLowerCase().endsWith('.ico')) {
+    if (path != null) {
       return ClipRRect(
         borderRadius: BorderRadius.circular(6),
         child: Image.file(File(path!), width: 24, height: 24, fit: BoxFit.cover),

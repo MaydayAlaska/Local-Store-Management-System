@@ -30,6 +30,7 @@ class _SettingsPageState extends State<SettingsPage> {
   String? _status;
   UpdateCheckResult? _update;
   bool _checking = false;
+  bool _saving = false;
 
   @override
   void initState() {
@@ -51,7 +52,8 @@ class _SettingsPageState extends State<SettingsPage> {
     return file?.path;
   }
 
-  void _save() {
+  Future<void> _save() async {
+    setState(() => _saving = true);
     try {
       final settings = widget.services.settings.save(
         shopName: _shopName.text,
@@ -60,14 +62,18 @@ class _SettingsPageState extends State<SettingsPage> {
         iconSourcePath: _iconSource,
         logoSourcePath: _logoSource,
       );
+      await widget.services.applicationIcon.apply(settings);
       widget.onSaved(settings);
+      if (!mounted) return;
       setState(() {
         _iconSource = null;
         _logoSource = null;
-        _status = 'Impostazioni salvate.';
+        _status = 'Impostazioni salvate. Icona e titolo finestra aggiornati.';
       });
     } catch (error) {
-      setState(() => _status = 'Errore: $error');
+      if (mounted) setState(() => _status = 'Errore: $error');
+    } finally {
+      if (mounted) setState(() => _saving = false);
     }
   }
 
@@ -112,9 +118,9 @@ class _SettingsPageState extends State<SettingsPage> {
                 SwitchListTile(contentPadding: EdgeInsets.zero, value: _showLogo, onChanged: (v) => setState(() => _showLogo = v), title: const Text('Mostra logo nel menu')),
                 const SizedBox(height: 8),
                 Wrap(spacing: 8, runSpacing: 8, children: [
-                  OutlinedButton.icon(onPressed: () async { final path = await _pickImage(allowIco: true); if (path != null) setState(() => _iconSource = path); }, icon: const Icon(Icons.app_shortcut), label: Text(_iconSource == null ? 'Cambia icona applicazione' : 'Icona selezionata')),
-                  OutlinedButton.icon(onPressed: () async { final path = await _pickImage(allowIco: false); if (path != null) setState(() => _logoSource = path); }, icon: const Icon(Icons.image_outlined), label: Text(_logoSource == null ? 'Cambia logo negozio' : 'Logo selezionato')),
-                  FilledButton.icon(onPressed: _save, icon: const Icon(Icons.save), label: const Text('Salva impostazioni')),
+                  OutlinedButton.icon(onPressed: _saving ? null : () async { final path = await _pickImage(allowIco: true); if (path != null && mounted) setState(() => _iconSource = path); }, icon: const Icon(Icons.app_shortcut), label: Text(_iconSource == null ? 'Cambia icona applicazione' : 'Icona selezionata')),
+                  OutlinedButton.icon(onPressed: _saving ? null : () async { final path = await _pickImage(allowIco: false); if (path != null && mounted) setState(() => _logoSource = path); }, icon: const Icon(Icons.image_outlined), label: Text(_logoSource == null ? 'Cambia logo negozio' : 'Logo selezionato')),
+                  FilledButton.icon(onPressed: _saving ? null : _save, icon: const Icon(Icons.save), label: Text(_saving ? 'Salvataggio…' : 'Salva impostazioni')),
                 ]),
                 const SizedBox(height: 8),
                 Text('Dati: ${AppPaths.dataDirectory}', style: Theme.of(context).textTheme.bodySmall),
