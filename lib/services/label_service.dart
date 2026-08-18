@@ -79,7 +79,7 @@ class LabelService {
           left: marginX,
           right: marginX,
           top: height * 0.055,
-          height: height * 0.145,
+          bottom: height * 0.80,
           child: pw.Align(
             alignment: pw.Alignment.centerLeft,
             child: pw.Text(
@@ -95,7 +95,7 @@ class LabelService {
             left: marginX,
             right: marginX,
             top: height * 0.20,
-            height: height * 0.09,
+            bottom: height * 0.71,
             child: pw.Align(
               alignment: pw.Alignment.centerLeft,
               child: pw.Text(details, maxLines: 1, style: pw.TextStyle(fontSize: smallSize)),
@@ -105,7 +105,7 @@ class LabelService {
           left: marginX,
           right: marginX,
           top: height * 0.30,
-          height: height * 0.37,
+          bottom: height * 0.33,
           child: pw.BarcodeWidget(
             barcode: barcodeFor(code),
             data: code,
@@ -116,7 +116,7 @@ class LabelService {
           left: marginX,
           right: marginX,
           top: height * 0.67,
-          height: height * 0.13,
+          bottom: height * 0.20,
           child: pw.Center(
             child: pw.Text(code, maxLines: 1, style: pw.TextStyle(fontSize: barcodeTextSize)),
           ),
