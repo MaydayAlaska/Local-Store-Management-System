@@ -71,15 +71,15 @@
                                         <Grid Margin="10,7" ColumnDefinitions="*,160,130,70">
                                             <StackPanel>
                                                 <TextBlock FontWeight="SemiBold" Text="{Binding Name}" />
-                                                <TextBlock FontSize="11" Opacity="0.62" Text="{Binding DetailsDisplay}" />
+                                                <TextBlock FontSize="11" Text="{Binding DetailsDisplay}" />
                                             </StackPanel>
                                             <StackPanel Grid.Column="1">
                                                 <TextBlock Text="{Binding Brand}" />
-                                                <TextBlock FontSize="11" Opacity="0.62" Text="{Binding Category}" />
+                                                <TextBlock FontSize="11" Text="{Binding Category}" />
                                             </StackPanel>
                                             <StackPanel Grid.Column="2">
                                                 <TextBlock HorizontalAlignment="Right" Text="{Binding Sku}" />
-                                                <TextBlock HorizontalAlignment="Right" FontSize="11" Opacity="0.62" Text="{Binding Barcode}" />
+                                                <TextBlock HorizontalAlignment="Right" FontSize="11" Text="{Binding Barcode}" />
                                             </StackPanel>
                                             <TextBlock Grid.Column="3" VerticalAlignment="Center" HorizontalAlignment="Right" FontSize="18" FontWeight="Bold" Text="{Binding StockQuantity}" />
                                         </Grid>
@@ -216,11 +216,11 @@
                                     <Grid Margin="12,9" ColumnDefinitions="120,*,150,150,95,70,90">
                                         <StackPanel>
                                             <TextBlock FontWeight="SemiBold" Text="{Binding Sku}" />
-                                            <TextBlock FontSize="11" Foreground="#66707A" Text="{Binding Barcode}" />
+                                            <TextBlock FontSize="11" Text="{Binding Barcode}" />
                                         </StackPanel>
                                         <StackPanel Grid.Column="1">
                                             <TextBlock FontWeight="SemiBold" Text="{Binding Name}" />
-                                            <TextBlock FontSize="11" Foreground="#66707A" Text="{Binding DetailsDisplay}" />
+                                            <TextBlock FontSize="11" Text="{Binding DetailsDisplay}" />
                                         </StackPanel>
                                         <TextBlock Grid.Column="2" VerticalAlignment="Center" Text="{Binding Brand}" />
                                         <TextBlock Grid.Column="3" VerticalAlignment="Center" Text="{Binding Category}" />
@@ -267,11 +267,11 @@
                                     <Grid Margin="12,10" ColumnDefinitions="125,*,170,160,90">
                                         <StackPanel>
                                             <TextBlock FontWeight="SemiBold" Text="{Binding Sku}" />
-                                            <TextBlock FontSize="11" Foreground="#66707A" Text="{Binding Barcode}" />
+                                            <TextBlock FontSize="11" Text="{Binding Barcode}" />
                                         </StackPanel>
                                         <StackPanel Grid.Column="1">
                                             <TextBlock FontWeight="SemiBold" Text="{Binding Name}" />
-                                            <TextBlock FontSize="11" Foreground="#66707A" Text="{Binding DetailsDisplay}" />
+                                            <TextBlock FontSize="11" Text="{Binding DetailsDisplay}" />
                                         </StackPanel>
                                         <TextBlock Grid.Column="2" VerticalAlignment="Center" Text="{Binding Brand}" />
                                         <TextBlock Grid.Column="3" VerticalAlignment="Center" Text="{Binding Category}" />
@@ -312,7 +312,7 @@
                                         <TextBlock Grid.Column="2" VerticalAlignment="Center" Text="{Binding Sku}" />
                                         <StackPanel Grid.Column="3">
                                             <TextBlock FontWeight="SemiBold" Text="{Binding ProductName}" />
-                                            <TextBlock FontSize="11" Foreground="#66707A" Text="{Binding Note}" />
+                                            <TextBlock FontSize="11" Text="{Binding Note}" />
                                         </StackPanel>
                                         <TextBlock Grid.Column="4" VerticalAlignment="Center" Text="{Binding Brand}" />
                                         <TextBlock Grid.Column="5" VerticalAlignment="Center" HorizontalAlignment="Right" FontWeight="SemiBold" Text="{Binding QuantityDisplay}" />
