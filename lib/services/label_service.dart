@@ -189,6 +189,7 @@ class LabelService {
     final margin = (width * 0.055).round().clamp(12, 36).toInt();
     final contentWidth = width - (margin * 2);
     final code = _bplText(_printableCode(product), maxLength: 40);
+    final ean13 = isValidEan13(code);
     final title = _bplText(product.name, maxLength: _maxChars(contentWidth, 27));
     final details = _bplText(
       <String>[
@@ -213,7 +214,7 @@ class LabelService {
     final detailsFont = (height * 0.07).round().clamp(15, 22).toInt();
     final footerFont = (height * 0.075).round().clamp(16, 24).toInt();
     final priceFont = (height * 0.11).round().clamp(22, 34).toInt();
-    final moduleWidth = code.length > 18 || widthMm < 45 ? 1 : 2;
+    final barcode = _barcodeLayout(code: code, labelWidth: width, ean13: ean13);
 
     final out = StringBuffer()
       ..writeln('^XA')
@@ -226,10 +227,20 @@ class LabelService {
       out.writeln('^FO$margin,$detailsY^A0N,$detailsFont,$detailsFont^FD$details^FS');
     }
 
+    out.writeln('^BY${barcode.moduleWidth},2,$barcodeHeight');
+    if (ean13) {
+      // ^BE riceve le 12 cifre dati e calcola automaticamente il check digit EAN-13.
+      out.writeln(
+        '^FO${barcode.x},$barcodeY^BEN,$barcodeHeight,N,N^FD${code.substring(0, 12)}^FS',
+      );
+    } else {
+      out.writeln(
+        '^FO${barcode.x},$barcodeY^BCN,$barcodeHeight,N,N,N,N^FD$code^FS',
+      );
+    }
+
     out
-      ..writeln('^BY$moduleWidth,2,$barcodeHeight')
-      ..writeln('^FO$margin,$barcodeY^BCN,$barcodeHeight,N,N,N^FD$code^FS')
-      ..writeln('^FO$margin,$codeY^A0N,$detailsFont,$detailsFont^FD$code^FS')
+      ..writeln('^FO$margin,$codeY^A0N,$detailsFont,$detailsFont^FB$contentWidth,1,0,C,0^FD$code^FS')
       ..writeln('^FO$margin,$footerY^A0N,$footerFont,$footerFont^FD$sku^FS');
 
     if (price.isNotEmpty) {
@@ -325,6 +336,20 @@ class LabelService {
 
   String _printableCode(ProductVariant product) =>
       product.barcode?.trim().isNotEmpty == true ? product.barcode!.trim() : product.sku.trim();
+
+  static ({int moduleWidth, int widthDots, int x}) _barcodeLayout({
+    required String code,
+    required int labelWidth,
+    required bool ean13,
+  }) {
+    // EAN-13 usa 95 moduli. Per Code 128 subset B: start + dati + check + stop.
+    final modules = ean13 ? 95 : (code.length * 11) + 35;
+    final usableWidth = (labelWidth - 24).clamp(1, labelWidth).toInt();
+    final moduleWidth = (usableWidth ~/ modules).clamp(1, 3).toInt();
+    final widthDots = modules * moduleWidth;
+    final x = ((labelWidth - widthDots) / 2).round().clamp(0, labelWidth).toInt();
+    return (moduleWidth: moduleWidth, widthDots: widthDots, x: x);
+  }
 
   static int _maxChars(int availableDots, int fontWidth) {
     if (availableDots <= 0) return 1;
