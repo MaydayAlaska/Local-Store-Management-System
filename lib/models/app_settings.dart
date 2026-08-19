@@ -112,7 +112,7 @@ class AppSettings {
     this.showLogoInMenu = false,
     this.lastLabelPrinterUrl,
     this.lastLabelPrinterName,
-    this.labelPrinterProfiles = const [LabelPrinterProfile.legacyApiX110],
+    this.labelPrinterProfiles = const [],
     this.currencyCode = 'EUR',
     this.themeMode = 'system',
     this.languageCode = 'it',
@@ -153,7 +153,7 @@ class AppSettings {
             )
             .where((profile) => profile.host.trim().isNotEmpty)
             .toList(growable: false)
-        : defaults.labelPrinterProfiles;
+        : const <LabelPrinterProfile>[LabelPrinterProfile.legacyApiX110];
 
     return AppSettings(
       shopName: (json['ShopName'] as String?)?.trim().isNotEmpty == true
