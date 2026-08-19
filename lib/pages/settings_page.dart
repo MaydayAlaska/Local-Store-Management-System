@@ -138,7 +138,7 @@ class _SettingsPageState extends State<SettingsPage> {
                 if (UpdateService.currentCommit.isNotEmpty) Text('Commit: ${UpdateService.currentCommit.substring(0, 7)}'),
                 const SizedBox(height: 6),
                 Text(UpdateService.isBetaBuild
-                    ? 'Build BETA/TEST dal branch test. Gli aggiornamenti OTA stabili sono disattivati.'
+                    ? 'Build BETA dal branch ${UpdateService.currentBranch}. Gli aggiornamenti OTA stabili sono disattivati.'
                     : UpdateService.isInstalledBuild
                         ? 'Canale aggiornamenti: GitHub, branch main.'
                         : 'Build di sviluppo: il controllo è disponibile, l’installazione OTA richiede una release pubblicata.'),
