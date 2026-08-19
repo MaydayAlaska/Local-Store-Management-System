@@ -171,7 +171,7 @@ class UpdateService {
   static const owner = 'MaydayAlaska';
   static const repository = 'Local-Store-Management-System';
   static const stableBranch = 'main';
-  static const currentVersion = '0.1.6-b6';
+  static const currentVersion = '0.1.6-b7';
   static const currentCommit = String.fromEnvironment('GIT_COMMIT');
   static const currentBranch = String.fromEnvironment('BUILD_BRANCH');
   static const tokenEnvironmentVariable = 'LOCAL_STORE_GITHUB_TOKEN';
