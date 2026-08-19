@@ -276,7 +276,7 @@ class _SettingsPageState extends State<SettingsPage> {
                           labelText: AppStrings.t('currency'),
                           items: const [
                             GlassDropdownItem(value: 'EUR', label: 'EUR · €'),
-                            GlassDropdownItem(value: 'USD', label: 'USD · $'),
+                            GlassDropdownItem(value: 'USD', label: 'USD · \$'),
                             GlassDropdownItem(value: 'GBP', label: 'GBP · £'),
                             GlassDropdownItem(value: 'CHF', label: 'CHF'),
                           ],
