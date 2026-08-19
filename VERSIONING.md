@@ -14,6 +14,7 @@ Le versioni BETA usano sempre il formato `X.Y.Z-bN` (per esempio `0.1.6-b1`). Qu
 - L'OTA confronta le versioni in modo monotono: un aggiornamento viene proposto solo quando la versione online è realmente successiva a quella installata. Un commit differente, da solo, non è sufficiente.
 - A parità di `X.Y.Z`, una release stabile è successiva a qualunque Beta della stessa versione ai fini dell'ordinamento semantico, ma i due canali non vengono mai incrociati dall'OTA.
 - Durante il ciclo Beta si incrementa solo `bN`: `0.1.6-b1` → `0.1.6-b2` → `0.1.6-b3` → `0.1.6-b4` → `0.1.6-b5` → `0.1.6-b6` → `0.1.6-b7` → `0.1.6-b8`.
+- La `0.1.6-b8` include l'archivio ANPR dei luoghi di nascita aggiornato e il lookup storico del codice Belfiore nell'interfaccia clienti.
 - Dopo la promozione di una Beta a stabile, `main` mantiene la versione stabile e `Flutter` passa alla prima Beta della versione successiva.
 - `avalonia` contiene la precedente implementazione Avalonia ed è un ramo storico/alternativo.
 
