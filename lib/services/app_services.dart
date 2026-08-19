@@ -19,7 +19,7 @@ class AppServices {
         settings = SettingsService() {
     applicationIcon = ApplicationIconService(settings);
     backup = BackupService(database);
-    labels = LabelService();
+    labels = LabelService(settings);
     export = ExportService(products, settings);
     updates = UpdateService();
   }
