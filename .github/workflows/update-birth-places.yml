@@ -27,18 +27,50 @@ jobs:
       - name: Generate and validate dataset
         run: python3 tool/update_birth_places.py
 
-      - name: Commit only when ANPR changed
+      - name: Ensure every build verifies ANPR freshness
         shell: bash
         run: |
           set -euo pipefail
-          if git diff --quiet -- assets/data/birth_places.json assets/data/birth_places_manifest.json; then
-            echo "Archivio ANPR invariato."
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path('.github/workflows/build.yml')
+          text = path.read_text(encoding='utf-8')
+          marker = '      - name: Verify embedded ANPR dataset is current\n'
+          if marker in text:
+              raise SystemExit(0)
+
+          needle = '      - name: Setup Flutter\n'
+          if needle not in text:
+              raise SystemExit('Impossibile trovare il punto di inserimento nel job verify.')
+
+          step = '''      - name: Verify embedded ANPR dataset is current
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tool/update_birth_places.py
+          if ! git diff --quiet -- assets/data/birth_places.json assets/data/birth_places_manifest.json; then
+            echo "::error::Il dataset ANPR incorporato non coincide con la fonte ufficiale corrente."
+            git diff --stat -- assets/data/birth_places.json assets/data/birth_places_manifest.json
+            exit 1
+          fi
+
+'''
+          path.write_text(text.replace(needle, step + needle, 1), encoding='utf-8')
+          PY
+
+      - name: Commit only when ANPR data or guard changed
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git diff --quiet -- assets/data/birth_places.json assets/data/birth_places_manifest.json .github/workflows/build.yml; then
+            echo "Archivio ANPR e controllo build invariati."
             exit 0
           fi
 
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add assets/data/birth_places.json assets/data/birth_places_manifest.json
-          git commit -m "data: update ANPR birth places"
+          git add assets/data/birth_places.json assets/data/birth_places_manifest.json .github/workflows/build.yml
+          git commit -m "ci: refresh ANPR data and build guard"
           git pull --rebase origin Flutter
           git push origin HEAD:Flutter
