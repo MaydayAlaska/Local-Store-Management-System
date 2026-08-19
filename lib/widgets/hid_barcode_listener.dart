@@ -47,7 +47,7 @@ class _HidBarcodeListenerState extends State<HidBarcodeListener> {
       final value = _buffer.toString().trim();
       _clearBuffer();
       if (value.isEmpty) return false;
-      WidgetsBinding.instance.addPostFrameCallback((_) => widget.onBarcode(value));
+      widget.onBarcode(value);
       return true;
     }
 
