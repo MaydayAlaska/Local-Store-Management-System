@@ -39,15 +39,38 @@ class LabelService {
   LabelPrinterProfile? profileForUrl(String? url) =>
       _settings.load().labelPrinterForUrl(url);
 
-  LabelPrinterProfile? profileForPrinter(Printer? printer) =>
-      printer == null ? null : profileForUrl(printer.url);
+  LabelPrinterProfile? profileForPrinter(Printer? printer) {
+    if (printer == null) return null;
+    final settings = _settings.load();
+    final byUrl = settings.labelPrinterForUrl(printer.url);
+    if (byUrl != null) return byUrl;
 
-  bool isDirectPrinter(Printer? printer) => profileForPrinter(printer) != null;
+    final printerName = printer.name.trim().toLowerCase();
+    for (final profile in settings.labelPrinterProfiles) {
+      if (!profile.isSystem) continue;
+      if (profile.systemPrinterName?.trim().toLowerCase() == printerName ||
+          profile.name.trim().toLowerCase() == printerName) {
+        return profile;
+      }
+    }
+    return null;
+  }
+
+  bool isDirectPrinter(Printer? printer) =>
+      profileForPrinter(printer)?.isTcp == true;
+
+  Future<List<Printer>> getSystemPrinters() async {
+    try {
+      return await Printing.listPrinters();
+    } catch (_) {
+      return const <Printer>[];
+    }
+  }
 
   Future<List<Printer>> getPrinters() async {
     final settings = _settings.load();
     final network = settings.labelPrinterProfiles
-        .where((profile) => profile.enabled)
+        .where((profile) => profile.enabled && profile.isTcp)
         .map(
           (profile) => Printer(
             url: profile.url,
@@ -60,20 +83,93 @@ class LabelService {
         )
         .toList(growable: false);
 
-    try {
-      final system = await Printing.listPrinters();
-      final configuredUrls = network.map((printer) => printer.url).toSet();
-      return <Printer>[
-        ...network,
-        ...system.where((printer) => !configuredUrls.contains(printer.url)),
-      ];
-    } catch (_) {
-      // La stampa TCP diretta non dipende dai driver o dallo spooler di sistema.
-      return network;
+    final system = await getSystemPrinters();
+    if (system.isEmpty) return network;
+
+    final configuredSystem = <Printer>[];
+    final claimedSystemUrls = <String>{};
+    for (final profile in settings.labelPrinterProfiles) {
+      if (!profile.enabled || !profile.isSystem) continue;
+
+      Printer? match;
+      final configuredUrl = profile.systemPrinterUrl?.trim();
+      if (configuredUrl?.isNotEmpty == true) {
+        for (final printer in system) {
+          if (printer.url == configuredUrl) {
+            match = printer;
+            break;
+          }
+        }
+      }
+      if (match == null &&
+          profile.systemPrinterName?.trim().isNotEmpty == true) {
+        final target = profile.systemPrinterName!.trim().toLowerCase();
+        for (final printer in system) {
+          if (printer.name.trim().toLowerCase() == target) {
+            match = printer;
+            break;
+          }
+        }
+      }
+      if (match == null) continue;
+
+      claimedSystemUrls.add(match.url);
+      configuredSystem.add(
+        Printer(
+          url: match.url,
+          name: profile.name,
+          model: match.model,
+          location: match.location,
+          comment: match.comment,
+          isDefault: match.isDefault,
+          isAvailable: match.isAvailable,
+        ),
+      );
     }
+
+    return <Printer>[
+      ...network,
+      ...configuredSystem,
+      ...system.where((printer) => !claimedSystemUrls.contains(printer.url)),
+    ];
   }
 
   Future<void> testConnection(LabelPrinterProfile profile) async {
+    if (profile.isSystem) {
+      final printers = await getSystemPrinters();
+      Printer? match;
+      final configuredUrl = profile.systemPrinterUrl?.trim();
+      if (configuredUrl?.isNotEmpty == true) {
+        for (final printer in printers) {
+          if (printer.url == configuredUrl) {
+            match = printer;
+            break;
+          }
+        }
+      }
+      if (match == null &&
+          profile.systemPrinterName?.trim().isNotEmpty == true) {
+        final target = profile.systemPrinterName!.trim().toLowerCase();
+        for (final printer in printers) {
+          if (printer.name.trim().toLowerCase() == target) {
+            match = printer;
+            break;
+          }
+        }
+      }
+      if (match == null) {
+        throw StateError(
+          'Stampante USB/sistema non rilevata. Verifica il collegamento USB e che la stampante sia installata nel sistema operativo.',
+        );
+      }
+      if (!match.isAvailable) {
+        throw StateError(
+          'La stampante «${match.name}» è installata ma al momento non risulta disponibile.',
+        );
+      }
+      return;
+    }
+
     Socket? socket;
     try {
       socket = await Socket.connect(
@@ -393,11 +489,12 @@ class LabelService {
     required double heightMm,
   }) async {
     final profile = profileForPrinter(printer);
-    if (profile != null) {
-      if (!profile.enabled) {
-        throw StateError('Il profilo stampante «${profile.name}» è disattivato.');
-      }
-      if (profile.protocol != 'bpl-z') {
+    if (profile != null && !profile.enabled) {
+      throw StateError('Il profilo stampante «${profile.name}» è disattivato.');
+    }
+
+    if (profile?.isTcp == true) {
+      if (profile!.protocol != 'bpl-z') {
         throw StateError(
           'Protocollo ${profile.protocol} non ancora supportato per la stampa diretta.',
         );
