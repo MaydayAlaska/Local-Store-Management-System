@@ -9,8 +9,8 @@ class AppTitleBar extends StatelessWidget {
         height: 36,
         child: Row(
           children: [
-            const Expanded(
-              child: DragToMoveArea(child: SizedBox.expand()),
+            Expanded(
+              child: DragToMoveArea(child: const SizedBox.expand()),
             ),
             _CaptionButton(
               tooltip: 'Riduci a icona',
