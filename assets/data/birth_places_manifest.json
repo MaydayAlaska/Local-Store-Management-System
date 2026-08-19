@@ -1,9 +1,9 @@
 {
-  "code_count": 1,
-  "record_count": 1,
+  "code_count": 9859,
+  "record_count": 19324,
   "schema_version": 1,
   "source": "ANPR - Anagrafe Nazionale della Popolazione Residente",
-  "source_sha256": "8cf82c23e96426dbc91a7b9c3a6f25319b10b59972a3962fc7b7e9792efa8a2",
-  "source_size_bytes": 2359465,
+  "source_sha256": "c86791d240f35861a662db78ba4d48978b844a47b5204a38117fe39c4341edb0",
+  "source_size_bytes": 2469804,
   "source_url": "https://raw.githubusercontent.com/italia/anpr/refs/heads/master/src/archivi/ANPR_archivio_comuni.csv"
 }
