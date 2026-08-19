@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../l10n/app_strings.dart';
 import '../models/customer.dart';
 import '../repositories/customer_repository.dart';
 
@@ -34,7 +35,7 @@ class _CustomerPickerDialogState extends State<_CustomerPickerDialog> {
   Widget build(BuildContext context) {
     final customers = widget.repository.search(_search.text, 200);
     return AlertDialog(
-      title: const Text('Cerca cliente'),
+      title: Text(AppStrings.t('search_customer')),
       content: SizedBox(
         width: 560,
         height: 480,
@@ -43,23 +44,33 @@ class _CustomerPickerDialogState extends State<_CustomerPickerDialog> {
             controller: _search,
             autofocus: true,
             onChanged: (_) => setState(() {}),
-            decoration: const InputDecoration(
-              border: OutlineInputBorder(),
-              prefixIcon: Icon(Icons.search),
-              labelText: 'Nome, cognome o codice fiscale',
+            decoration: InputDecoration(
+              border: const OutlineInputBorder(),
+              prefixIcon: const Icon(Icons.search),
+              labelText: AppStrings.isEnglish
+                  ? 'First name, last name or tax code'
+                  : 'Nome, cognome o codice fiscale',
             ),
           ),
           const SizedBox(height: 10),
           Expanded(
             child: customers.isEmpty
-                ? const Center(child: Text('Nessun cliente trovato.'))
+                ? Center(
+                    child: Text(
+                      AppStrings.isEnglish
+                          ? 'No customers found.'
+                          : 'Nessun cliente trovato.',
+                    ),
+                  )
                 : ListView.separated(
                     itemCount: customers.length,
                     separatorBuilder: (_, _) => const Divider(height: 1),
                     itemBuilder: (context, index) {
                       final customer = customers[index];
                       return ListTile(
-                        leading: const CircleAvatar(child: Icon(Icons.person_outline)),
+                        leading: const CircleAvatar(
+                          child: Icon(Icons.person_outline),
+                        ),
                         title: Text(customer.displayName),
                         subtitle: Text(customer.fiscalCode),
                         trailing: const Icon(Icons.chevron_right),
@@ -71,7 +82,10 @@ class _CustomerPickerDialogState extends State<_CustomerPickerDialog> {
         ]),
       ),
       actions: [
-        TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Annulla')),
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: Text(AppStrings.t('cancel')),
+        ),
       ],
     );
   }
