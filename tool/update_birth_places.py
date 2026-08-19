@@ -8,6 +8,7 @@ import hashlib
 import io
 import json
 import re
+from datetime import date
 from pathlib import Path
 from urllib.request import Request, urlopen
 
@@ -26,6 +27,8 @@ REQUIRED_COLUMNS = {
     "SIGLAPROVINCIA",
 }
 CODE_RE = re.compile(r"^[A-Z][0-9]{3}$")
+DATE_IT_RE = re.compile(r"^(\d{2})/(\d{2})/(\d{4})$")
+DATE_ISO_RE = re.compile(r"^(\d{4})-(\d{2})-(\d{2})$")
 
 
 def download_source() -> bytes:
@@ -43,6 +46,28 @@ def download_source() -> bytes:
             f"Archivio ANPR insolitamente piccolo ({len(data)} byte): aggiornamento bloccato."
         )
     return data
+
+
+def normalize_date(value: str) -> str:
+    """Convert ANPR dates to ISO so lexical comparisons are chronological."""
+    value = value.strip()
+    if not value:
+        return ""
+
+    match = DATE_IT_RE.fullmatch(value)
+    if match:
+        day, month, year = (int(part) for part in match.groups())
+    else:
+        match = DATE_ISO_RE.fullmatch(value)
+        if not match:
+            raise RuntimeError(f"Formato data ANPR non riconosciuto: {value!r}")
+        year, month, day = (int(part) for part in match.groups())
+
+    try:
+        parsed = date(year, month, day)
+    except ValueError as error:
+        raise RuntimeError(f"Data ANPR non valida: {value!r}") from error
+    return parsed.isoformat()
 
 
 def build_dataset(source: bytes) -> tuple[dict[str, list[list[str]]], int]:
@@ -63,8 +88,8 @@ def build_dataset(source: bytes) -> tuple[dict[str, list[list[str]]], int]:
         if not CODE_RE.fullmatch(code) or not name:
             continue
 
-        start = (row.get("DATAISTITUZIONE") or "").strip()
-        end = (row.get("DATACESSAZIONE") or "").strip()
+        start = normalize_date(row.get("DATAISTITUZIONE") or "")
+        end = normalize_date(row.get("DATACESSAZIONE") or "")
         province = (row.get("SIGLAPROVINCIA") or "").strip().upper()
         records.setdefault(code, []).append([start, end, name, province])
         row_count += 1
@@ -103,6 +128,7 @@ def write_outputs(source: bytes, records: dict[str, list[list[str]]], row_count:
         "source_size_bytes": len(source),
         "record_count": row_count,
         "code_count": len(records),
+        "date_format": "YYYY-MM-DD",
     }
     MANIFEST.write_text(
         json.dumps(manifest, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
