@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../l10n/app_strings.dart';
 import '../models/catalog.dart';
 import '../services/app_services.dart';
 import 'product_editor_dialog.dart';
@@ -37,38 +38,66 @@ class _ProductsPageState extends State<ProductsPage> {
       padding: const EdgeInsets.all(24),
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         Row(children: [
-          Expanded(child: Text('Prodotti', style: Theme.of(context).textTheme.headlineMedium)),
-          FilledButton.icon(onPressed: () => _open(), icon: const Icon(Icons.add), label: const Text('Nuovo prodotto')),
+          Expanded(
+            child: Text(
+              AppStrings.t('products'),
+              style: Theme.of(context).textTheme.headlineMedium,
+            ),
+          ),
+          FilledButton.icon(
+            onPressed: () => _open(),
+            icon: const Icon(Icons.add),
+            label: Text(AppStrings.t('new_product')),
+          ),
         ]),
         const SizedBox(height: 16),
         TextField(
           controller: _search,
           onChanged: (_) => setState(() {}),
-          decoration: const InputDecoration(border: OutlineInputBorder(), prefixIcon: Icon(Icons.search), labelText: 'Cerca nome, SKU, barcode, marca o categoria'),
+          decoration: InputDecoration(
+            border: const OutlineInputBorder(),
+            prefixIcon: const Icon(Icons.search),
+            labelText: AppStrings.isEnglish
+                ? 'Search name, SKU, barcode, brand or category'
+                : 'Cerca nome, SKU, barcode, marca o categoria',
+          ),
         ),
         const SizedBox(height: 12),
         Expanded(
           child: Card(
             clipBehavior: Clip.antiAlias,
             child: products.isEmpty
-                ? const Center(child: Text('Nessun prodotto.'))
+                ? Center(
+                    child: Text(
+                      AppStrings.isEnglish ? 'No products.' : 'Nessun prodotto.',
+                    ),
+                  )
                 : ListView.separated(
                     itemCount: products.length,
                     separatorBuilder: (_, __) => const Divider(height: 1),
                     itemBuilder: (context, index) {
-                      final p = products[index];
+                      final product = products[index];
+                      final noBrand = AppStrings.isEnglish ? 'No brand' : 'Senza marca';
+                      final noCategory =
+                          AppStrings.isEnglish ? 'No category' : 'Senza categoria';
                       return ListTile(
-                        title: Text(p.name),
-                        subtitle: Text('${p.brand ?? 'Senza marca'} · ${p.category ?? 'Senza categoria'} · ${p.variantCountDisplay}'),
-                        leading: CircleAvatar(child: Text('${p.stockQuantity}')),
+                        title: Text(product.name),
+                        subtitle: Text(
+                          '${product.brand ?? noBrand} · ${product.category ?? noCategory} · ${product.variantCountDisplay}',
+                        ),
+                        leading: CircleAvatar(child: Text('${product.stockQuantity}')),
                         trailing: Row(mainAxisSize: MainAxisSize.min, children: [
-                          Text(p.salePriceDisplay),
+                          Text(product.salePriceDisplay),
                           const SizedBox(width: 16),
-                          Icon(p.isActive ? Icons.check_circle : Icons.pause_circle_outline),
+                          Icon(
+                            product.isActive
+                                ? Icons.check_circle
+                                : Icons.pause_circle_outline,
+                          ),
                           const SizedBox(width: 8),
                           const Icon(Icons.chevron_right),
                         ]),
-                        onTap: () => _open(p),
+                        onTap: () => _open(product),
                       );
                     },
                   ),
