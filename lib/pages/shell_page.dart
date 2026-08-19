@@ -38,7 +38,6 @@ class ShellPage extends StatefulWidget {
 
 class _ShellPageState extends State<ShellPage> {
   static const _settingsIndex = 9;
-  static const _minimumRailHeight = 760.0;
 
   int _index = 0;
   UpdateCheckResult? _startupUpdate;
@@ -234,7 +233,11 @@ class _ShellPageState extends State<ShellPage> {
       CashPage(services: widget.services, isActive: _index == 1),
       OrdersPage(services: widget.services),
       CustomersPage(services: widget.services, isActive: _index == 3),
-      LabelsPage(services: widget.services, settings: widget.settings, isActive: _index == 4),
+      LabelsPage(
+        services: widget.services,
+        settings: widget.settings,
+        isActive: _index == 4,
+      ),
       ProductsPage(services: widget.services),
       StockPage(services: widget.services, isActive: _index == 6),
       LookupsPage(services: widget.services),
@@ -261,33 +264,24 @@ class _ShellPageState extends State<ShellPage> {
                   children: [
                     GlassSurface(
                       borderRadius: BorderRadius.circular(24),
-                      child: LayoutBuilder(
-                        builder: (context, constraints) {
-                          final railHeight = constraints.maxHeight < _minimumRailHeight
-                              ? _minimumRailHeight
-                              : constraints.maxHeight;
-                          return SingleChildScrollView(
-                            child: SizedBox(
-                              height: railHeight,
-                              child: NavigationRail(
-                                selectedIndex: _index,
-                                onDestinationSelected: _selectPage,
-                                labelType: NavigationRailLabelType.all,
-                                leading: _MenuBrand(
-                                  settings: widget.settings,
-                                  services: widget.services,
-                                ),
-                                destinations: _destinations(),
-                              ),
-                            ),
-                          );
-                        },
+                      child: NavigationRail(
+                        selectedIndex: _index,
+                        onDestinationSelected: _selectPage,
+                        labelType: NavigationRailLabelType.all,
+                        scrollable: true,
+                        leading: _MenuBrand(
+                          settings: widget.settings,
+                          services: widget.services,
+                        ),
+                        destinations: _destinations(),
                       ),
                     ),
                     const SizedBox(width: 10),
                     Expanded(
                       child: GlassSurface(
-                        opacity: Theme.of(context).brightness == Brightness.dark ? 0.055 : 0.24,
+                        opacity: Theme.of(context).brightness == Brightness.dark
+                            ? 0.055
+                            : 0.24,
                         borderRadius: BorderRadius.circular(24),
                         child: ClipRRect(
                           borderRadius: BorderRadius.circular(24),
