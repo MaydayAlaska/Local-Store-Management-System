@@ -943,7 +943,7 @@ class _CashKeypad extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             SizedBox(
-              height: 146,
+              height: 170,
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
