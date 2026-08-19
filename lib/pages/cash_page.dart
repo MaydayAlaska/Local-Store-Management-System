@@ -2,8 +2,12 @@ import 'package:flutter/material.dart';
 
 import '../core/formatters.dart';
 import '../models/catalog.dart';
+import '../models/customer.dart';
 import '../services/app_services.dart';
+import '../services/fiscal_code_service.dart';
 import '../widgets/hid_barcode_listener.dart';
+import 'customer_editor_dialog.dart';
+import 'customer_picker_dialog.dart';
 
 class CashPage extends StatefulWidget {
   const CashPage({super.key, required this.services, required this.isActive});
@@ -21,9 +25,10 @@ class _CashPageState extends State<CashPage> {
   final _fixedDiscount = TextEditingController();
   final List<_CashLine> _cart = [];
   final List<_FixedDiscountLine> _fixedDiscounts = [];
+  Customer? _customer;
   int _nextDiscountId = 1;
-  String _searchStatus = 'Scanner HID pronto. Scansiona barcode/SKU oppure cerca un prodotto.';
-  String _cartStatus = 'Vendita in preparazione: nessun movimento di magazzino viene registrato.';
+  String _searchStatus = 'Scanner HID pronto. Scansiona barcode/SKU oppure la Tessera Sanitaria del cliente.';
+  String _cartStatus = 'Vendita in preparazione: la giacenza verrà scaricata quando registri la vendita.';
 
   @override
   void dispose() {
@@ -39,6 +44,15 @@ class _CashPageState extends State<CashPage> {
   void _submitSearch(String value) {
     final query = value.trim();
     if (query.isEmpty) return;
+
+    final fiscalCode = FiscalCodeService.tryParse(query);
+    if (fiscalCode != null) {
+      _search.clear();
+      _handleFiscalCode(fiscalCode);
+      setState(() {});
+      return;
+    }
+
     final exact = widget.services.products.findByBarcode(query);
     if (exact != null) {
       _add(exact, refresh: false);
@@ -52,6 +66,40 @@ class _CashPageState extends State<CashPage> {
     }
     _search.clear();
     setState(() {});
+  }
+
+  Future<void> _handleFiscalCode(FiscalCodeData data) async {
+    final existing = widget.services.customers.findByFiscalCode(data.fiscalCode);
+    if (existing != null) {
+      setState(() {
+        _customer = existing;
+        _searchStatus = 'Cliente associato: ${existing.displayName}.';
+      });
+      return;
+    }
+
+    final created = await showCustomerEditorDialog(
+      context,
+      repository: widget.services.customers,
+      scanned: data,
+    );
+    if (!mounted || created == null) return;
+    setState(() {
+      _customer = created;
+      _searchStatus = 'Nuovo cliente associato: ${created.displayName}.';
+    });
+  }
+
+  Future<void> _pickCustomer() async {
+    final customer = await showCustomerPickerDialog(
+      context,
+      repository: widget.services.customers,
+    );
+    if (!mounted || customer == null) return;
+    setState(() {
+      _customer = customer;
+      _searchStatus = 'Cliente associato: ${customer.displayName}.';
+    });
   }
 
   void _add(ProductVariant candidate, {bool refresh = true}) {
@@ -76,7 +124,7 @@ class _CashPageState extends State<CashPage> {
     }
     setState(() {
       _searchStatus = 'Aggiunto: ${latest.name} · ${latest.variantDisplay}. Quantità: ${line.quantity}.';
-      _cartStatus = 'La giacenza verrà modificata solo quando sarà integrata la chiusura fiscale.';
+      _cartStatus = 'Vendita in preparazione: la giacenza verrà scaricata quando registri la vendita.';
     });
   }
 
@@ -135,12 +183,15 @@ class _CashPageState extends State<CashPage> {
     setState(() => _cartStatus = 'Sconto di ${formatMoney(line.amountCents)} rimosso dal carrello.');
   }
 
-  void _clear() {
+  void _clear({bool keepStatus = false}) {
     _cart.clear();
     _fixedDiscounts.clear();
+    _customer = null;
     _totalPercent.text = '0';
     _fixedDiscount.clear();
-    setState(() => _cartStatus = 'Carrello svuotato. Nessun movimento di magazzino è stato registrato.');
+    if (!keepStatus) {
+      setState(() => _cartStatus = 'Carrello svuotato. Nessun movimento di magazzino è stato registrato.');
+    }
   }
 
   void _normalizeDiscounts() {
@@ -167,6 +218,49 @@ class _CashPageState extends State<CashPage> {
   int _applyPercent(int cents, double percent) => (cents * (1 - _clampPercent(percent) / 100)).round();
   double _clampPercent(double value) => value.clamp(0, 100).toDouble();
   String _percentText(double value) => value == value.roundToDouble() ? value.toInt().toString() : value.toStringAsFixed(2).replaceAll('.', ',');
+
+  void _registerSale() {
+    if (_cart.isEmpty) return;
+    final itemDiscountRaw = _grossCents - _subtotalCents;
+    final itemDiscount = itemDiscountRaw < 0 ? 0 : itemDiscountRaw;
+    final totalPercentDiscountRaw = _subtotalCents - _afterPercentCents;
+    final totalPercentDiscount = totalPercentDiscountRaw < 0 ? 0 : totalPercentDiscountRaw;
+
+    final draft = SalesOrderDraft(
+      customerId: _customer?.id,
+      lines: _cart
+          .map((line) => SalesOrderDraftLine(
+                variantId: line.variantId,
+                sku: line.product.sku,
+                barcode: line.product.barcode,
+                productName: line.product.name,
+                variantDisplay: line.product.variantDisplay,
+                quantity: line.quantity,
+                unitPriceCents: line.product.salePriceCents ?? 0,
+                discountBasisPoints: (line.discountPercent * 100).round(),
+                grossTotalCents: line.grossLineTotalCents,
+                finalTotalCents: line.lineTotalCents,
+              ))
+          .toList(growable: false),
+      grossTotalCents: _grossCents,
+      itemDiscountCents: itemDiscount,
+      orderDiscountBasisPoints: (_totalDiscountPercent * 100).round(),
+      orderPercentDiscountCents: totalPercentDiscount,
+      fixedDiscountCents: _fixedCents,
+      finalTotalCents: _finalTotalCents,
+    );
+
+    try {
+      final order = widget.services.customers.recordSale(draft);
+      _clear(keepStatus: true);
+      setState(() {
+        _cartStatus = 'Vendita ${order.orderNumber} registrata. Magazzino aggiornato.';
+        _searchStatus = 'Vendita completata. Scanner pronto per il prossimo cliente o prodotto.';
+      });
+    } catch (error) {
+      setState(() => _cartStatus = 'Impossibile registrare la vendita: $error');
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -197,8 +291,8 @@ class _CashPageState extends State<CashPage> {
                     decoration: const InputDecoration(
                       border: OutlineInputBorder(),
                       prefixIcon: Icon(Icons.qr_code_scanner),
-                      labelText: 'Scansiona barcode/SKU o cerca prodotto',
-                      hintText: 'Puoi scansionare anche senza cliccare questo campo',
+                      labelText: 'Scansiona prodotto o cerca',
+                      hintText: 'Lo scanner HID funziona anche senza cliccare questo campo',
                     ),
                   ),
                   const SizedBox(height: 8),
@@ -235,7 +329,36 @@ class _CashPageState extends State<CashPage> {
                       padding: const EdgeInsets.all(14),
                       child: Row(children: [
                         Expanded(child: Text('Carrello · $count ${count == 1 ? 'articolo' : 'articoli'}', style: Theme.of(context).textTheme.titleLarge)),
-                        TextButton.icon(onPressed: _cart.isEmpty && _fixedDiscounts.isEmpty ? null : _clear, icon: const Icon(Icons.delete_sweep), label: const Text('Svuota')),
+                        TextButton.icon(onPressed: _cart.isEmpty && _fixedDiscounts.isEmpty && _customer == null ? null : _clear, icon: const Icon(Icons.delete_sweep), label: const Text('Svuota')),
+                      ]),
+                    ),
+                    const Divider(height: 1),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      child: Row(children: [
+                        const Icon(Icons.person_outline),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: _customer == null
+                              ? const Text('Nessun cliente associato · scansiona la Tessera Sanitaria')
+                              : Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                                  Text(_customer!.displayName, style: const TextStyle(fontWeight: FontWeight.w700)),
+                                  Text(_customer!.fiscalCode),
+                                ]),
+                        ),
+                        OutlinedButton.icon(
+                          onPressed: _pickCustomer,
+                          icon: const Icon(Icons.search),
+                          label: Text(_customer == null ? 'Cerca cliente' : 'Cambia cliente'),
+                        ),
+                        if (_customer != null) ...[
+                          const SizedBox(width: 4),
+                          IconButton(
+                            tooltip: 'Rimuovi cliente dalla vendita',
+                            onPressed: () => setState(() => _customer = null),
+                            icon: const Icon(Icons.close),
+                          ),
+                        ],
                       ]),
                     ),
                     const Divider(height: 1),
@@ -294,6 +417,12 @@ class _CashPageState extends State<CashPage> {
                         Text(_cartStatus, style: Theme.of(context).textTheme.bodySmall),
                         const SizedBox(height: 8),
                         FilledButton.icon(
+                          onPressed: _cart.isEmpty ? null : _registerSale,
+                          icon: const Icon(Icons.shopping_bag_outlined),
+                          label: Text(_customer == null ? 'Registra vendita senza cliente' : 'Registra vendita per ${_customer!.displayName}'),
+                        ),
+                        const SizedBox(height: 6),
+                        OutlinedButton.icon(
                           onPressed: null,
                           icon: const Icon(Icons.receipt_long),
                           label: const Text('Emetti documento commerciale (RT non integrato)'),

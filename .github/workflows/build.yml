@@ -2,9 +2,9 @@ name: Build and package Flutter desktop app
 
 on:
   push:
-    branches: [Flutter, test, main]
+    branches: [Flutter, main]
   pull_request:
-    branches: [Flutter, test, main]
+    branches: [Flutter, main]
 
 concurrency:
   group: flutter-build-package-${{ github.event_name }}-${{ github.ref }}
@@ -20,11 +20,6 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
-      - name: Linux desktop dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev libstdc++-12-dev
 
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
@@ -46,36 +41,89 @@ jobs:
       - name: SQLite smoke test
         run: flutter test
 
-  package-windows:
-    name: Windows installer (${{ matrix.arch }})
+  package-windows-x64:
+    name: Windows installer (x64) — priority
     needs: verify
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - runner: windows-latest
-            arch: x64
-            build_arch: x64
-            allowed_architectures: x64compatible
-          - runner: windows-11-vs2026-arm
-            arch: arm64
-            build_arch: arm64
-            allowed_architectures: arm64
-    runs-on: ${{ matrix.runner }}
+    runs-on: windows-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
       - name: Setup Flutter x64 host SDK
-        if: matrix.arch == 'x64'
         uses: subosito/flutter-action@v2
         with:
           channel: stable
           architecture: x64
           cache: true
 
+      - name: Show Flutter and host architecture
+        shell: pwsh
+        run: |
+          flutter --version
+          Write-Host "PROCESSOR_ARCHITECTURE=$env:PROCESSOR_ARCHITECTURE"
+          Write-Host "PROCESSOR_ARCHITEW6432=$env:PROCESSOR_ARCHITEW6432"
+
+      - name: Generate Windows runner
+        run: flutter create --platforms=windows --project-name local_store_management --org com.maydayalaska .
+
+      - name: Prepare Windows application icon
+        shell: pwsh
+        run: |
+          $png = [Convert]::FromBase64String((Get-Content -Raw "${{ env.ICON_BASE64 }}").Trim())
+          $iconPath = "windows/runner/resources/app_icon.ico"
+          $stream = [IO.File]::Open($iconPath, [IO.FileMode]::Create, [IO.FileAccess]::Write)
+          try {
+            $writer = [IO.BinaryWriter]::new($stream)
+            $writer.Write([UInt16]0); $writer.Write([UInt16]1); $writer.Write([UInt16]1)
+            $writer.Write([Byte]64); $writer.Write([Byte]64); $writer.Write([Byte]0); $writer.Write([Byte]0)
+            $writer.Write([UInt16]1); $writer.Write([UInt16]32)
+            $writer.Write([UInt32]$png.Length); $writer.Write([UInt32]22); $writer.Write($png); $writer.Flush()
+          } finally { $stream.Dispose() }
+
+      - name: Resolve packages
+        run: flutter pub get
+
+      - name: Build Windows release
+        shell: pwsh
+        run: |
+          $commit = if ("${{ github.event.pull_request.head.sha }}") { "${{ github.event.pull_request.head.sha }}" } else { "${{ github.sha }}" }
+          $branch = if ("${{ github.head_ref }}") { "${{ github.head_ref }}" } else { "${{ github.ref_name }}" }
+          flutter build windows --release --dart-define="GIT_COMMIT=$commit" --dart-define="BUILD_BRANCH=$branch"
+
+      - name: Build installer
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path dist | Out-Null
+          $rawVersion = ((Select-String -Path pubspec.yaml -Pattern '^version:\s*(\S+)' | Select-Object -First 1).Matches.Groups[1].Value)
+          $version = $rawVersion -replace '\+', '.'
+          $publishDir = (Resolve-Path 'build/windows/x64/runner/Release').Path
+          $outputDir = (Resolve-Path 'dist').Path
+          $iconFile = (Resolve-Path 'windows/runner/resources/app_icon.ico').Path
+          $iscc = (Get-Command ISCC.exe -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty Source)
+          if (-not $iscc) {
+            $iscc = Get-ChildItem 'C:\Program Files*\Inno Setup *\ISCC.exe' -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty FullName
+          }
+          if (-not $iscc) { throw 'ISCC.exe (Inno Setup) non trovato nel runner Windows.' }
+          & $iscc "/DPublishDir=$publishDir" "/DOutputDir=$outputDir" "/DAppVersion=$version" "/DIconFile=$iconFile" "/DAllowedArchitectures=x64compatible" "/DOutputBaseFilename=LocalStoreManagement-Setup-win-x64" 'packaging/windows/installer.iss'
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Upload Windows x64 installer immediately
+        uses: actions/upload-artifact@v4
+        with:
+          name: package-win-x64
+          path: dist/LocalStoreManagement-Setup-win-x64.exe
+          if-no-files-found: error
+          retention-days: 1
+
+  package-windows-arm64:
+    name: Windows installer (arm64)
+    needs: package-windows-x64
+    runs-on: windows-11-vs2026-arm
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
       - name: Setup Flutter x64 host SDK for Windows ARM64
-        if: matrix.arch == 'arm64'
         uses: subosito/flutter-action@v2
         with:
           channel: stable
@@ -90,7 +138,6 @@ jobs:
           Write-Host "PROCESSOR_ARCHITEW6432=$env:PROCESSOR_ARCHITEW6432"
 
       - name: Force Flutter Windows ARM64 host detection
-        if: matrix.arch == 'arm64'
         shell: pwsh
         run: |
           $source = Join-Path $env:FLUTTER_ROOT 'packages/flutter_tools/lib/src/base/os.dart'
@@ -143,7 +190,7 @@ jobs:
           New-Item -ItemType Directory -Force -Path dist | Out-Null
           $rawVersion = ((Select-String -Path pubspec.yaml -Pattern '^version:\s*(\S+)' | Select-Object -First 1).Matches.Groups[1].Value)
           $version = $rawVersion -replace '\+', '.'
-          $publishDir = (Resolve-Path 'build/windows/${{ matrix.build_arch }}/runner/Release').Path
+          $publishDir = (Resolve-Path 'build/windows/arm64/runner/Release').Path
           $outputDir = (Resolve-Path 'dist').Path
           $iconFile = (Resolve-Path 'windows/runner/resources/app_icon.ico').Path
           $iscc = (Get-Command ISCC.exe -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty Source)
@@ -151,20 +198,20 @@ jobs:
             $iscc = Get-ChildItem 'C:\Program Files*\Inno Setup *\ISCC.exe' -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty FullName
           }
           if (-not $iscc) { throw 'ISCC.exe (Inno Setup) non trovato nel runner Windows.' }
-          & $iscc "/DPublishDir=$publishDir" "/DOutputDir=$outputDir" "/DAppVersion=$version" "/DIconFile=$iconFile" "/DAllowedArchitectures=${{ matrix.allowed_architectures }}" "/DOutputBaseFilename=LocalStoreManagement-Setup-win-${{ matrix.arch }}" 'packaging/windows/installer.iss'
+          & $iscc "/DPublishDir=$publishDir" "/DOutputDir=$outputDir" "/DAppVersion=$version" "/DIconFile=$iconFile" "/DAllowedArchitectures=arm64" "/DOutputBaseFilename=LocalStoreManagement-Setup-win-arm64" 'packaging/windows/installer.iss'
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
-      - name: Upload Windows installer for release jobs
+      - name: Upload Windows ARM64 installer for release jobs
         uses: actions/upload-artifact@v4
         with:
-          name: package-win-${{ matrix.arch }}
-          path: dist/LocalStoreManagement-Setup-win-${{ matrix.arch }}.exe
+          name: package-win-arm64
+          path: dist/LocalStoreManagement-Setup-win-arm64.exe
           if-no-files-found: error
           retention-days: 1
 
   package-linux:
     name: Linux packages (${{ matrix.arch }})
-    needs: verify
+    needs: package-windows-x64
     strategy:
       fail-fast: false
       matrix:
@@ -185,9 +232,25 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Linux desktop dependencies
+        timeout-minutes: 25
+        shell: bash
         run: |
-          sudo apt-get update
-          sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev libstdc++-12-dev squashfs-tools curl git unzip xz-utils
+          set -euo pipefail
+          sudo apt-get \
+            -o Acquire::Retries=5 \
+            -o Acquire::http::Timeout=30 \
+            -o Acquire::https::Timeout=30 \
+            -o DPkg::Lock::Timeout=60 \
+            update
+          sudo env DEBIAN_FRONTEND=noninteractive apt-get \
+            -o Acquire::Retries=5 \
+            -o Acquire::http::Timeout=30 \
+            -o Acquire::https::Timeout=30 \
+            -o DPkg::Lock::Timeout=60 \
+            -o Dpkg::Use-Pty=0 \
+            install -y --no-install-recommends \
+            clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev libstdc++-12-dev \
+            squashfs-tools curl git unzip xz-utils
 
       - name: Setup Flutter x64
         if: matrix.arch == 'x64'
@@ -300,38 +363,10 @@ jobs:
           if-no-files-found: error
           retention-days: 1
 
-  release-flutter:
-    name: Publish Flutter development assets
+  release-beta:
+    name: Publish Flutter beta assets
     if: github.event_name == 'push' && github.ref == 'refs/heads/Flutter'
-    needs: [package-windows, package-linux]
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
-        with:
-          pattern: package-*
-          path: dist
-          merge-multiple: true
-      - name: Publish direct development downloads
-        env:
-          GH_TOKEN: ${{ github.token }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          TAG='flutter-latest'
-          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            gh release delete "$TAG" --repo "$GITHUB_REPOSITORY" --cleanup-tag --yes
-          fi
-          gh release create "$TAG" dist/* --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --prerelease --latest=false \
-            --title "Flutter development build (${GITHUB_SHA::7})" \
-            --notes 'Build di sviluppo del branch Flutter. Scarica direttamente il file adatto al sistema: EXE per Windows, AppImage o DEB per Linux. Gli artifact Actions sono solo trasferimenti interni temporanei.'
-
-  release-test:
-    name: Publish test beta assets
-    if: github.event_name == 'push' && github.ref == 'refs/heads/test'
-    needs: [package-windows, package-linux]
+    needs: [package-windows-x64, package-windows-arm64, package-linux]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -350,7 +385,8 @@ jobs:
           set -euo pipefail
           RAW_VERSION="$(awk '/^version:/{print $2; exit}' pubspec.yaml)"
           VERSION="${RAW_VERSION/+/.}"
-          TAG='test-latest'
+          VERSION="${VERSION/-b/.b}"
+          TAG='beta-latest'
           mv dist/LocalStoreManagement-Setup-win-x64.exe "dist/LocalStoreManagement-${VERSION}-BETA-Setup-win-x64.exe"
           mv dist/LocalStoreManagement-Setup-win-arm64.exe "dist/LocalStoreManagement-${VERSION}-BETA-Setup-win-arm64.exe"
           mv dist/LocalStoreManagement-linux-x64.AppImage "dist/LocalStoreManagement-${VERSION}-BETA-linux-x64.AppImage"
@@ -361,13 +397,13 @@ jobs:
             gh release delete "$TAG" --repo "$GITHUB_REPOSITORY" --cleanup-tag --yes
           fi
           gh release create "$TAG" dist/* --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --prerelease --latest=false \
-            --title "Local Store Management v${VERSION} BETA / TEST (${GITHUB_SHA::7})" \
-            --notes 'Versione BETA/TEST generata automaticamente dal branch test. Include Windows x64/ARM64 e Linux x64/ARM64 in formato AppImage e DEB.'
+            --title "Local Store Management v${VERSION} BETA (${GITHUB_SHA::7})" \
+            --notes 'Versione BETA generata automaticamente dal branch Flutter. Include Windows x64/ARM64 e Linux x64/ARM64 in formato AppImage e DEB. Le versioni validate vengono poi promosse su main.'
 
   release-main:
     name: Publish main release assets
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    needs: [package-windows, package-linux]
+    needs: [package-windows-x64, package-windows-arm64, package-linux]
     runs-on: ubuntu-latest
     permissions:
       contents: write

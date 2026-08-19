@@ -1,16 +1,20 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
 
 import '../models/app_settings.dart';
 import '../services/app_services.dart';
+import '../services/update_service.dart';
 import '../widgets/app_title_bar.dart';
 import '../widgets/glass.dart';
 import 'cash_page.dart';
+import 'customers_page.dart';
 import 'dashboard_page.dart';
 import 'export_page.dart';
 import 'labels_page.dart';
 import 'lookups_page.dart';
+import 'orders_page.dart';
 import 'products_page.dart';
 import 'settings_page.dart';
 import 'stock_page.dart';
@@ -32,7 +36,136 @@ class ShellPage extends StatefulWidget {
 }
 
 class _ShellPageState extends State<ShellPage> {
+  static const _settingsIndex = 9;
+
   int _index = 0;
+  UpdateCheckResult? _startupUpdate;
+  OverlayEntry? _updateNotification;
+  Timer? _updateNotificationTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _checkUpdatesOnStartup());
+  }
+
+  @override
+  void dispose() {
+    _updateNotificationTimer?.cancel();
+    _updateNotification?.remove();
+    _updateNotification = null;
+    super.dispose();
+  }
+
+  Future<void> _checkUpdatesOnStartup() async {
+    try {
+      final result = await widget.services.updates.check();
+      if (!mounted || !result.updateAvailable) return;
+
+      setState(() => _startupUpdate = result);
+      _showUpdateNotification(result);
+    } catch (error) {
+      debugPrint('Controllo aggiornamenti automatico non riuscito: $error');
+    }
+  }
+
+  void _showUpdateNotification(UpdateCheckResult update) {
+    _dismissUpdateNotification();
+
+    final overlay = Overlay.of(context, rootOverlay: true);
+    final entry = OverlayEntry(
+      builder: (context) {
+        final theme = Theme.of(context);
+        final isDark = theme.brightness == Brightness.dark;
+        return Positioned(
+          right: 24,
+          bottom: 24,
+          child: Material(
+            type: MaterialType.transparency,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 360),
+              child: GlassSurface(
+                blur: 30,
+                opacity: isDark ? 0.18 : 0.58,
+                borderRadius: BorderRadius.circular(18),
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(18),
+                  onTap: _openUpdateSettings,
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 14, 10, 14),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(
+                          Icons.system_update_alt_rounded,
+                          color: theme.colorScheme.primary,
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Aggiornamento disponibile',
+                                style: theme.textTheme.titleSmall?.copyWith(
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                update.message,
+                                maxLines: 3,
+                                overflow: TextOverflow.ellipsis,
+                                style: theme.textTheme.bodySmall,
+                              ),
+                              const SizedBox(height: 6),
+                              Text(
+                                'Clicca per aprire Impostazioni',
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  color: theme.colorScheme.primary,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        IconButton(
+                          tooltip: 'Chiudi',
+                          visualDensity: VisualDensity.compact,
+                          onPressed: _dismissUpdateNotification,
+                          icon: const Icon(Icons.close_rounded, size: 18),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+
+    _updateNotification = entry;
+    overlay.insert(entry);
+    _updateNotificationTimer = Timer(
+      const Duration(seconds: 15),
+      _dismissUpdateNotification,
+    );
+  }
+
+  void _dismissUpdateNotification() {
+    _updateNotificationTimer?.cancel();
+    _updateNotificationTimer = null;
+    _updateNotification?.remove();
+    _updateNotification = null;
+  }
+
+  void _openUpdateSettings() {
+    _dismissUpdateNotification();
+    _selectPage(_settingsIndex);
+  }
 
   void _selectPage(int value) {
     FocusManager.instance.primaryFocus?.unfocus();
@@ -44,15 +177,18 @@ class _ShellPageState extends State<ShellPage> {
     final pages = <Widget>[
       DashboardPage(services: widget.services, isActive: _index == 0),
       CashPage(services: widget.services, isActive: _index == 1),
-      LabelsPage(services: widget.services, settings: widget.settings, isActive: _index == 2),
+      OrdersPage(services: widget.services),
+      CustomersPage(services: widget.services, isActive: _index == 3),
+      LabelsPage(services: widget.services, settings: widget.settings, isActive: _index == 4),
       ProductsPage(services: widget.services),
-      StockPage(services: widget.services, isActive: _index == 4),
+      StockPage(services: widget.services, isActive: _index == 6),
       LookupsPage(services: widget.services),
       ExportPage(services: widget.services, settings: widget.settings),
       SettingsPage(
         services: widget.services,
         current: widget.settings,
         onSaved: widget.onSettingsChanged,
+        initialUpdate: _startupUpdate,
       ),
     ];
 
@@ -78,6 +214,8 @@ class _ShellPageState extends State<ShellPage> {
                         destinations: const [
                           NavigationRailDestination(icon: Icon(Icons.dashboard_outlined), selectedIcon: Icon(Icons.dashboard), label: Text('Dashboard')),
                           NavigationRailDestination(icon: Icon(Icons.point_of_sale_outlined), selectedIcon: Icon(Icons.point_of_sale), label: Text('Cassa')),
+                          NavigationRailDestination(icon: Icon(Icons.receipt_long_outlined), selectedIcon: Icon(Icons.receipt_long), label: Text('Vendite')),
+                          NavigationRailDestination(icon: Icon(Icons.people_outline), selectedIcon: Icon(Icons.people), label: Text('Clienti')),
                           NavigationRailDestination(icon: Icon(Icons.label_outline), selectedIcon: Icon(Icons.label), label: Text('Etichette')),
                           NavigationRailDestination(icon: Icon(Icons.inventory_2_outlined), selectedIcon: Icon(Icons.inventory_2), label: Text('Prodotti')),
                           NavigationRailDestination(icon: Icon(Icons.warehouse_outlined), selectedIcon: Icon(Icons.warehouse), label: Text('Magazzino')),

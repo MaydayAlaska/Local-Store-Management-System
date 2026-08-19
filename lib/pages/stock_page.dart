@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../models/catalog.dart';
 import '../models/stock.dart';
 import '../services/app_services.dart';
+import '../widgets/glass_dropdown.dart';
 import '../widgets/hid_barcode_listener.dart';
 
 class StockPage extends StatefulWidget {
@@ -61,7 +62,10 @@ class _StockPageState extends State<StockPage> {
         _note.clear();
       });
     } catch (error) {
-      setState(() => _status = error.toString().replaceFirst('Bad state: ', '').replaceFirst('Invalid argument(s): ', ''));
+      setState(() => _status = error
+          .toString()
+          .replaceFirst('Bad state: ', '')
+          .replaceFirst('Invalid argument(s): ', ''));
     }
   }
 
@@ -121,32 +125,80 @@ class _StockPageState extends State<StockPage> {
                 child: Padding(
                   padding: const EdgeInsets.all(14),
                   child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-                    Text(_selected == null ? 'Seleziona una variante' : '${_selected!.name} · ${_selected!.variantDisplay}', style: Theme.of(context).textTheme.titleMedium),
+                    Text(
+                      _selected == null
+                          ? 'Seleziona una variante'
+                          : '${_selected!.name} · ${_selected!.variantDisplay}',
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
                     const SizedBox(height: 12),
-                    DropdownButtonFormField<StockMovementKind>(
-                      initialValue: _kind,
-                      decoration: const InputDecoration(border: OutlineInputBorder(), labelText: 'Tipo movimento'),
+                    GlassDropdown<StockMovementKind>(
+                      value: _kind,
+                      labelText: 'Tipo movimento',
                       items: const [
-                        DropdownMenuItem(value: StockMovementKind.incoming, child: Text('Carico')),
-                        DropdownMenuItem(value: StockMovementKind.outgoing, child: Text('Scarico')),
-                        DropdownMenuItem(value: StockMovementKind.adjustment, child: Text('Rettifica giacenza')),
+                        GlassDropdownItem(
+                          value: StockMovementKind.incoming,
+                          label: 'Carico',
+                          icon: Icons.arrow_downward,
+                        ),
+                        GlassDropdownItem(
+                          value: StockMovementKind.outgoing,
+                          label: 'Scarico',
+                          icon: Icons.arrow_upward,
+                        ),
+                        GlassDropdownItem(
+                          value: StockMovementKind.adjustment,
+                          label: 'Rettifica giacenza',
+                          icon: Icons.tune,
+                        ),
                       ],
-                      onChanged: (value) => setState(() => _kind = value!),
+                      onChanged: (value) {
+                        if (value != null) setState(() => _kind = value);
+                      },
                     ),
                     const SizedBox(height: 8),
-                    TextField(controller: _quantity, keyboardType: TextInputType.number, decoration: InputDecoration(border: const OutlineInputBorder(), labelText: _kind == StockMovementKind.adjustment ? 'Nuova giacenza' : 'Quantità')),
+                    TextField(
+                      controller: _quantity,
+                      keyboardType: TextInputType.number,
+                      decoration: InputDecoration(
+                        border: const OutlineInputBorder(),
+                        labelText: _kind == StockMovementKind.adjustment ? 'Nuova giacenza' : 'Quantità',
+                      ),
+                    ),
                     const SizedBox(height: 8),
-                    TextField(controller: _note, decoration: const InputDecoration(border: OutlineInputBorder(), labelText: 'Nota')),
+                    TextField(
+                      controller: _note,
+                      decoration: const InputDecoration(
+                        border: OutlineInputBorder(),
+                        labelText: 'Nota',
+                      ),
+                    ),
                     const SizedBox(height: 10),
-                    FilledButton.icon(onPressed: _selected == null ? null : _register, icon: const Icon(Icons.save), label: const Text('Registra movimento')),
-                    if (_status != null) Padding(padding: const EdgeInsets.only(top: 8), child: Text(_status!)),
+                    FilledButton.icon(
+                      onPressed: _selected == null ? null : _register,
+                      icon: const Icon(Icons.save),
+                      label: const Text('Registra movimento'),
+                    ),
+                    if (_status != null)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 8),
+                        child: Text(_status!),
+                      ),
                   ]),
                 ),
               ),
             ),
           ]),
           const SizedBox(height: 14),
-          TextField(controller: _historySearch, onChanged: (_) => setState(() {}), decoration: const InputDecoration(border: OutlineInputBorder(), labelText: 'Cerca nello storico', prefixIcon: Icon(Icons.history))),
+          TextField(
+            controller: _historySearch,
+            onChanged: (_) => setState(() {}),
+            decoration: const InputDecoration(
+              border: OutlineInputBorder(),
+              labelText: 'Cerca nello storico',
+              prefixIcon: Icon(Icons.history),
+            ),
+          ),
           const SizedBox(height: 8),
           Expanded(
             child: Card(
@@ -158,7 +210,13 @@ class _StockPageState extends State<StockPage> {
                   final m = history[index];
                   return ListTile(
                     dense: true,
-                    leading: Icon(m.kind == StockMovementKind.incoming ? Icons.arrow_downward : m.kind == StockMovementKind.outgoing ? Icons.arrow_upward : Icons.tune),
+                    leading: Icon(
+                      m.kind == StockMovementKind.incoming
+                          ? Icons.arrow_downward
+                          : m.kind == StockMovementKind.outgoing
+                              ? Icons.arrow_upward
+                              : Icons.tune,
+                    ),
                     title: Text('${m.productName} · SKU ${m.sku}'),
                     subtitle: Text('${m.createdAtDisplay}${m.note == null ? '' : ' · ${m.note}'}'),
                     trailing: Text('${m.typeDisplay} ${m.quantityDisplay}  →  ${m.stockAfter}'),

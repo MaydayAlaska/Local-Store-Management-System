@@ -27,7 +27,7 @@ class LabelsPage extends StatefulWidget {
 class _LabelsPageState extends State<LabelsPage> {
   final _search = TextEditingController();
   final _copies = TextEditingController(text: '1');
-  final _width = TextEditingController(text: '50');
+  final _width = TextEditingController(text: '40');
   final _height = TextEditingController(text: '30');
   ProductVariant? _selected;
   List<Printer> _printers = const [];
@@ -84,7 +84,7 @@ class _LabelsPageState extends State<LabelsPage> {
         _printers = printers;
         _printer = selected ?? (printers.isEmpty ? null : printers.first);
         _status = printers.isEmpty
-            ? 'Nessuna stampante rilevata. Verifica che il driver della stampante etichette sia installato.'
+            ? 'Nessuna stampante rilevata.'
             : selected != null
                 ? 'Ultima stampante ripristinata: ${selected.name}.'
                 : 'Stampante pronta: ${_printer!.name}.';
@@ -163,8 +163,9 @@ class _LabelsPageState extends State<LabelsPage> {
   Widget build(BuildContext context) {
     final products = widget.services.products.search(_search.text).take(100).toList();
     final code = _selected?.barcode ?? _selected?.sku;
-    final widthMm = double.tryParse(_width.text.replaceAll(',', '.')) ?? 50;
+    final widthMm = double.tryParse(_width.text.replaceAll(',', '.')) ?? 40;
     final heightMm = double.tryParse(_height.text.replaceAll(',', '.')) ?? 30;
+    final directNetworkPrint = _printer?.url.startsWith('tcp://') == true;
 
     return HidBarcodeListener(
       enabled: widget.isActive,
@@ -239,7 +240,7 @@ class _LabelsPageState extends State<LabelsPage> {
                       Expanded(
                         child: Center(
                           child: AspectRatio(
-                            aspectRatio: widthMm > 0 && heightMm > 0 ? widthMm / heightMm : 5 / 3,
+                            aspectRatio: widthMm > 0 && heightMm > 0 ? widthMm / heightMm : 4 / 3,
                             child: DecoratedBox(
                               decoration: BoxDecoration(
                                 color: Colors.white,
@@ -274,7 +275,9 @@ class _LabelsPageState extends State<LabelsPage> {
                       if (_status != null) Padding(padding: const EdgeInsets.only(top: 8), child: Text(_status!)),
                       const SizedBox(height: 6),
                       Text(
-                        'Layout allineato alla versione main: nome e variante in alto, barcode al centro, SKU in basso a sinistra e prezzo in basso a destra. Configura nel driver la stessa misura dell’etichetta.',
+                        directNetworkPrint
+                            ? 'Stampa diretta TCP/BPL-Z: la misura impostata qui viene inviata direttamente alla stampante. Non è necessario alcun driver Windows.'
+                            : 'Stampa tramite sistema: configura nel driver della stampante la stessa misura impostata qui.',
                         style: Theme.of(context).textTheme.bodySmall,
                       ),
                     ]),

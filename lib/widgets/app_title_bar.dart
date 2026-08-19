@@ -6,24 +6,11 @@ class AppTitleBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => SizedBox(
-        height: 44,
+        height: 36,
         child: Row(
           children: [
             Expanded(
-              child: DragToMoveArea(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 10),
-                  child: Align(
-                    alignment: Alignment.centerLeft,
-                    child: Text(
-                      'Local Store Management System',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
-                    ),
-                  ),
-                ),
-              ),
+              child: DragToMoveArea(child: const SizedBox.expand()),
             ),
             _CaptionButton(
               tooltip: 'Riduci a icona',
@@ -53,7 +40,13 @@ class AppTitleBar extends StatelessWidget {
 }
 
 class _CaptionButton extends StatelessWidget {
-  const _CaptionButton({required this.tooltip, required this.icon, required this.onPressed, this.danger = false});
+  const _CaptionButton({
+    required this.tooltip,
+    required this.icon,
+    required this.onPressed,
+    this.danger = false,
+  });
+
   final String tooltip;
   final IconData icon;
   final VoidCallback onPressed;
@@ -63,15 +56,18 @@ class _CaptionButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return SizedBox(
-      width: 42,
-      height: 36,
+      width: 40,
+      height: 32,
       child: IconButton(
         tooltip: tooltip,
+        padding: EdgeInsets.zero,
         onPressed: onPressed,
         hoverColor: danger
             ? theme.colorScheme.errorContainer.withValues(alpha: 0.78)
-            : Colors.white.withValues(alpha: theme.brightness == Brightness.dark ? 0.10 : 0.34),
-        icon: Icon(icon, size: 18),
+            : Colors.white.withValues(
+                alpha: theme.brightness == Brightness.dark ? 0.10 : 0.34,
+              ),
+        icon: Icon(icon, size: 17),
       ),
     );
   }

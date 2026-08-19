@@ -1,4 +1,5 @@
 import '../core/database_service.dart';
+import '../repositories/customer_repository.dart';
 import '../repositories/lookup_repository.dart';
 import '../repositories/product_repository.dart';
 import '../repositories/stock_repository.dart';
@@ -14,6 +15,7 @@ class AppServices {
       : products = ProductRepository(database),
         lookups = LookupRepository(database),
         stock = StockRepository(database),
+        customers = CustomerRepository(database),
         settings = SettingsService() {
     applicationIcon = ApplicationIconService(settings);
     backup = BackupService(database);
@@ -26,6 +28,7 @@ class AppServices {
   final ProductRepository products;
   final LookupRepository lookups;
   final StockRepository stock;
+  final CustomerRepository customers;
   final SettingsService settings;
   late final ApplicationIconService applicationIcon;
   late final BackupService backup;
