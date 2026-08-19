@@ -2,11 +2,11 @@
 
 Gestionale desktop **offline** per negozi, sviluppato in **Flutter/Dart** con database locale **SQLite**.
 
-Il branch `Flutter` è il canale **BETA/TEST** del progetto. Le build di questo branch vengono pubblicate come prerelease `flutter-latest`, mostrano `BETA` nell'applicazione e non installano automaticamente gli aggiornamenti stabili di `main`.
+Il branch `Flutter` è il canale **BETA/TEST** del progetto. Le build di questo branch vengono pubblicate come prerelease `beta-latest`, mostrano `BETA` nell'applicazione e ricevono aggiornamenti esclusivamente dal canale OTA BETA. Le release stabili di `main` restano separate.
 
 ## Download BETA
 
-Le build BETA sono disponibili nella prerelease `flutter-latest` come file diretti per:
+Le build BETA sono disponibili nella prerelease `beta-latest` come file diretti per:
 
 | Sistema | Architettura | Formati |
 | --- | --- | --- |
@@ -29,14 +29,27 @@ La sezione Etichette supporta stampante persistente, dimensioni fisiche, antepri
 
 ## Aggiornamenti OTA
 
-L'updater stabile distingue automaticamente sistema operativo e architettura:
+L'updater distingue automaticamente sistema operativo e architettura:
 
 - Windows x64
 - Windows ARM64
 - Linux x64 AppImage
 - Linux ARM64 AppImage
 
-Le build del branch `Flutter` sono però considerate **BETA** e non possono installare il canale OTA stabile. Le release stabili vengono pubblicate da `main`.
+Sono presenti due canali OTA indipendenti:
+
+- `main` → canale **STABILE**
+- `Flutter` → canale **BETA**, pubblicato come `beta-latest`
+
+Una build BETA non installa release stabili e una build stabile non installa Beta.
+
+All'avvio dell'app viene eseguito automaticamente un controllo aggiornamenti. Se è disponibile una versione realmente più recente, compare una notifica discreta in basso a destra; cliccandola si apre direttamente la sezione **Impostazioni**, dove è già disponibile il risultato del controllo.
+
+Il confronto OTA è basato sulla versione, non sul semplice fatto che il commit online sia diverso. Un aggiornamento viene proposto solo se `versione_online > versione_installata`. Di conseguenza una release uguale o precedente non genera notifiche, anche se ha un commit differente.
+
+Per le Beta il formato leggibile è `X.Y.Z.bN`: ad esempio `0.1.5.b2` è più recente di `0.1.5.b1`. La release stabile `0.1.5` è considerata successiva a tutte le Beta `0.1.5.bN`.
+
+Su Linux l'installazione automatica è disponibile per AppImage; i pacchetti `.deb` possono essere pubblicati e scaricati ma non vengono sostituiti automaticamente dal processo in esecuzione.
 
 ## Database
 
@@ -74,6 +87,8 @@ flutter analyze --no-fatal-infos
 flutter test
 ```
 
+I test dell'updater coprono selezione dell'asset per sistema/architettura, riconoscimento del canale Beta, normalizzazione delle versioni e confronto monotono fra Beta e release stabili.
+
 ## CI e release
 
 La pipeline produce:
@@ -87,11 +102,18 @@ LocalStoreManagement-linux-arm64.AppImage
 LocalStoreManagement-linux-arm64.deb
 ```
 
+Gli asset della prerelease Beta vengono rinominati includendo la versione, per esempio:
+
+```text
+LocalStoreManagement-0.1.5.b1-BETA-Setup-win-x64.exe
+LocalStoreManagement-0.1.5.b1-BETA-linux-x64.AppImage
+```
+
 Strategia branch:
 
-- `Flutter` → BETA/TEST, prerelease `flutter-latest`
+- `Flutter` → BETA/TEST, prerelease `beta-latest`, OTA BETA
 - `main` → stabile, tag `v<versione>` e OTA stabile
-- `test` → canale BETA legacy compatibile
+- `avalonia` → implementazione storica/alternativa
 
 ## Versioning
 
