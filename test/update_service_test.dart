@@ -32,6 +32,40 @@ void main() {
     );
   });
 
+  test('beta OTA matches versioned Windows assets', () {
+    expect(
+      betaUpdateAssetSuffixFor(
+        operatingSystem: 'windows',
+        abi: Abi.windowsX64,
+      ),
+      '-BETA-Setup-win-x64.exe',
+    );
+    expect(
+      betaUpdateAssetSuffixFor(
+        operatingSystem: 'windows',
+        abi: Abi.windowsArm64,
+      ),
+      '-BETA-Setup-win-arm64.exe',
+    );
+  });
+
+  test('beta OTA matches versioned Linux AppImages', () {
+    expect(
+      betaUpdateAssetSuffixFor(
+        operatingSystem: 'linux',
+        abi: Abi.linuxX64,
+      ),
+      '-BETA-linux-x64.AppImage',
+    );
+    expect(
+      betaUpdateAssetSuffixFor(
+        operatingSystem: 'linux',
+        abi: Abi.linuxArm64,
+      ),
+      '-BETA-linux-arm64.AppImage',
+    );
+  });
+
   test('only Flutter is the beta branch', () {
     expect(isBetaBranch('Flutter'), isTrue);
     expect(isBetaBranch('flutter'), isTrue);
