@@ -1,4 +1,5 @@
 import '../core/formatters.dart';
+import '../l10n/app_strings.dart';
 
 class LookupItem {
   const LookupItem({required this.id, required this.name, required this.productCount});
@@ -51,13 +52,19 @@ class ProductVariant {
 
   String get salePriceDisplay => formatMoney(salePriceCents);
   String get purchasePriceDisplay => formatMoney(purchasePriceCents);
-  String get statusDisplay => isActive ? 'Attivo' : 'Disattivato';
+  String get statusDisplay => isActive
+      ? (AppStrings.isEnglish ? 'Active' : 'Attivo')
+      : (AppStrings.isEnglish ? 'Disabled' : 'Disattivato');
 
   String get variantDisplay {
     final parts = <String>[];
     if (variant?.trim().isNotEmpty == true) parts.add(variant!.trim());
-    if (size?.trim().isNotEmpty == true) parts.add('Taglia ${size!.trim()}');
-    return parts.isEmpty ? 'Variante base' : parts.join(' · ');
+    if (size?.trim().isNotEmpty == true) {
+      parts.add('${AppStrings.t('size')} ${size!.trim()}');
+    }
+    return parts.isEmpty
+        ? (AppStrings.isEnglish ? 'Base variant' : 'Variante base')
+        : parts.join(' · ');
   }
 }
 
@@ -94,8 +101,15 @@ class ProductSummary {
   final int? minimumSalePriceCents;
   final int? maximumSalePriceCents;
 
-  String get variantCountDisplay => '$variantCount ${variantCount == 1 ? 'variante' : 'varianti'}';
-  String get salePriceDisplay => formatMoneyRange(minimumSalePriceCents, maximumSalePriceCents);
+  String get variantCountDisplay {
+    if (AppStrings.isEnglish) {
+      return '$variantCount ${variantCount == 1 ? 'variant' : 'variants'}';
+    }
+    return '$variantCount ${variantCount == 1 ? 'variante' : 'varianti'}';
+  }
+
+  String get salePriceDisplay =>
+      formatMoneyRange(minimumSalePriceCents, maximumSalePriceCents);
 }
 
 class ProductDraft {
@@ -148,7 +162,11 @@ class ProductVariantDraft {
   String get variantDisplay {
     final parts = <String>[];
     if (variant?.trim().isNotEmpty == true) parts.add(variant!.trim());
-    if (size?.trim().isNotEmpty == true) parts.add('Taglia ${size!.trim()}');
-    return parts.isEmpty ? 'Variante base' : parts.join(' · ');
+    if (size?.trim().isNotEmpty == true) {
+      parts.add('${AppStrings.t('size')} ${size!.trim()}');
+    }
+    return parts.isEmpty
+        ? (AppStrings.isEnglish ? 'Base variant' : 'Variante base')
+        : parts.join(' · ');
   }
 }
