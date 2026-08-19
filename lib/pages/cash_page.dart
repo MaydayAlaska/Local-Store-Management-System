@@ -593,12 +593,29 @@ class _CashPageState extends State<CashPage> {
                     ),
                     const SizedBox(height: 8),
                     Expanded(
-                      child: _CashKeypad(
-                        priceText: formatMoney(_keypadPriceCents),
-                        onKey: _keypadInsert,
-                        onBackspace: _keypadBackspace,
-                        onClear: _keypadClear,
-                        onSubmit: _keypadSubmit,
+                      child: LayoutBuilder(
+                        builder: (context, constraints) {
+                          final keypadWidth = constraints.maxWidth > 500
+                              ? 500.0
+                              : constraints.maxWidth;
+                          final keypadHeight = constraints.maxHeight > 460
+                              ? 460.0
+                              : constraints.maxHeight;
+                          return Align(
+                            alignment: Alignment.topCenter,
+                            child: SizedBox(
+                              width: keypadWidth,
+                              height: keypadHeight,
+                              child: _CashKeypad(
+                                priceText: formatMoney(_keypadPriceCents),
+                                onKey: _keypadInsert,
+                                onBackspace: _keypadBackspace,
+                                onClear: _keypadClear,
+                                onSubmit: _keypadSubmit,
+                              ),
+                            ),
+                          );
+                        },
                       ),
                     ),
                   ],
@@ -831,7 +848,13 @@ class _CashKeypad extends StatelessWidget {
         child: SizedBox.expand(
           child: OutlinedButton(
             onPressed: () => onKey(value),
-            child: Text(value),
+            child: Text(
+              value,
+              style: const TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
           ),
         ),
       );
@@ -939,7 +962,7 @@ class _CashKeypad extends StatelessWidget {
                     ),
                     const SizedBox(width: 8),
                     SizedBox(
-                      width: 54,
+                      width: 60,
                       child: Column(
                         children: [
                           Expanded(
