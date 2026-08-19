@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../core/app_paths.dart';
+import '../l10n/app_strings.dart';
 import '../models/catalog.dart';
 import '../models/stock.dart';
 import '../services/app_services.dart';
@@ -22,9 +23,17 @@ class _DashboardPageState extends State<DashboardPage> {
   final _search = TextEditingController();
   final _focus = FocusNode();
   _ScanMode _mode = _ScanMode.search;
-  String _status = 'Scanner HID pronto.';
+  late String _status;
   String? _scannedCode;
   ProductVariant? _scannedProduct;
+
+  String _itEn(String it, String en) => AppStrings.isEnglish ? en : it;
+
+  @override
+  void initState() {
+    super.initState();
+    _status = _itEn('Scanner HID pronto.', 'HID scanner ready.');
+  }
 
   List<ProductVariant> get _results {
     final scanned = _scannedCode;
@@ -35,7 +44,8 @@ class _DashboardPageState extends State<DashboardPage> {
     return widget.services.products.search(_search.text, 50);
   }
 
-  bool get _scannedCodeIsMissing => _scannedCode != null && _scannedProduct == null;
+  bool get _scannedCodeIsMissing =>
+      _scannedCode != null && _scannedProduct == null;
 
   @override
   void dispose() {
@@ -56,33 +66,58 @@ class _DashboardPageState extends State<DashboardPage> {
           _scannedCode = code;
           _scannedProduct = product;
           _status = product == null
-              ? 'Barcode «$code» non presente. Puoi aggiungerlo dall’elenco qui sotto.'
-              : 'Trovato: ${product.name} · ${product.variantDisplay}.';
+              ? _itEn(
+                  'Barcode «$code» non presente. Puoi aggiungerlo dall’elenco qui sotto.',
+                  'Barcode “$code” was not found. You can add it from the list below.',
+                )
+              : _itEn(
+                  'Trovato: ${product.name} · ${product.variantDisplay}.',
+                  'Found: ${product.name} · ${product.variantDisplay}.',
+                );
         });
       } else if (product == null) {
         _search.text = code;
         setState(() {
           _scannedCode = code;
           _scannedProduct = null;
-          _status = 'Nessun prodotto trovato per «$code».';
+          _status = _itEn(
+            'Nessun prodotto trovato per «$code».',
+            'No product found for “$code”.',
+          );
         });
       } else if (_mode == _ScanMode.incoming) {
-        widget.services.stock.addMovement(product.id, StockMovementKind.incoming, 1, 'Carico rapido da scanner');
+        widget.services.stock.addMovement(
+          product.id,
+          StockMovementKind.incoming,
+          1,
+          _itEn('Carico rapido da scanner', 'Quick incoming scan'),
+        );
         final latest = widget.services.products.getById(product.id) ?? product;
         _search.text = code;
         setState(() {
           _scannedCode = code;
           _scannedProduct = latest;
-          _status = '${product.name}: caricato +1.';
+          _status = _itEn(
+            '${product.name}: caricato +1.',
+            '${product.name}: added +1.',
+          );
         });
       } else {
-        widget.services.stock.addMovement(product.id, StockMovementKind.outgoing, 1, 'Scarico rapido da scanner');
+        widget.services.stock.addMovement(
+          product.id,
+          StockMovementKind.outgoing,
+          1,
+          _itEn('Scarico rapido da scanner', 'Quick outgoing scan'),
+        );
         final latest = widget.services.products.getById(product.id) ?? product;
         _search.text = code;
         setState(() {
           _scannedCode = code;
           _scannedProduct = latest;
-          _status = '${product.name}: scaricato -1.';
+          _status = _itEn(
+            '${product.name}: scaricato -1.',
+            '${product.name}: removed -1.',
+          );
         });
       }
     } catch (error) {
@@ -96,7 +131,10 @@ class _DashboardPageState extends State<DashboardPage> {
     await showDialog<bool>(
       context: context,
       barrierDismissible: false,
-      builder: (_) => ProductEditorDialog(services: widget.services, product: summary),
+      builder: (_) => ProductEditorDialog(
+        services: widget.services,
+        product: summary,
+      ),
     );
     if (mounted) setState(() {});
   }
@@ -105,21 +143,28 @@ class _DashboardPageState extends State<DashboardPage> {
     final action = await showDialog<_BarcodeAction>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Aggiungi articolo'),
+        title: Text(_itEn('Aggiungi articolo', 'Add item')),
         content: Text(
-          'Il barcode $code non è presente nel database. Vuoi creare un nuovo articolo oppure aggiungerlo come nuova variante di un articolo esistente?',
+          _itEn(
+            'Il barcode $code non è presente nel database. Vuoi creare un nuovo articolo oppure aggiungerlo come nuova variante di un articolo esistente?',
+            'Barcode $code is not in the database. Do you want to create a new item or add it as a new variant of an existing item?',
+          ),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Annulla')),
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(AppStrings.t('cancel')),
+          ),
           OutlinedButton.icon(
-            onPressed: () => Navigator.pop(context, _BarcodeAction.existingProduct),
+            onPressed: () =>
+                Navigator.pop(context, _BarcodeAction.existingProduct),
             icon: const Icon(Icons.library_add_outlined),
-            label: const Text('Articolo esistente'),
+            label: Text(_itEn('Articolo esistente', 'Existing item')),
           ),
           FilledButton.icon(
             onPressed: () => Navigator.pop(context, _BarcodeAction.newProduct),
             icon: const Icon(Icons.add),
-            label: const Text('Nuovo articolo'),
+            label: Text(_itEn('Nuovo articolo', 'New item')),
           ),
         ],
       ),
@@ -130,7 +175,10 @@ class _DashboardPageState extends State<DashboardPage> {
       final changed = await showDialog<bool>(
         context: context,
         barrierDismissible: false,
-        builder: (_) => ProductEditorDialog(services: widget.services, initialBarcode: code),
+        builder: (_) => ProductEditorDialog(
+          services: widget.services,
+          initialBarcode: code,
+        ),
       );
       if (changed == true && mounted) {
         _refreshAfterBarcodeAssignment(code);
@@ -161,9 +209,12 @@ class _DashboardPageState extends State<DashboardPage> {
         context: context,
         builder: (dialogContext) => StatefulBuilder(
           builder: (context, setLocalState) {
-            final products = widget.services.products.searchProducts(controller.text, 100);
+            final products =
+                widget.services.products.searchProducts(controller.text, 100);
             return AlertDialog(
-              title: const Text('Scegli articolo esistente'),
+              title: Text(
+                _itEn('Scegli articolo esistente', 'Choose existing item'),
+              ),
               content: SizedBox(
                 width: 620,
                 height: 480,
@@ -173,24 +224,37 @@ class _DashboardPageState extends State<DashboardPage> {
                       controller: controller,
                       autofocus: true,
                       onChanged: (_) => setLocalState(() {}),
-                      decoration: const InputDecoration(
-                        prefixIcon: Icon(Icons.search),
-                        labelText: 'Cerca articolo',
+                      decoration: InputDecoration(
+                        prefixIcon: const Icon(Icons.search),
+                        labelText: _itEn('Cerca articolo', 'Search item'),
                       ),
                     ),
                     const SizedBox(height: 10),
                     Expanded(
                       child: products.isEmpty
-                          ? const Center(child: Text('Nessun articolo trovato.'))
+                          ? Center(
+                              child: Text(
+                                _itEn(
+                                  'Nessun articolo trovato.',
+                                  'No items found.',
+                                ),
+                              ),
+                            )
                           : ListView.separated(
                               itemCount: products.length,
-                              separatorBuilder: (_, _) => const Divider(height: 1),
+                              separatorBuilder: (_, _) =>
+                                  const Divider(height: 1),
                               itemBuilder: (context, index) {
                                 final product = products[index];
                                 return ListTile(
                                   title: Text(product.name),
-                                  subtitle: Text('${product.brand ?? 'Senza marca'} · ${product.category ?? 'Senza categoria'} · ${product.variantCountDisplay}'),
-                                  onTap: () => Navigator.pop(dialogContext, product),
+                                  subtitle: Text(
+                                    '${product.brand ?? _itEn('Senza marca', 'No brand')} · '
+                                    '${product.category ?? _itEn('Senza categoria', 'No category')} · '
+                                    '${product.variantCountDisplay}',
+                                  ),
+                                  onTap: () =>
+                                      Navigator.pop(dialogContext, product),
                                 );
                               },
                             ),
@@ -199,7 +263,10 @@ class _DashboardPageState extends State<DashboardPage> {
                 ),
               ),
               actions: [
-                TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Annulla')),
+                TextButton(
+                  onPressed: () => Navigator.pop(dialogContext),
+                  child: Text(AppStrings.t('cancel')),
+                ),
               ],
             );
           },
@@ -217,8 +284,11 @@ class _DashboardPageState extends State<DashboardPage> {
       _scannedCode = code;
       _scannedProduct = product;
       _status = product == null
-          ? 'Barcode non ancora assegnato.'
-          : 'Barcode assegnato a ${product.name} · ${product.variantDisplay}.';
+          ? _itEn('Barcode non ancora assegnato.', 'Barcode is not assigned yet.')
+          : _itEn(
+              'Barcode assegnato a ${product.name} · ${product.variantDisplay}.',
+              'Barcode assigned to ${product.name} · ${product.variantDisplay}.',
+            );
     });
   }
 
@@ -244,21 +314,45 @@ class _DashboardPageState extends State<DashboardPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text('Dashboard', style: Theme.of(context).textTheme.headlineMedium),
+            Text(
+              AppStrings.t('dashboard'),
+              style: Theme.of(context).textTheme.headlineMedium,
+            ),
             const SizedBox(height: 16),
             Wrap(spacing: 12, runSpacing: 12, children: [
-              _MetricCard(label: 'Prodotti', value: '$products', icon: Icons.inventory_2),
-              _MetricCard(label: 'Pezzi a magazzino', value: '$stock', icon: Icons.warehouse),
+              _MetricCard(
+                label: AppStrings.t('products'),
+                value: '$products',
+                icon: Icons.inventory_2,
+              ),
+              _MetricCard(
+                label: _itEn('Pezzi a magazzino', 'Items in stock'),
+                value: '$stock',
+                icon: Icons.warehouse,
+              ),
             ]),
             const SizedBox(height: 20),
             SegmentedButton<_ScanMode>(
-              segments: const [
-                ButtonSegment(value: _ScanMode.search, icon: Icon(Icons.search), label: Text('Cerca / mostra')),
-                ButtonSegment(value: _ScanMode.incoming, icon: Icon(Icons.add), label: Text('Carico rapido +1')),
-                ButtonSegment(value: _ScanMode.outgoing, icon: Icon(Icons.remove), label: Text('Scarico rapido -1')),
+              segments: [
+                ButtonSegment(
+                  value: _ScanMode.search,
+                  icon: const Icon(Icons.search),
+                  label: Text(_itEn('Cerca / mostra', 'Search / show')),
+                ),
+                ButtonSegment(
+                  value: _ScanMode.incoming,
+                  icon: const Icon(Icons.add),
+                  label: Text(_itEn('Carico rapido +1', 'Quick add +1')),
+                ),
+                ButtonSegment(
+                  value: _ScanMode.outgoing,
+                  icon: const Icon(Icons.remove),
+                  label: Text(_itEn('Scarico rapido -1', 'Quick remove -1')),
+                ),
               ],
               selected: {_mode},
-              onSelectionChanged: (value) => setState(() => _mode = value.first),
+              onSelectionChanged: (value) =>
+                  setState(() => _mode = value.first),
             ),
             const SizedBox(height: 12),
             TextField(
@@ -266,11 +360,17 @@ class _DashboardPageState extends State<DashboardPage> {
               focusNode: _focus,
               onChanged: _manualSearchChanged,
               onSubmitted: _submit,
-              decoration: const InputDecoration(
-                border: OutlineInputBorder(),
-                prefixIcon: Icon(Icons.qr_code_scanner),
-                labelText: 'Scansiona barcode/SKU o cerca per nome',
-                hintText: 'Puoi scansionare anche senza cliccare questo campo',
+              decoration: InputDecoration(
+                border: const OutlineInputBorder(),
+                prefixIcon: const Icon(Icons.qr_code_scanner),
+                labelText: _itEn(
+                  'Scansiona barcode/SKU o cerca per nome',
+                  'Scan barcode/SKU or search by name',
+                ),
+                hintText: _itEn(
+                  'Puoi scansionare anche senza cliccare questo campo',
+                  'You can scan without clicking this field',
+                ),
               ),
             ),
             const SizedBox(height: 8),
@@ -283,25 +383,40 @@ class _DashboardPageState extends State<DashboardPage> {
                     ? ListView(
                         children: [
                           ListTile(
-                            leading: const CircleAvatar(child: Icon(Icons.add)),
-                            title: const Text('Aggiungi articolo'),
-                            subtitle: Text('Barcode ${_scannedCode!} non presente nel database'),
+                            leading: const CircleAvatar(
+                              child: Icon(Icons.add),
+                            ),
+                            title: Text(_itEn('Aggiungi articolo', 'Add item')),
+                            subtitle: Text(
+                              _itEn(
+                                'Barcode ${_scannedCode!} non presente nel database',
+                                'Barcode ${_scannedCode!} not found in the database',
+                              ),
+                            ),
                             trailing: const Icon(Icons.chevron_right),
                             onTap: () => _addScannedBarcode(_scannedCode!),
                           ),
                         ],
                       )
                     : results.isEmpty
-                        ? const Center(child: Text('Nessun prodotto trovato.'))
+                        ? Center(
+                            child: Text(AppStrings.t('no_product_found')),
+                          )
                         : ListView.separated(
                             itemCount: results.length,
-                            separatorBuilder: (_, _) => const Divider(height: 1),
+                            separatorBuilder: (_, _) =>
+                                const Divider(height: 1),
                             itemBuilder: (context, index) {
                               final item = results[index];
                               return ListTile(
-                                leading: CircleAvatar(child: Text('${item.stockQuantity}')),
+                                leading: CircleAvatar(
+                                  child: Text('${item.stockQuantity}'),
+                                ),
                                 title: Text(item.name),
-                                subtitle: Text('${item.variantDisplay} · SKU ${item.sku} · ${item.barcode ?? 'nessun barcode'}'),
+                                subtitle: Text(
+                                  '${item.variantDisplay} · SKU ${item.sku} · '
+                                  '${item.barcode ?? _itEn('nessun barcode', 'no barcode')}',
+                                ),
                                 trailing: Text(item.salePriceDisplay),
                                 onTap: () => _editProduct(item.productId),
                               );
@@ -310,7 +425,10 @@ class _DashboardPageState extends State<DashboardPage> {
               ),
             ),
             const SizedBox(height: 8),
-            Text('Database: ${AppPaths.databasePath}', style: Theme.of(context).textTheme.bodySmall),
+            Text(
+              'Database: ${AppPaths.databasePath}',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
           ],
         ),
       ),
@@ -335,10 +453,13 @@ class _MetricCard extends StatelessWidget {
             child: Row(children: [
               Icon(icon, size: 30),
               const SizedBox(width: 14),
-              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text(value, style: Theme.of(context).textTheme.headlineSmall),
-                Text(label),
-              ]),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(value, style: Theme.of(context).textTheme.headlineSmall),
+                  Text(label),
+                ],
+              ),
             ]),
           ),
         ),
