@@ -8,16 +8,14 @@ import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 
 import '../core/formatters.dart';
+import '../models/app_settings.dart';
 import '../models/catalog.dart';
+import 'settings_service.dart';
 
 class LabelService {
-  static const networkPrinterHost = '192.168.1.63';
-  static const networkPrinterPort = 9100;
-  static const networkPrinterUrl = 'tcp://$networkPrinterHost:$networkPrinterPort';
-  static const networkPrinterName = 'BIXOLON ApiX110 (rete)';
+  LabelService(this._settings);
 
-  // 203 dpi ~= 8 dots/mm.
-  static const _dotsPerMm = 8.0;
+  final SettingsService _settings;
 
   Barcode barcodeFor(String code) => isValidEan13(code)
       ? Barcode.ean13()
@@ -38,25 +36,61 @@ class LabelService {
     return check == digits[12];
   }
 
+  LabelPrinterProfile? profileForUrl(String? url) =>
+      _settings.load().labelPrinterForUrl(url);
+
+  LabelPrinterProfile? profileForPrinter(Printer? printer) =>
+      printer == null ? null : profileForUrl(printer.url);
+
+  bool isDirectPrinter(Printer? printer) => profileForPrinter(printer) != null;
+
   Future<List<Printer>> getPrinters() async {
-    final network = Printer(
-      url: networkPrinterUrl,
-      name: networkPrinterName,
-      model: 'ApiX110 / BPL-Z',
-      location: '$networkPrinterHost:$networkPrinterPort',
-      isDefault: false,
-      isAvailable: true,
-    );
+    final settings = _settings.load();
+    final network = settings.labelPrinterProfiles
+        .where((profile) => profile.enabled)
+        .map(
+          (profile) => Printer(
+            url: profile.url,
+            name: profile.name,
+            model: '${profile.protocolLabel} · ${profile.dpi} dpi',
+            location: '${profile.host}:${profile.port}',
+            isDefault: false,
+            isAvailable: true,
+          ),
+        )
+        .toList(growable: false);
 
     try {
       final system = await Printing.listPrinters();
+      final configuredUrls = network.map((printer) => printer.url).toSet();
       return <Printer>[
-        network,
-        ...system.where((printer) => printer.url != networkPrinterUrl),
+        ...network,
+        ...system.where((printer) => !configuredUrls.contains(printer.url)),
       ];
     } catch (_) {
       // La stampa TCP diretta non dipende dai driver o dallo spooler di sistema.
-      return <Printer>[network];
+      return network;
+    }
+  }
+
+  Future<void> testConnection(LabelPrinterProfile profile) async {
+    Socket? socket;
+    try {
+      socket = await Socket.connect(
+        profile.host,
+        profile.port,
+        timeout: const Duration(seconds: 3),
+      );
+      await socket.close();
+    } on SocketException catch (error) {
+      socket?.destroy();
+      throw StateError(
+        'Impossibile raggiungere ${profile.host}:${profile.port}. '
+        'Dettagli: ${error.message}',
+      );
+    } catch (_) {
+      socket?.destroy();
+      rethrow;
     }
   }
 
@@ -211,12 +245,13 @@ class LabelService {
     );
   }
 
-  /// Costruisce il payload BPL-Z/ZPL inviato direttamente alla ApiX110 via TCP 9100.
+  /// Costruisce il payload BPL-Z/ZPL per una stampante termica compatibile.
   String buildBplZ({
     required ProductVariant product,
     required int copies,
     required double widthMm,
     required double heightMm,
+    int dpi = 203,
   }) {
     _validateJob(
       product: product,
@@ -225,8 +260,9 @@ class LabelService {
       heightMm: heightMm,
     );
 
-    final width = (widthMm * _dotsPerMm).round();
-    final height = (heightMm * _dotsPerMm).round();
+    final dotsPerMm = dpi / 25.4;
+    final width = (widthMm * dotsPerMm).round();
+    final height = (heightMm * dotsPerMm).round();
     final margin = (width * 0.055).round().clamp(12, 36).toInt();
     final contentWidth = width - (margin * 2);
     final code = _bplText(_printableCode(product), maxLength: 40);
@@ -268,8 +304,7 @@ class LabelService {
       ean13: ean13,
     );
 
-    // Gli EAN-13 hanno guard bar piu lunghi a sinistra, al centro e a destra.
-    // Lasciamo spazio sotto il simbolo prima di stampare la riga numerica manuale.
+    // Gli EAN-13 hanno guard bar più lunghi a sinistra, al centro e a destra.
     final codeClearance = 8 + (ean13 ? barcode.moduleWidth * 6 : 0);
     final codeY = barcodeY + barcodeHeight + codeClearance;
 
@@ -328,14 +363,24 @@ class LabelService {
     required double widthMm,
     required double heightMm,
   }) async {
-    if (printer.url.startsWith('tcp://')) {
+    final profile = profileForPrinter(printer);
+    if (profile != null) {
+      if (!profile.enabled) {
+        throw StateError('Il profilo stampante «${profile.name}» è disattivato.');
+      }
+      if (profile.protocol != 'bpl-z') {
+        throw StateError(
+          'Protocollo ${profile.protocol} non ancora supportato per la stampa diretta.',
+        );
+      }
       final payload = buildBplZ(
         product: product,
         copies: copies,
         widthMm: widthMm,
         heightMm: heightMm,
+        dpi: profile.dpi,
       );
-      await _sendTcp(printer.url, payload);
+      await _sendTcp(profile.url, payload);
       return true;
     }
 
@@ -373,7 +418,7 @@ class LabelService {
       socket?.destroy();
       throw StateError(
         'Impossibile raggiungere ${uri.host}:${uri.port}. '
-        'Verifica che la BIXOLON sia accesa e collegata alla rete. '
+        'Verifica che la stampante sia accesa e collegata alla rete. '
         'Dettagli: ${error.message}',
       );
     } catch (_) {
@@ -470,8 +515,7 @@ class LabelService {
     return text;
   }
 
-  static String _formatBplPrice(int cents) =>
-      _bplText(formatMoney(cents));
+  static String _formatBplPrice(int cents) => _bplText(formatMoney(cents));
 
   static double _clamp(double value, double min, double max) {
     if (value < min) return min;
