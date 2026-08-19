@@ -34,18 +34,18 @@ class _CashPageState extends State<CashPage> {
     super.dispose();
   }
 
-  List<ProductVariant> get _results => widget.services.products.search(_search.text).take(50).toList();
+  List<ProductVariant> get _results => widget.services.products.search(_search.text, 50);
 
   void _submitSearch(String value) {
     final query = value.trim();
     if (query.isEmpty) return;
     final exact = widget.services.products.findByBarcode(query);
     if (exact != null) {
-      _add(exact);
+      _add(exact, refresh: false);
     } else {
-      final matches = widget.services.products.search(query).take(2).toList();
+      final matches = widget.services.products.search(query, 2);
       if (matches.length == 1) {
-        _add(matches.first);
+        _add(matches.first, refresh: false);
       } else {
         setState(() => _searchStatus = 'Nessun prodotto univoco trovato per «$query».');
       }
@@ -54,8 +54,8 @@ class _CashPageState extends State<CashPage> {
     setState(() {});
   }
 
-  void _add(ProductVariant candidate) {
-    final latest = widget.services.products.getById(candidate.id);
+  void _add(ProductVariant candidate, {bool refresh = true}) {
+    final ProductVariant? latest = refresh ? widget.services.products.getById(candidate.id) : candidate;
     if (latest == null) return _message('Il prodotto selezionato non esiste più.');
     if (!latest.isActive) return _message('${latest.name}: variante disattivata, non aggiunta.');
     if (latest.salePriceCents == null) return _message('${latest.name}: prezzo di vendita non impostato.');
