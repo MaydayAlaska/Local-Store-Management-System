@@ -5,6 +5,7 @@ on:
     branches: [Flutter]
     paths:
       - tool/update_birth_places.py
+      - tool/ensure_anpr_build_guard.py
       - .github/workflows/update-birth-places.yml
   schedule:
     - cron: '17 5 * * *'
@@ -28,36 +29,7 @@ jobs:
         run: python3 tool/update_birth_places.py
 
       - name: Ensure every build verifies ANPR freshness
-        shell: bash
-        run: |
-          set -euo pipefail
-          python3 - <<'PY'
-          from pathlib import Path
-
-          path = Path('.github/workflows/build.yml')
-          text = path.read_text(encoding='utf-8')
-          marker = '      - name: Verify embedded ANPR dataset is current\n'
-          if marker in text:
-              raise SystemExit(0)
-
-          needle = '      - name: Setup Flutter\n'
-          if needle not in text:
-              raise SystemExit('Impossibile trovare il punto di inserimento nel job verify.')
-
-          step = '''      - name: Verify embedded ANPR dataset is current
-        shell: bash
-        run: |
-          set -euo pipefail
-          python3 tool/update_birth_places.py
-          if ! git diff --quiet -- assets/data/birth_places.json assets/data/birth_places_manifest.json; then
-            echo "::error::Il dataset ANPR incorporato non coincide con la fonte ufficiale corrente."
-            git diff --stat -- assets/data/birth_places.json assets/data/birth_places_manifest.json
-            exit 1
-          fi
-
-'''
-          path.write_text(text.replace(needle, step + needle, 1), encoding='utf-8')
-          PY
+        run: python3 tool/ensure_anpr_build_guard.py
 
       - name: Commit only when ANPR data or guard changed
         shell: bash
