@@ -115,6 +115,7 @@ class _WindowGlyphPainter extends CustomPainter {
           Offset(size.width * 0.76, size.height * 0.58),
           paint,
         );
+        break;
       case _WindowGlyph.maximize:
         canvas.drawRRect(
           RRect.fromRectAndRadius(
@@ -128,6 +129,7 @@ class _WindowGlyphPainter extends CustomPainter {
           ),
           paint,
         );
+        break;
       case _WindowGlyph.close:
         canvas.drawLine(
           Offset(size.width * 0.29, size.height * 0.29),
@@ -139,6 +141,7 @@ class _WindowGlyphPainter extends CustomPainter {
           Offset(size.width * 0.29, size.height * 0.71),
           paint,
         );
+        break;
     }
   }
 
