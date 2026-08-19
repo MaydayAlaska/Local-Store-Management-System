@@ -47,7 +47,7 @@ class _GlassDropdownState<T> extends State<GlassDropdown<T>> {
 
   @override
   void dispose() {
-    _close();
+    _close(notify: false);
     super.dispose();
   }
 
@@ -192,12 +192,12 @@ class _GlassDropdownState<T> extends State<GlassDropdown<T>> {
     setState(() {});
   }
 
-  void _close() {
+  void _close({bool notify = true}) {
     final entry = _entry;
     if (entry == null) return;
     _entry = null;
     entry.remove();
-    if (mounted) setState(() {});
+    if (notify && mounted) setState(() {});
   }
 
   @override
@@ -222,9 +222,11 @@ class _GlassDropdownState<T> extends State<GlassDropdown<T>> {
             selected?.label ?? widget.hintText ?? '—',
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: _enabled ? null : Theme.of(context).textTheme.bodyLarge?.copyWith(
-                  color: Theme.of(context).disabledColor,
-                ),
+            style: _enabled
+                ? null
+                : Theme.of(context).textTheme.bodyLarge?.copyWith(
+                      color: Theme.of(context).disabledColor,
+                    ),
           ),
         ),
       ),
