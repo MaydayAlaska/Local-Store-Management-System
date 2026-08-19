@@ -264,16 +264,21 @@ class _ShellPageState extends State<ShellPage> {
                   children: [
                     GlassSurface(
                       borderRadius: BorderRadius.circular(24),
-                      child: NavigationRail(
-                        selectedIndex: _index,
-                        onDestinationSelected: _selectPage,
-                        labelType: NavigationRailLabelType.all,
-                        scrollable: true,
-                        leading: _MenuBrand(
-                          settings: widget.settings,
-                          services: widget.services,
+                      child: ScrollConfiguration(
+                        behavior: ScrollConfiguration.of(context).copyWith(
+                          scrollbars: false,
                         ),
-                        destinations: _destinations(),
+                        child: NavigationRail(
+                          selectedIndex: _index,
+                          onDestinationSelected: _selectPage,
+                          labelType: NavigationRailLabelType.all,
+                          scrollable: true,
+                          leading: _MenuBrand(
+                            settings: widget.settings,
+                            services: widget.services,
+                          ),
+                          destinations: _destinations(),
+                        ),
                       ),
                     ),
                     const SizedBox(width: 10),
