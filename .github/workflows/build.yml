@@ -55,12 +55,10 @@ jobs:
         include:
           - runner: windows-latest
             arch: x64
-            flutter_arch: x64
             build_arch: x64
             allowed_architectures: x64compatible
           - runner: windows-11-vs2026-arm
             arch: arm64
-            flutter_arch: x64
             build_arch: arm64
             allowed_architectures: arm64
     runs-on: ${{ matrix.runner }}
@@ -68,12 +66,21 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Flutter
+      - name: Setup Flutter x64 host SDK
+        if: matrix.arch == 'x64'
         uses: subosito/flutter-action@v2
         with:
           channel: stable
-          architecture: ${{ matrix.flutter_arch }}
-          cache: ${{ matrix.arch == 'x64' }}
+          architecture: x64
+          cache: true
+
+      - name: Setup Flutter x64 host SDK for Windows ARM64
+        if: matrix.arch == 'arm64'
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          architecture: x64
+          cache: false
 
       - name: Show Flutter and host architecture
         shell: pwsh
@@ -92,14 +99,7 @@ jobs:
           if (-not [regex]::IsMatch($text, $pattern)) {
             throw 'Impossibile applicare il workaround Windows ARM64: il codice Flutter atteso è cambiato.'
           }
-          $replacement = @"
-HostPlatform get hostPlatform {
-    if (_platform.isWindows &&
-        _platform.environment['PROCESSOR_ARCHITECTURE']?.toUpperCase() == 'ARM64') {
-      return HostPlatform.windows_arm64;
-    }
-    return switch (_currentAbi) {
-"@
+          $replacement = "HostPlatform get hostPlatform {`n    if (_platform.isWindows &&`n        _platform.environment['PROCESSOR_ARCHITECTURE']?.toUpperCase() == 'ARM64') {`n      return HostPlatform.windows_arm64;`n    }`n    return switch (_currentAbi) {"
           $patched = [regex]::Replace($text, $pattern, $replacement, 1)
           [IO.File]::WriteAllText($source, $patched)
           Remove-Item (Join-Path $env:FLUTTER_ROOT 'bin/cache/flutter_tools.snapshot') -Force -ErrorAction SilentlyContinue
@@ -354,7 +354,9 @@ HostPlatform get hostPlatform {
           mv dist/LocalStoreManagement-linux-x64.deb "dist/LocalStoreManagement-${VERSION}-BETA-linux-x64.deb"
           mv dist/LocalStoreManagement-linux-arm64.AppImage "dist/LocalStoreManagement-${VERSION}-BETA-linux-arm64.AppImage"
           mv dist/LocalStoreManagement-linux-arm64.deb "dist/LocalStoreManagement-${VERSION}-BETA-linux-arm64.deb"
-          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then gh release delete "$TAG" --repo "$GITHUB_REPOSITORY" --cleanup-tag --yes; fi
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release delete "$TAG" --repo "$GITHUB_REPOSITORY" --cleanup-tag --yes
+          fi
           gh release create "$TAG" dist/* --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --prerelease --latest=false \
             --title "Local Store Management v${VERSION} BETA / TEST (${GITHUB_SHA::7})" \
             --notes 'Versione BETA/TEST generata automaticamente dal branch test. Include Windows x64/ARM64 e Linux x64/ARM64 in formato AppImage e DEB.'
@@ -387,10 +389,15 @@ HostPlatform get hostPlatform {
             [ -z "$old_tag" ] && continue
             gh release delete "$old_tag" --repo "$GITHUB_REPOSITORY" --cleanup-tag --yes
           done < <(gh release list --repo "$GITHUB_REPOSITORY" --limit 100 --json tagName,name --jq '.[] | select(.name | startswith("Legacy OTA bridge")) | .tagName')
-          if gh release view "$STABLE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then gh release delete "$STABLE_TAG" --repo "$GITHUB_REPOSITORY" --cleanup-tag --yes; fi
-          if gh release view "$LEGACY_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then gh release delete "$LEGACY_TAG" --repo "$GITHUB_REPOSITORY" --cleanup-tag --yes; fi
+          if gh release view "$STABLE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release delete "$STABLE_TAG" --repo "$GITHUB_REPOSITORY" --cleanup-tag --yes
+          fi
+          if gh release view "$LEGACY_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release delete "$LEGACY_TAG" --repo "$GITHUB_REPOSITORY" --cleanup-tag --yes
+          fi
           gh release create "$LEGACY_TAG" dist/* --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --prerelease --latest=false \
-            --title "Legacy OTA bridge v${VERSION}" --notes 'Release tecnica per gli aggiornamenti automatici.'
+            --title "Legacy OTA bridge v${VERSION}" \
+            --notes 'Release tecnica per gli aggiornamenti automatici.'
           mkdir stable-dist
           cp dist/LocalStoreManagement-Setup-win-x64.exe "stable-dist/LocalStoreManagement-${VERSION}-Setup-win-x64.exe"
           cp dist/LocalStoreManagement-Setup-win-arm64.exe "stable-dist/LocalStoreManagement-${VERSION}-Setup-win-arm64.exe"
@@ -399,4 +406,5 @@ HostPlatform get hostPlatform {
           cp dist/LocalStoreManagement-linux-arm64.AppImage "stable-dist/LocalStoreManagement-${VERSION}-linux-arm64.AppImage"
           cp dist/LocalStoreManagement-linux-arm64.deb "stable-dist/LocalStoreManagement-${VERSION}-linux-arm64.deb"
           gh release create "$STABLE_TAG" stable-dist/* --repo "$GITHUB_REPOSITORY" --latest=true \
-            --title "Local Store Management v${VERSION}" --notes "Release stabile v${VERSION}. Windows x64/ARM64 e Linux x64/ARM64 (AppImage + DEB)."
+            --title "Local Store Management v${VERSION}" \
+            --notes "Release stabile v${VERSION}. Windows x64/ARM64 e Linux x64/ARM64 (AppImage + DEB)."
