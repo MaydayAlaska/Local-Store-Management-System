@@ -4,6 +4,7 @@ import 'package:barcode_widget/barcode_widget.dart';
 import 'package:flutter/material.dart';
 import 'package:printing/printing.dart';
 
+import '../l10n/app_strings.dart';
 import '../models/app_settings.dart';
 import '../models/catalog.dart';
 import '../services/app_services.dart';
@@ -35,6 +36,8 @@ class _LabelsPageState extends State<LabelsPage> {
   String? _status;
   bool _printing = false;
   bool _loadingPrinters = false;
+
+  String _itEn(String it, String en) => AppStrings.isEnglish ? en : it;
 
   @override
   void initState() {
@@ -84,13 +87,24 @@ class _LabelsPageState extends State<LabelsPage> {
         _printers = printers;
         _printer = selected ?? (printers.isEmpty ? null : printers.first);
         _status = printers.isEmpty
-            ? 'Nessuna stampante rilevata.'
+            ? _itEn('Nessuna stampante rilevata.', 'No printers detected.')
             : selected != null
-                ? 'Ultima stampante ripristinata: ${selected.name}.'
-                : 'Stampante pronta: ${_printer!.name}.';
+                ? _itEn(
+                    'Ultima stampante ripristinata: ${selected.name}.',
+                    'Last printer restored: ${selected.name}.',
+                  )
+                : _itEn(
+                    'Stampante pronta: ${_printer!.name}.',
+                    'Printer ready: ${_printer!.name}.',
+                  );
       });
     } catch (error) {
-      if (mounted) setState(() => _status = 'Impossibile leggere le stampanti: $error');
+      if (mounted) {
+        setState(() => _status = _itEn(
+              'Impossibile leggere le stampanti: $error',
+              'Unable to read printers: $error',
+            ));
+      }
     } finally {
       if (mounted) setState(() => _loadingPrinters = false);
     }
@@ -99,13 +113,22 @@ class _LabelsPageState extends State<LabelsPage> {
   void _selectPrinter(Printer printer) {
     setState(() {
       _printer = printer;
-      _status = 'Stampante selezionata: ${printer.name}.';
+      _status = _itEn(
+        'Stampante selezionata: ${printer.name}.',
+        'Printer selected: ${printer.name}.',
+      );
     });
     try {
-      widget.services.settings.saveLastLabelPrinter(url: printer.url, name: printer.name);
+      widget.services.settings.saveLastLabelPrinter(
+        url: printer.url,
+        name: printer.name,
+      );
     } catch (error) {
       if (mounted) {
-        setState(() => _status = 'Stampante selezionata, ma non è stato possibile salvarla: $error');
+        setState(() => _status = _itEn(
+              'Stampante selezionata, ma non è stato possibile salvarla: $error',
+              'Printer selected, but it could not be saved: $error',
+            ));
       }
     }
   }
@@ -118,8 +141,14 @@ class _LabelsPageState extends State<LabelsPage> {
     setState(() {
       _selected = product;
       _status = product == null
-          ? 'Nessun prodotto trovato per «$code».'
-          : 'Etichetta pronta per ${product.name} · ${product.variantDisplay}.';
+          ? _itEn(
+              'Nessun prodotto trovato per «$code».',
+              'No product found for “$code”.',
+            )
+          : _itEn(
+              'Etichetta pronta per ${product.name} · ${product.variantDisplay}.',
+              'Label ready for ${product.name} · ${product.variantDisplay}.',
+            );
     });
   }
 
@@ -128,14 +157,20 @@ class _LabelsPageState extends State<LabelsPage> {
     final printer = _printer;
     if (product == null) return;
     if (printer == null) {
-      setState(() => _status = 'Seleziona una stampante.');
+      setState(() => _status = _itEn(
+            'Seleziona una stampante.',
+            'Select a printer.',
+          ));
       return;
     }
     final copies = int.tryParse(_copies.text) ?? 0;
     final width = double.tryParse(_width.text.replaceAll(',', '.')) ?? 0;
     final height = double.tryParse(_height.text.replaceAll(',', '.')) ?? 0;
     if (copies <= 0 || width <= 0 || height <= 0) {
-      setState(() => _status = 'Copie e dimensioni devono essere maggiori di zero.');
+      setState(() => _status = _itEn(
+            'Copie e dimensioni devono essere maggiori di zero.',
+            'Copies and dimensions must be greater than zero.',
+          ));
       return;
     }
     setState(() => _printing = true);
@@ -149,11 +184,19 @@ class _LabelsPageState extends State<LabelsPage> {
       );
       if (mounted) {
         setState(() => _status = ok
-            ? 'Stampa inviata a ${printer.name}: $copies ${copies == 1 ? 'copia' : 'copie'}.'
-            : 'Stampa annullata.');
+            ? _itEn(
+                'Stampa inviata a ${printer.name}: $copies ${copies == 1 ? 'copia' : 'copie'}.',
+                'Print sent to ${printer.name}: $copies ${copies == 1 ? 'copy' : 'copies'}.',
+              )
+            : _itEn('Stampa annullata.', 'Print cancelled.'));
       }
     } catch (error) {
-      if (mounted) setState(() => _status = 'Errore di stampa: $error');
+      if (mounted) {
+        setState(() => _status = _itEn(
+              'Errore di stampa: $error',
+              'Print error: $error',
+            ));
+      }
     } finally {
       if (mounted) setState(() => _printing = false);
     }
@@ -173,7 +216,10 @@ class _LabelsPageState extends State<LabelsPage> {
       child: Padding(
         padding: const EdgeInsets.all(24),
         child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-          Text('Etichette', style: Theme.of(context).textTheme.headlineMedium),
+          Text(
+            AppStrings.t('labels'),
+            style: Theme.of(context).textTheme.headlineMedium,
+          ),
           const SizedBox(height: 14),
           Expanded(
             child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
@@ -183,11 +229,17 @@ class _LabelsPageState extends State<LabelsPage> {
                     controller: _search,
                     onChanged: (_) => setState(() {}),
                     onSubmitted: _scan,
-                    decoration: const InputDecoration(
-                      border: OutlineInputBorder(),
-                      labelText: 'Cerca prodotto / SKU / barcode',
-                      prefixIcon: Icon(Icons.qr_code_scanner),
-                      hintText: 'Puoi scansionare anche senza cliccare questo campo',
+                    decoration: InputDecoration(
+                      border: const OutlineInputBorder(),
+                      labelText: _itEn(
+                        'Cerca prodotto / SKU / barcode',
+                        'Search product / SKU / barcode',
+                      ),
+                      prefixIcon: const Icon(Icons.qr_code_scanner),
+                      hintText: _itEn(
+                        'Puoi scansionare anche senza cliccare questo campo',
+                        'You can scan without clicking this field',
+                      ),
                     ),
                   ),
                   const SizedBox(height: 8),
@@ -198,13 +250,18 @@ class _LabelsPageState extends State<LabelsPage> {
                         itemCount: products.length,
                         separatorBuilder: (_, _) => const Divider(height: 1),
                         itemBuilder: (context, index) {
-                          final p = products[index];
+                          final product = products[index];
                           return ListTile(
-                            selected: _selected?.id == p.id,
-                            title: Text(p.name),
-                            subtitle: Text('${p.variantDisplay} · ${p.sku}'),
-                            trailing: Text(p.barcode ?? 'Code 128 da SKU'),
-                            onTap: () => setState(() => _selected = p),
+                            selected: _selected?.id == product.id,
+                            title: Text(product.name),
+                            subtitle: Text(
+                              '${product.variantDisplay} · ${product.sku}',
+                            ),
+                            trailing: Text(
+                              product.barcode ??
+                                  _itEn('Code 128 da SKU', 'Code 128 from SKU'),
+                            ),
+                            onTap: () => setState(() => _selected = product),
                           );
                         },
                       ),
@@ -218,69 +275,153 @@ class _LabelsPageState extends State<LabelsPage> {
                 child: Card(
                   child: Padding(
                     padding: const EdgeInsets.all(18),
-                    child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-                      Row(children: [
-                        Expanded(child: Text('Anteprima', style: Theme.of(context).textTheme.titleLarge)),
-                        IconButton(
-                          tooltip: 'Aggiorna stampanti',
-                          onPressed: _loadingPrinters ? null : _refreshPrinters,
-                          icon: _loadingPrinters
-                              ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
-                              : const Icon(Icons.refresh),
-                        ),
-                      ]),
-                      const SizedBox(height: 10),
-                      _PrinterPicker(
-                        printers: _printers,
-                        selected: _printer,
-                        enabled: !_printing && !_loadingPrinters && _printers.isNotEmpty,
-                        onChanged: _selectPrinter,
-                      ),
-                      const SizedBox(height: 12),
-                      Expanded(
-                        child: Center(
-                          child: AspectRatio(
-                            aspectRatio: widthMm > 0 && heightMm > 0 ? widthMm / heightMm : 4 / 3,
-                            child: DecoratedBox(
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                border: Border.all(color: Colors.black26),
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: _selected == null
-                                  ? const Center(child: Text('Seleziona una variante.', style: TextStyle(color: Colors.black54)))
-                                  : _LabelPreview(
-                                      product: _selected!,
-                                      code: code!,
-                                      barcode: widget.services.labels.barcodeFor(code),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Row(children: [
+                          Expanded(
+                            child: Text(
+                              _itEn('Anteprima', 'Preview'),
+                              style: Theme.of(context).textTheme.titleLarge,
+                            ),
+                          ),
+                          IconButton(
+                            tooltip: _itEn(
+                              'Aggiorna stampanti',
+                              'Refresh printers',
+                            ),
+                            onPressed:
+                                _loadingPrinters ? null : _refreshPrinters,
+                            icon: _loadingPrinters
+                                ? const SizedBox(
+                                    width: 18,
+                                    height: 18,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
                                     ),
+                                  )
+                                : const Icon(Icons.refresh),
+                          ),
+                        ]),
+                        const SizedBox(height: 10),
+                        _PrinterPicker(
+                          printers: _printers,
+                          selected: _printer,
+                          enabled: !_printing &&
+                              !_loadingPrinters &&
+                              _printers.isNotEmpty,
+                          onChanged: _selectPrinter,
+                        ),
+                        const SizedBox(height: 12),
+                        Expanded(
+                          child: Center(
+                            child: AspectRatio(
+                              aspectRatio: widthMm > 0 && heightMm > 0
+                                  ? widthMm / heightMm
+                                  : 4 / 3,
+                              child: DecoratedBox(
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  border: Border.all(color: Colors.black26),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: _selected == null
+                                    ? Center(
+                                        child: Text(
+                                          _itEn(
+                                            'Seleziona una variante.',
+                                            'Select a variant.',
+                                          ),
+                                          style: const TextStyle(
+                                            color: Colors.black54,
+                                          ),
+                                        ),
+                                      )
+                                    : _LabelPreview(
+                                        product: _selected!,
+                                        code: code!,
+                                        barcode: widget.services.labels
+                                            .barcodeFor(code),
+                                      ),
+                              ),
                             ),
                           ),
                         ),
-                      ),
-                      const SizedBox(height: 12),
-                      Row(children: [
-                        Expanded(child: TextField(controller: _copies, keyboardType: TextInputType.number, decoration: const InputDecoration(border: OutlineInputBorder(), labelText: 'Copie'))),
-                        const SizedBox(width: 8),
-                        Expanded(child: TextField(controller: _width, onChanged: (_) => setState(() {}), keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(border: OutlineInputBorder(), labelText: 'Larghezza mm'))),
-                        const SizedBox(width: 8),
-                        Expanded(child: TextField(controller: _height, onChanged: (_) => setState(() {}), keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(border: OutlineInputBorder(), labelText: 'Altezza mm'))),
-                      ]),
-                      const SizedBox(height: 10),
-                      FilledButton.icon(
-                        onPressed: _selected == null || _printer == null || _printing ? null : _print,
-                        icon: const Icon(Icons.print),
-                        label: Text(_printing ? 'Stampa…' : 'Stampa etichette'),
-                      ),
-                      if (_status != null) Padding(padding: const EdgeInsets.only(top: 8), child: Text(_status!)),
-                      const SizedBox(height: 6),
-                      Text(
-                        directNetworkPrint
-                            ? 'Stampa diretta TCP/BPL-Z: la misura impostata qui viene inviata direttamente alla stampante. Non è necessario alcun driver Windows.'
-                            : 'Stampa tramite sistema: configura nel driver della stampante la stessa misura impostata qui.',
-                        style: Theme.of(context).textTheme.bodySmall,
-                      ),
-                    ]),
+                        const SizedBox(height: 12),
+                        Row(children: [
+                          Expanded(
+                            child: TextField(
+                              controller: _copies,
+                              keyboardType: TextInputType.number,
+                              decoration: InputDecoration(
+                                border: const OutlineInputBorder(),
+                                labelText: _itEn('Copie', 'Copies'),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: TextField(
+                              controller: _width,
+                              onChanged: (_) => setState(() {}),
+                              keyboardType: const TextInputType.numberWithOptions(
+                                decimal: true,
+                              ),
+                              decoration: InputDecoration(
+                                border: const OutlineInputBorder(),
+                                labelText: _itEn('Larghezza mm', 'Width mm'),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: TextField(
+                              controller: _height,
+                              onChanged: (_) => setState(() {}),
+                              keyboardType: const TextInputType.numberWithOptions(
+                                decimal: true,
+                              ),
+                              decoration: InputDecoration(
+                                border: const OutlineInputBorder(),
+                                labelText: _itEn('Altezza mm', 'Height mm'),
+                              ),
+                            ),
+                          ),
+                        ]),
+                        const SizedBox(height: 10),
+                        FilledButton.icon(
+                          onPressed: _selected == null ||
+                                  _printer == null ||
+                                  _printing
+                              ? null
+                              : _print,
+                          icon: const Icon(Icons.print),
+                          label: Text(
+                            _printing
+                                ? _itEn('Stampa…', 'Printing…')
+                                : _itEn('Stampa etichette', 'Print labels'),
+                          ),
+                        ),
+                        if (_status != null)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 8),
+                            child: Text(_status!),
+                          ),
+                        const SizedBox(height: 6),
+                        Text(
+                          directNetworkPrint
+                              ? _itEn(
+                                  'Stampa diretta TCP/BPL-Z: la misura impostata qui viene inviata direttamente alla stampante. Non è necessario alcun driver Windows.',
+                                  'Direct TCP/BPL-Z printing: the size set here is sent directly to the printer. No Windows printer driver is required.',
+                                )
+                              : _itEn(
+                                  'Stampa tramite sistema: configura nel driver della stampante la stessa misura impostata qui.',
+                                  'System printing: configure the printer driver with the same size set here.',
+                                ),
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -331,7 +472,8 @@ class _PrinterPickerState extends State<_PrinterPicker> {
 
   void _open() {
     final overlay = Overlay.of(context);
-    final targetBox = _targetKey.currentContext?.findRenderObject() as RenderBox?;
+    final targetBox =
+        _targetKey.currentContext?.findRenderObject() as RenderBox?;
     if (targetBox == null) return;
     final targetSize = targetBox.size;
     final theme = Theme.of(context);
@@ -364,14 +506,20 @@ class _PrinterPickerState extends State<_PrinterPicker> {
                     child: Container(
                       constraints: const BoxConstraints(maxHeight: 280),
                       decoration: BoxDecoration(
-                        color: isDark ? const Color(0xE0212836) : const Color(0xE8FFFFFF),
+                        color: isDark
+                            ? const Color(0xE0212836)
+                            : const Color(0xE8FFFFFF),
                         borderRadius: BorderRadius.circular(16),
                         border: Border.all(
-                          color: isDark ? const Color(0x55FFFFFF) : const Color(0xB8FFFFFF),
+                          color: isDark
+                              ? const Color(0x55FFFFFF)
+                              : const Color(0xB8FFFFFF),
                         ),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withValues(alpha: isDark ? 0.38 : 0.16),
+                            color: Colors.black.withValues(
+                              alpha: isDark ? 0.38 : 0.16,
+                            ),
                             blurRadius: 28,
                             offset: const Offset(0, 12),
                           ),
@@ -386,7 +534,9 @@ class _PrinterPickerState extends State<_PrinterPicker> {
                             padding: const EdgeInsets.symmetric(vertical: 2),
                             child: Material(
                               color: selected
-                                  ? theme.colorScheme.primary.withValues(alpha: isDark ? 0.25 : 0.14)
+                                  ? theme.colorScheme.primary.withValues(
+                                      alpha: isDark ? 0.25 : 0.14,
+                                    )
                                   : Colors.transparent,
                               borderRadius: BorderRadius.circular(12),
                               child: InkWell(
@@ -396,13 +546,20 @@ class _PrinterPickerState extends State<_PrinterPicker> {
                                   _close();
                                 },
                                 child: Padding(
-                                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 14,
+                                    vertical: 12,
+                                  ),
                                   child: Row(
                                     children: [
                                       Icon(
-                                        selected ? Icons.print : Icons.print_outlined,
+                                        selected
+                                            ? Icons.print
+                                            : Icons.print_outlined,
                                         size: 18,
-                                        color: selected ? theme.colorScheme.primary : theme.colorScheme.onSurfaceVariant,
+                                        color: selected
+                                            ? theme.colorScheme.primary
+                                            : theme.colorScheme.onSurfaceVariant,
                                       ),
                                       const SizedBox(width: 10),
                                       Expanded(
@@ -410,12 +567,20 @@ class _PrinterPickerState extends State<_PrinterPicker> {
                                           printer.name,
                                           maxLines: 1,
                                           overflow: TextOverflow.ellipsis,
-                                          style: TextStyle(fontWeight: selected ? FontWeight.w700 : FontWeight.w500),
+                                          style: TextStyle(
+                                            fontWeight: selected
+                                                ? FontWeight.w700
+                                                : FontWeight.w500,
+                                          ),
                                         ),
                                       ),
                                       if (selected) ...[
                                         const SizedBox(width: 8),
-                                        Icon(Icons.check_rounded, size: 18, color: theme.colorScheme.primary),
+                                        Icon(
+                                          Icons.check_rounded,
+                                          size: 18,
+                                          color: theme.colorScheme.primary,
+                                        ),
                                       ],
                                     ],
                                   ),
@@ -456,11 +621,22 @@ class _PrinterPickerState extends State<_PrinterPicker> {
           child: InputDecorator(
             isEmpty: widget.selected == null,
             decoration: InputDecoration(
-              labelText: 'Stampante',
-              suffixIcon: Icon(_entry == null ? Icons.keyboard_arrow_down_rounded : Icons.keyboard_arrow_up_rounded),
+              labelText: AppStrings.isEnglish ? 'Printer' : 'Stampante',
+              suffixIcon: Icon(
+                _entry == null
+                    ? Icons.keyboard_arrow_down_rounded
+                    : Icons.keyboard_arrow_up_rounded,
+              ),
             ),
             child: Text(
-              widget.selected?.name ?? (widget.printers.isEmpty ? 'Nessuna stampante disponibile' : 'Seleziona stampante'),
+              widget.selected?.name ??
+                  (widget.printers.isEmpty
+                      ? (AppStrings.isEnglish
+                          ? 'No printers available'
+                          : 'Nessuna stampante disponibile')
+                      : (AppStrings.isEnglish
+                          ? 'Select printer'
+                          : 'Seleziona stampante')),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),
@@ -470,7 +646,11 @@ class _PrinterPickerState extends State<_PrinterPicker> {
 }
 
 class _LabelPreview extends StatelessWidget {
-  const _LabelPreview({required this.product, required this.code, required this.barcode});
+  const _LabelPreview({
+    required this.product,
+    required this.code,
+    required this.barcode,
+  });
   final ProductVariant product;
   final String code;
   final Barcode barcode;
@@ -493,7 +673,15 @@ class _LabelPreview extends StatelessWidget {
           height: h * 0.145,
           child: Align(
             alignment: Alignment.centerLeft,
-            child: Text(product.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+            child: Text(
+              product.name,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: Colors.black,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
           ),
         ),
         if (details.isNotEmpty)
@@ -502,28 +690,60 @@ class _LabelPreview extends StatelessWidget {
             right: margin,
             top: h * 0.20,
             height: h * 0.09,
-            child: Align(alignment: Alignment.centerLeft, child: Text(details, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.black, fontSize: 11))),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                details,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(color: Colors.black, fontSize: 11),
+              ),
+            ),
           ),
         Positioned(
           left: margin,
           right: margin,
           top: h * 0.30,
           height: h * 0.37,
-          child: BarcodeWidget(barcode: barcode, data: code, drawText: false, color: Colors.black, backgroundColor: Colors.white),
+          child: BarcodeWidget(
+            barcode: barcode,
+            data: code,
+            drawText: false,
+            color: Colors.black,
+            backgroundColor: Colors.white,
+          ),
         ),
         Positioned(
           left: margin,
           right: margin,
           top: h * 0.67,
           height: h * 0.13,
-          child: Center(child: Text(code, maxLines: 1, style: const TextStyle(color: Colors.black, fontSize: 11))),
+          child: Center(
+            child: Text(
+              code,
+              maxLines: 1,
+              style: const TextStyle(color: Colors.black, fontSize: 11),
+            ),
+          ),
         ),
         Positioned(
           left: margin,
           right: constraints.maxWidth * 0.50,
           top: h * 0.80,
           bottom: h * 0.045,
-          child: Align(alignment: Alignment.centerLeft, child: Text(product.sku, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 11))),
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: Text(
+              product.sku,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: Colors.black,
+                fontWeight: FontWeight.bold,
+                fontSize: 11,
+              ),
+            ),
+          ),
         ),
         if (product.salePriceCents != null)
           Positioned(
@@ -531,7 +751,18 @@ class _LabelPreview extends StatelessWidget {
             right: margin,
             top: h * 0.80,
             bottom: h * 0.035,
-            child: Align(alignment: Alignment.centerRight, child: Text(product.salePriceDisplay, maxLines: 1, style: const TextStyle(color: Colors.black, fontSize: 16, fontWeight: FontWeight.bold))),
+            child: Align(
+              alignment: Alignment.centerRight,
+              child: Text(
+                product.salePriceDisplay,
+                maxLines: 1,
+                style: const TextStyle(
+                  color: Colors.black,
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
           ),
       ]);
     });
