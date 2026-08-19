@@ -4,6 +4,10 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:local_store_management/services/update_service.dart';
 
 void main() {
+  test('current beta OTA version is aligned', () {
+    expect(UpdateService.currentVersion, '0.1.6-b3');
+  });
+
   test('OTA selects Windows x64 asset', () {
     expect(
       updateAssetNameFor(operatingSystem: 'windows', abi: Abi.windowsX64),
