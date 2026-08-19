@@ -4,6 +4,7 @@ import '../core/formatters.dart';
 import '../models/catalog.dart';
 import '../repositories/lookup_repository.dart';
 import '../services/app_services.dart';
+import '../widgets/glass_dropdown.dart';
 
 class ProductEditorDialog extends StatefulWidget {
   const ProductEditorDialog({
@@ -139,162 +140,178 @@ class _ProductEditorDialogState extends State<ProductEditorDialog> {
     final brands = widget.services.lookups.getAll(LookupKind.brand);
     final categories = widget.services.lookups.getAll(LookupKind.category);
     final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Dialog(
-      backgroundColor:
-          isDark ? const Color(0xFA1E2430) : const Color(0xFAFFFFFF),
+      backgroundColor: isDark ? const Color(0xFA1E2430) : const Color(0xFAFFFFFF),
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 1080, maxHeight: 780),
         child: Padding(
           padding: const EdgeInsets.all(20),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-            Row(children: [
-              Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(children: [
+                Expanded(
                   child: Text(
-                      widget.product == null
-                          ? 'Nuovo prodotto'
-                          : 'Modifica prodotto',
-                      style: Theme.of(context).textTheme.headlineSmall)),
-              IconButton(
+                    widget.product == null ? 'Nuovo prodotto' : 'Modifica prodotto',
+                    style: Theme.of(context).textTheme.headlineSmall,
+                  ),
+                ),
+                IconButton(
                   onPressed: () => Navigator.pop(context, false),
-                  icon: const Icon(Icons.close)),
-            ]),
-            if (widget.initialBarcode?.trim().isNotEmpty == true) ...[
-              const SizedBox(height: 8),
+                  icon: const Icon(Icons.close),
+                ),
+              ]),
+              if (widget.initialBarcode?.trim().isNotEmpty == true) ...[
+                const SizedBox(height: 8),
+                Text(
+                  widget.product == null
+                      ? 'Barcode scansionato: ${widget.initialBarcode!.trim()}'
+                      : 'Nuova variante precompilata con barcode: ${widget.initialBarcode!.trim()}',
+                  style: Theme.of(context)
+                      .textTheme
+                      .bodyMedium
+                      ?.copyWith(fontWeight: FontWeight.w600),
+                ),
+              ],
+              const SizedBox(height: 16),
+              Row(children: [
+                Expanded(
+                  flex: 2,
+                  child: TextField(
+                    controller: _name,
+                    decoration: const InputDecoration(
+                      border: OutlineInputBorder(),
+                      labelText: 'Nome *',
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: GlassDropdown<int>(
+                    value: _brandId,
+                    labelText: 'Marca',
+                    items: [
+                      const GlassDropdownItem<int>(value: null, label: '—'),
+                      ...brands.map((b) => GlassDropdownItem<int>(value: b.id, label: b.name)),
+                    ],
+                    onChanged: (value) => setState(() => _brandId = value),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: GlassDropdown<int>(
+                    value: _categoryId,
+                    labelText: 'Categoria',
+                    items: [
+                      const GlassDropdownItem<int>(value: null, label: '—'),
+                      ...categories.map((c) => GlassDropdownItem<int>(value: c.id, label: c.name)),
+                    ],
+                    onChanged: (value) => setState(() => _categoryId = value),
+                  ),
+                ),
+              ]),
+              const SizedBox(height: 14),
+              Row(children: [
+                Expanded(
+                  child: TextField(
+                    controller: _purchase,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    decoration: const InputDecoration(
+                      border: OutlineInputBorder(),
+                      labelText: 'Prezzo acquisto prodotto €',
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: TextField(
+                    controller: _sale,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    decoration: const InputDecoration(
+                      border: OutlineInputBorder(),
+                      labelText: 'Prezzo vendita prodotto €',
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  flex: 2,
+                  child: TextField(
+                    controller: _notes,
+                    decoration: const InputDecoration(
+                      border: OutlineInputBorder(),
+                      labelText: 'Note',
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Switch(value: _active, onChanged: (v) => setState(() => _active = v)),
+                const Text('Attivo'),
+              ]),
+              const SizedBox(height: 12),
               Text(
-                widget.product == null
-                    ? 'Barcode scansionato: ${widget.initialBarcode!.trim()}'
-                    : 'Nuova variante precompilata con barcode: ${widget.initialBarcode!.trim()}',
-                style: Theme.of(context)
-                    .textTheme
-                    .bodyMedium
-                    ?.copyWith(fontWeight: FontWeight.w600),
+                'I prezzi del prodotto vengono usati da tutte le varianti. Compila un prezzo nella variante solo se deve sovrascrivere quello del prodotto.',
+                style: Theme.of(context).textTheme.bodySmall,
               ),
-            ],
-            const SizedBox(height: 12),
-            Row(children: [
-              Expanded(
-                  flex: 2,
-                  child: TextField(
-                      controller: _name,
-                      decoration: const InputDecoration(
-                          border: OutlineInputBorder(), labelText: 'Nome *'))),
-              const SizedBox(width: 10),
-              Expanded(
-                  child: DropdownButtonFormField<int?>(
-                initialValue: _brandId,
-                decoration: const InputDecoration(
-                    border: OutlineInputBorder(), labelText: 'Marca'),
-                items: [
-                  const DropdownMenuItem<int?>(value: null, child: Text('—')),
-                  ...brands.map((b) =>
-                      DropdownMenuItem<int?>(value: b.id, child: Text(b.name)))
-                ],
-                onChanged: (v) => _brandId = v,
-              )),
-              const SizedBox(width: 10),
-              Expanded(
-                  child: DropdownButtonFormField<int?>(
-                initialValue: _categoryId,
-                decoration: const InputDecoration(
-                    border: OutlineInputBorder(), labelText: 'Categoria'),
-                items: [
-                  const DropdownMenuItem<int?>(value: null, child: Text('—')),
-                  ...categories.map((c) =>
-                      DropdownMenuItem<int?>(value: c.id, child: Text(c.name)))
-                ],
-                onChanged: (v) => _categoryId = v,
-              )),
-            ]),
-            const SizedBox(height: 10),
-            Row(children: [
-              Expanded(
-                  child: TextField(
-                controller: _purchase,
-                keyboardType:
-                    const TextInputType.numberWithOptions(decimal: true),
-                decoration: const InputDecoration(
-                    border: OutlineInputBorder(),
-                    labelText: 'Prezzo acquisto prodotto €'),
-              )),
-              const SizedBox(width: 10),
-              Expanded(
-                  child: TextField(
-                controller: _sale,
-                keyboardType:
-                    const TextInputType.numberWithOptions(decimal: true),
-                decoration: const InputDecoration(
-                    border: OutlineInputBorder(),
-                    labelText: 'Prezzo vendita prodotto €'),
-              )),
-              const SizedBox(width: 10),
-              Expanded(
-                  flex: 2,
-                  child: TextField(
-                      controller: _notes,
-                      decoration: const InputDecoration(
-                          border: OutlineInputBorder(), labelText: 'Note'))),
-              const SizedBox(width: 12),
-              Switch(
-                  value: _active,
-                  onChanged: (v) => setState(() => _active = v)),
-              const Text('Attivo'),
-            ]),
-            const SizedBox(height: 8),
-            Text(
-              'I prezzi del prodotto vengono usati da tutte le varianti. Compila un prezzo nella variante solo se deve sovrascrivere quello del prodotto.',
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
-            const SizedBox(height: 14),
-            Row(children: [
-              Expanded(
-                  child: Text('Varianti',
-                      style: Theme.of(context).textTheme.titleMedium)),
-              OutlinedButton.icon(
+              const SizedBox(height: 16),
+              Row(children: [
+                Expanded(
+                  child: Text('Varianti', style: Theme.of(context).textTheme.titleMedium),
+                ),
+                OutlinedButton.icon(
                   onPressed: _addVariant,
                   icon: const Icon(Icons.add),
-                  label: const Text('Aggiungi variante')),
-            ]),
-            const SizedBox(height: 8),
-            Expanded(
-              child: ListView.separated(
-                itemCount: _variants.length,
-                separatorBuilder: (_, _) => const SizedBox(height: 8),
-                itemBuilder: (context, index) => _VariantEditor(
-                  key: ObjectKey(_variants[index]),
-                  form: _variants[index],
-                  index: index,
-                  canRemove:
-                      _variants[index].id == null && _variants.length > 1,
-                  onRemove: () => _removeVariant(index),
+                  label: const Text('Aggiungi variante'),
+                ),
+              ]),
+              const SizedBox(height: 10),
+              Expanded(
+                child: ListView.separated(
+                  itemCount: _variants.length,
+                  separatorBuilder: (_, _) => const SizedBox(height: 10),
+                  itemBuilder: (context, index) => _VariantEditor(
+                    key: ObjectKey(_variants[index]),
+                    form: _variants[index],
+                    index: index,
+                    canRemove: _variants[index].id == null && _variants.length > 1,
+                    onRemove: () => _removeVariant(index),
+                  ),
                 ),
               ),
-            ),
-            if (_error != null)
-              Padding(
+              if (_error != null)
+                Padding(
                   padding: const EdgeInsets.only(top: 8),
-                  child: Text(_error!,
-                      style: TextStyle(
-                          color: Theme.of(context).colorScheme.error))),
-            const SizedBox(height: 12),
-            Row(mainAxisAlignment: MainAxisAlignment.end, children: [
-              TextButton(
-                  onPressed: () => Navigator.pop(context, false),
-                  child: const Text('Annulla')),
-              const SizedBox(width: 8),
-              FilledButton.icon(
-                  onPressed: _save,
-                  icon: const Icon(Icons.save),
-                  label: const Text('Salva')),
-            ]),
-          ]),
+                  child: Text(
+                    _error!,
+                    style: TextStyle(color: Theme.of(context).colorScheme.error),
+                  ),
+                ),
+              const SizedBox(height: 12),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(context, false),
+                    child: const Text('Annulla'),
+                  ),
+                  const SizedBox(width: 8),
+                  FilledButton.icon(
+                    onPressed: _save,
+                    icon: const Icon(Icons.save),
+                    label: const Text('Salva'),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 
-  static String _moneyInput(int? cents) => cents == null
-      ? ''
-      : (cents / 100).toStringAsFixed(2).replaceAll('.', ',');
+  static String _moneyInput(int? cents) =>
+      cents == null ? '' : (cents / 100).toStringAsFixed(2).replaceAll('.', ',');
 }
 
 class _VariantEditor extends StatefulWidget {
@@ -323,8 +340,8 @@ class _VariantEditorState extends State<_VariantEditor> {
         child: ExpansionTile(
           initiallyExpanded: widget.form.expanded,
           maintainState: true,
-          tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
-          childrenPadding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+          tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 3),
+          childrenPadding: const EdgeInsets.fromLTRB(12, 12, 12, 14),
           shape: const Border(),
           collapsedShape: const Border(),
           onExpansionChanged: (expanded) => widget.form.expanded = expanded,
@@ -346,72 +363,89 @@ class _VariantEditorState extends State<_VariantEditor> {
           children: [
             Row(children: [
               Expanded(
-                  child: TextField(
-                      controller: widget.form.sku,
-                      decoration: const InputDecoration(
-                          border: OutlineInputBorder(), labelText: 'SKU *'))),
+                child: TextField(
+                  controller: widget.form.sku,
+                  decoration: const InputDecoration(
+                    border: OutlineInputBorder(),
+                    labelText: 'SKU *',
+                  ),
+                ),
+              ),
               const SizedBox(width: 8),
               Expanded(
-                  child: TextField(
-                      controller: widget.form.variant,
-                      decoration: const InputDecoration(
-                          border: OutlineInputBorder(),
-                          labelText: 'Variante'))),
+                child: TextField(
+                  controller: widget.form.variant,
+                  decoration: const InputDecoration(
+                    border: OutlineInputBorder(),
+                    labelText: 'Variante',
+                  ),
+                ),
+              ),
               const SizedBox(width: 8),
               Expanded(
-                  child: TextField(
-                      controller: widget.form.size,
-                      decoration: const InputDecoration(
-                          border: OutlineInputBorder(), labelText: 'Taglia'))),
+                child: TextField(
+                  controller: widget.form.size,
+                  decoration: const InputDecoration(
+                    border: OutlineInputBorder(),
+                    labelText: 'Taglia',
+                  ),
+                ),
+              ),
               const SizedBox(width: 8),
               IconButton(
-                  onPressed: widget.canRemove ? widget.onRemove : null,
-                  tooltip: widget.canRemove
-                      ? 'Rimuovi variante nuova'
-                      : 'Le varianti già salvate non vengono eliminate per preservare lo storico',
-                  icon: const Icon(Icons.delete_outline)),
+                onPressed: widget.canRemove ? widget.onRemove : null,
+                tooltip: widget.canRemove
+                    ? 'Rimuovi variante nuova'
+                    : 'Le varianti già salvate non vengono eliminate per preservare lo storico',
+                icon: const Icon(Icons.delete_outline),
+              ),
             ]),
-            const SizedBox(height: 8),
+            const SizedBox(height: 12),
             Row(children: [
               Expanded(
-                  flex: 2,
-                  child: TextField(
-                      controller: widget.form.barcodes,
-                      decoration: const InputDecoration(
-                          border: OutlineInputBorder(),
-                          labelText:
-                              'Barcode (uno per riga o separati da virgola)'))),
+                flex: 2,
+                child: TextField(
+                  controller: widget.form.barcodes,
+                  decoration: const InputDecoration(
+                    border: OutlineInputBorder(),
+                    labelText: 'Barcode (uno per riga o separati da virgola)',
+                  ),
+                ),
+              ),
               const SizedBox(width: 8),
               Expanded(
-                  child: TextField(
-                controller: widget.form.purchase,
-                keyboardType:
-                    const TextInputType.numberWithOptions(decimal: true),
-                decoration: const InputDecoration(
+                child: TextField(
+                  controller: widget.form.purchase,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  decoration: const InputDecoration(
                     border: OutlineInputBorder(),
                     labelText: 'Override acquisto €',
-                    hintText: 'Eredita prodotto'),
-              )),
+                    hintText: 'Eredita prodotto',
+                  ),
+                ),
+              ),
               const SizedBox(width: 8),
               Expanded(
-                  child: TextField(
-                controller: widget.form.sale,
-                keyboardType:
-                    const TextInputType.numberWithOptions(decimal: true),
-                decoration: const InputDecoration(
+                child: TextField(
+                  controller: widget.form.sale,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  decoration: const InputDecoration(
                     border: OutlineInputBorder(),
                     labelText: 'Override vendita €',
-                    hintText: 'Eredita prodotto'),
-              )),
+                    hintText: 'Eredita prodotto',
+                  ),
+                ),
+              ),
               const SizedBox(width: 12),
               StatefulBuilder(
-                  builder: (context, setLocal) => Row(children: [
-                        Switch(
-                            value: widget.form.active,
-                            onChanged: (v) =>
-                                setLocal(() => widget.form.active = v)),
-                        const Text('Attiva'),
-                      ])),
+                builder: (context, setLocal) => Row(children: [
+                  Switch(
+                    value: widget.form.active,
+                    onChanged: (v) => setLocal(() => widget.form.active = v),
+                  ),
+                  const Text('Attiva'),
+                ]),
+              ),
               const SizedBox(width: 12),
               Text('Giacenza: ${widget.form.stock}'),
             ]),
@@ -446,14 +480,10 @@ class _VariantForm {
         size: draft.size ?? '',
         purchase: draft.purchasePriceCents == null
             ? ''
-            : (draft.purchasePriceCents! / 100)
-                .toStringAsFixed(2)
-                .replaceAll('.', ','),
+            : (draft.purchasePriceCents! / 100).toStringAsFixed(2).replaceAll('.', ','),
         sale: draft.salePriceCents == null
             ? ''
-            : (draft.salePriceCents! / 100)
-                .toStringAsFixed(2)
-                .replaceAll('.', ','),
+            : (draft.salePriceCents! / 100).toStringAsFixed(2).replaceAll('.', ','),
         barcodes: draft.barcodes.join('\n'),
         active: draft.isActive,
         stock: draft.stockQuantity,
