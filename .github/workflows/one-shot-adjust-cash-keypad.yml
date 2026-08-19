@@ -5,6 +5,10 @@ on:
     branches: [chatgpt-keypad-layout-20260819]
     paths:
       - .github/workflows/one-shot-adjust-cash-keypad.yml
+  pull_request:
+    branches: [Flutter]
+    paths:
+      - .github/workflows/one-shot-adjust-cash-keypad.yml
 
 permissions:
   contents: write
