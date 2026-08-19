@@ -42,6 +42,94 @@ bool isBetaBranch(String branch) => branch.trim().toLowerCase() == 'flutter';
 String betaReleaseTagFor(String branch) =>
     isBetaBranch(branch) ? 'beta-latest' : '';
 
+String normalizeAppVersion(String value) {
+  var normalized = value.trim().toLowerCase();
+  if (normalized.startsWith('v')) normalized = normalized.substring(1);
+  normalized = normalized.replaceFirst('-b', '.b');
+
+  final match = RegExp(r'^(\d+)\.(\d+)\.(\d+)(?:\.b(\d+))?$')
+      .firstMatch(normalized);
+  if (match == null) {
+    throw FormatException('Versione applicazione non valida: $value');
+  }
+
+  final major = int.parse(match.group(1)!);
+  final minor = int.parse(match.group(2)!);
+  final patch = int.parse(match.group(3)!);
+  final beta = match.group(4);
+  return beta == null
+      ? '$major.$minor.$patch'
+      : '$major.$minor.$patch.b${int.parse(beta)}';
+}
+
+int compareAppVersions(String left, String right) {
+  final a = _ParsedAppVersion.parse(left);
+  final b = _ParsedAppVersion.parse(right);
+
+  var comparison = a.major.compareTo(b.major);
+  if (comparison != 0) return comparison;
+  comparison = a.minor.compareTo(b.minor);
+  if (comparison != 0) return comparison;
+  comparison = a.patch.compareTo(b.patch);
+  if (comparison != 0) return comparison;
+
+  if (a.beta == null && b.beta == null) return 0;
+  if (a.beta == null) return 1;
+  if (b.beta == null) return -1;
+  return a.beta!.compareTo(b.beta!);
+}
+
+String? releaseVersionFromMetadata(Map<String, dynamic> release) {
+  final candidates = <String>[
+    if (release['name'] is String) release['name'] as String,
+    if (release['tag_name'] is String) release['tag_name'] as String,
+    for (final raw in (release['assets'] as List<dynamic>? ?? const []))
+      if (raw is Map<String, dynamic> && raw['name'] is String)
+        raw['name'] as String,
+  ];
+
+  final pattern = RegExp(
+    r'(\d+\.\d+\.\d+(?:[.-]b\d+)?)',
+    caseSensitive: false,
+  );
+  for (final candidate in candidates) {
+    final match = pattern.firstMatch(candidate);
+    if (match == null) continue;
+    try {
+      return normalizeAppVersion(match.group(1)!);
+    } on FormatException {
+      continue;
+    }
+  }
+  return null;
+}
+
+class _ParsedAppVersion {
+  const _ParsedAppVersion({
+    required this.major,
+    required this.minor,
+    required this.patch,
+    required this.beta,
+  });
+
+  factory _ParsedAppVersion.parse(String value) {
+    final normalized = normalizeAppVersion(value);
+    final match = RegExp(r'^(\d+)\.(\d+)\.(\d+)(?:\.b(\d+))?$')
+        .firstMatch(normalized)!;
+    return _ParsedAppVersion(
+      major: int.parse(match.group(1)!),
+      minor: int.parse(match.group(2)!),
+      patch: int.parse(match.group(3)!),
+      beta: match.group(4) == null ? null : int.parse(match.group(4)!),
+    );
+  }
+
+  final int major;
+  final int minor;
+  final int patch;
+  final int? beta;
+}
+
 class UpdateCheckResult {
   const UpdateCheckResult({
     required this.updateAvailable,
@@ -77,20 +165,46 @@ class UpdateService {
       isBetaBuild ? _checkBeta() : _checkStable();
 
   Future<UpdateCheckResult> _checkStable() async {
-    final latest = await _readCommit(stableBranch);
-    if (_isCurrentCommit(latest)) {
+    final latestCommit = await _readCommit(stableBranch);
+    final release = await _readRelease('ota-$latestCommit');
+    if (release == null) {
       return UpdateCheckResult(
         updateAvailable: false,
-        canInstall: _canInstall(),
-        latestCommit: latest,
-        message: 'Hai già l’ultima versione stabile pubblicata su main.',
+        canInstall: false,
+        latestCommit: latestCommit,
+        message:
+            'Nessun aggiornamento stabile pubblicato più recente. Una revisione di main potrebbe essere ancora in compilazione.',
       );
     }
 
-    final release = await _readRelease('ota-$latest');
-    final asset = release == null ? null : _findAssetInRelease(release);
+    final onlineVersion = releaseVersionFromMetadata(release);
+    if (onlineVersion == null) {
+      return UpdateCheckResult(
+        updateAvailable: false,
+        canInstall: false,
+        latestCommit: latestCommit,
+        message:
+            'Impossibile determinare la versione della release stabile pubblicata: aggiornamento automatico non proposto.',
+      );
+    }
+
+    final versionComparison =
+        compareAppVersions(onlineVersion, currentVersion);
+    if (versionComparison <= 0) {
+      return UpdateCheckResult(
+        updateAvailable: false,
+        canInstall: _canInstall(),
+        latestCommit: latestCommit,
+        message: versionComparison == 0
+            ? 'Hai già l’ultima versione stabile pubblicata ($onlineVersion).'
+            : 'La versione stabile pubblicata ($onlineVersion) è precedente alla versione installata ($currentVersion).',
+      );
+    }
+
+    final asset = _findAssetInRelease(release);
     return _buildAvailableResult(
-      latest: latest,
+      latest: latestCommit,
+      latestVersion: onlineVersion,
       asset: asset,
       channelName: 'stabile',
     );
@@ -108,19 +222,36 @@ class UpdateService {
       );
     }
 
-    final latest = await _resolveReleaseCommit(release);
-    if (_isCurrentCommit(latest)) {
+    final onlineVersion = releaseVersionFromMetadata(release);
+    if (onlineVersion == null) {
       return UpdateCheckResult(
         updateAvailable: false,
-        canInstall: _canInstall(),
-        latestCommit: latest,
-        message: 'Hai già l’ultima versione BETA pubblicata.',
+        canInstall: false,
+        latestCommit: currentCommit,
+        message:
+            'Impossibile determinare la versione della BETA pubblicata: aggiornamento automatico non proposto.',
       );
     }
 
+    final versionComparison =
+        compareAppVersions(onlineVersion, currentVersion);
+    if (versionComparison <= 0) {
+      final latestCommit = await _resolveReleaseCommit(release);
+      return UpdateCheckResult(
+        updateAvailable: false,
+        canInstall: _canInstall(),
+        latestCommit: latestCommit,
+        message: versionComparison == 0
+            ? 'Hai già l’ultima versione BETA pubblicata ($onlineVersion).'
+            : 'La BETA pubblicata ($onlineVersion) è precedente alla versione installata ($currentVersion).',
+      );
+    }
+
+    final latestCommit = await _resolveReleaseCommit(release);
     final asset = _findAssetInRelease(release, beta: true);
     return _buildAvailableResult(
-      latest: latest,
+      latest: latestCommit,
+      latestVersion: onlineVersion,
       asset: asset,
       channelName: 'BETA',
     );
@@ -128,6 +259,7 @@ class UpdateService {
 
   UpdateCheckResult _buildAvailableResult({
     required String latest,
+    required String latestVersion,
     required String? asset,
     required String channelName,
   }) {
@@ -137,7 +269,7 @@ class UpdateService {
         canInstall: false,
         latestCommit: latest,
         message:
-            'È disponibile una revisione $channelName più recente, ma il pacchetto OTA per questa piattaforma non è presente.',
+            'È disponibile la versione $latestVersion $channelName, ma il pacchetto OTA per questa piattaforma non è presente.',
       );
     }
 
@@ -148,7 +280,7 @@ class UpdateService {
         latestCommit: latest,
         assetUrl: asset,
         message:
-            'È disponibile una versione $channelName più recente. Questa è una build di sviluppo: installa una release per usare l’OTA.',
+            'È disponibile la versione $latestVersion $channelName. Questa è una build di sviluppo: installa una release per usare l’OTA.',
       );
     }
 
@@ -159,8 +291,8 @@ class UpdateService {
         latestCommit: latest,
         assetUrl: asset,
         message: Platform.isLinux
-            ? 'Aggiornamento $channelName disponibile, ma l’app non è stata avviata da AppImage.'
-            : 'Aggiornamento $channelName disponibile, ma il formato di installazione corrente non è aggiornabile automaticamente.',
+            ? 'Aggiornamento $channelName $latestVersion disponibile, ma l’app non è stata avviata da AppImage.'
+            : 'Aggiornamento $channelName $latestVersion disponibile, ma il formato di installazione corrente non è aggiornabile automaticamente.',
       );
     }
 
@@ -170,7 +302,7 @@ class UpdateService {
       latestCommit: latest,
       assetUrl: asset,
       message:
-          'Aggiornamento $channelName disponibile. Puoi scaricarlo e riavviare l’applicazione.',
+          'Aggiornamento $channelName $latestVersion disponibile. Puoi scaricarlo e riavviare l’applicazione.',
     );
   }
 
@@ -230,10 +362,6 @@ exec ${_shell(current)}
     throw UnsupportedError(
         'Aggiornamento automatico disponibile solo su Windows e Linux.');
   }
-
-  bool _isCurrentCommit(String latest) =>
-      currentCommit.isNotEmpty &&
-      currentCommit.toLowerCase() == latest.toLowerCase();
 
   bool _canInstall() =>
       Platform.isWindows ||
