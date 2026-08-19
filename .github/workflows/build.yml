@@ -21,6 +21,17 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
 
+      - name: Verify embedded ANPR dataset is current
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tool/update_birth_places.py
+          if ! git diff --quiet -- assets/data/birth_places.json assets/data/birth_places_manifest.json; then
+            echo "::error::Il dataset ANPR incorporato non coincide con la fonte ufficiale corrente."
+            git diff --stat -- assets/data/birth_places.json assets/data/birth_places_manifest.json
+            exit 1
+          fi
+
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
