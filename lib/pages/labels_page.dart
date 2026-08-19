@@ -46,12 +46,33 @@ class _LabelsPageState extends State<LabelsPage> {
   }
 
   @override
+  void didUpdateWidget(covariant LabelsPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!identical(widget.settings, oldWidget.settings)) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _refreshPrinters();
+      });
+    }
+  }
+
+  @override
   void dispose() {
     _search.dispose();
     _copies.dispose();
     _width.dispose();
     _height.dispose();
     super.dispose();
+  }
+
+  String _dimensionText(double value) => value == value.roundToDouble()
+      ? value.toInt().toString()
+      : value.toStringAsFixed(1);
+
+  void _applyProfileDefaults(Printer? printer) {
+    final profile = widget.services.labels.profileForPrinter(printer);
+    if (profile == null) return;
+    _width.text = _dimensionText(profile.defaultWidthMm);
+    _height.text = _dimensionText(profile.defaultHeightMm);
   }
 
   Future<void> _refreshPrinters() async {
@@ -73,6 +94,18 @@ class _LabelsPageState extends State<LabelsPage> {
             break;
           }
         }
+
+        if (selected == null) {
+          final profile = widget.services.labels.profileForUrl(preferredUrl);
+          if (profile != null) {
+            for (final printer in printers) {
+              if (printer.url == profile.url) {
+                selected = printer;
+                break;
+              }
+            }
+          }
+        }
       }
       if (selected == null && preferredName?.trim().isNotEmpty == true) {
         for (final printer in printers) {
@@ -83,9 +116,11 @@ class _LabelsPageState extends State<LabelsPage> {
         }
       }
 
+      final chosen = selected ?? (printers.isEmpty ? null : printers.first);
+      _applyProfileDefaults(chosen);
       setState(() {
         _printers = printers;
-        _printer = selected ?? (printers.isEmpty ? null : printers.first);
+        _printer = chosen;
         _status = printers.isEmpty
             ? _itEn('Nessuna stampante rilevata.', 'No printers detected.')
             : selected != null
@@ -111,6 +146,7 @@ class _LabelsPageState extends State<LabelsPage> {
   }
 
   void _selectPrinter(Printer printer) {
+    _applyProfileDefaults(printer);
     setState(() {
       _printer = printer;
       _status = _itEn(
@@ -208,7 +244,7 @@ class _LabelsPageState extends State<LabelsPage> {
     final code = _selected?.barcode ?? _selected?.sku;
     final widthMm = double.tryParse(_width.text.replaceAll(',', '.')) ?? 40;
     final heightMm = double.tryParse(_height.text.replaceAll(',', '.')) ?? 30;
-    final directNetworkPrint = _printer?.url.startsWith('tcp://') == true;
+    final directProfile = widget.services.labels.profileForPrinter(_printer);
 
     return HidBarcodeListener(
       enabled: widget.isActive,
@@ -409,10 +445,10 @@ class _LabelsPageState extends State<LabelsPage> {
                           ),
                         const SizedBox(height: 6),
                         Text(
-                          directNetworkPrint
+                          directProfile != null
                               ? _itEn(
-                                  'Stampa diretta TCP/BPL-Z: la misura impostata qui viene inviata direttamente alla stampante. Non è necessario alcun driver Windows.',
-                                  'Direct TCP/BPL-Z printing: the size set here is sent directly to the printer. No Windows printer driver is required.',
+                                  'Stampa diretta TCP/${directProfile.protocolLabel}: ${directProfile.host}:${directProfile.port}, ${directProfile.dpi} dpi. La misura impostata qui viene inviata direttamente alla stampante. Non è necessario alcun driver Windows.',
+                                  'Direct TCP/${directProfile.protocolLabel} printing: ${directProfile.host}:${directProfile.port}, ${directProfile.dpi} dpi. The size set here is sent directly to the printer. No Windows printer driver is required.',
                                 )
                               : _itEn(
                                   'Stampa tramite sistema: configura nel driver della stampante la stessa misura impostata qui.',
