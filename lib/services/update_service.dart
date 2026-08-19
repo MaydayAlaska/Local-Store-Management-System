@@ -38,12 +38,19 @@ class UpdateService {
   static const owner = 'MaydayAlaska';
   static const repository = 'Local-Store-Management-System';
   static const stableBranch = 'main';
-  static const currentVersion = '0.1.3+10';
+  static const currentVersion = '0.1.4';
   static const currentCommit = String.fromEnvironment('GIT_COMMIT');
   static const currentBranch = String.fromEnvironment('BUILD_BRANCH');
   static const tokenEnvironmentVariable = 'LOCAL_STORE_GITHUB_TOKEN';
 
-  static bool get isBetaBuild => currentBranch.toLowerCase() == 'test';
+  static bool get isBetaBuild {
+    final branch = currentBranch.toLowerCase();
+    return branch == 'flutter' || branch == 'test';
+  }
+
+  static String get betaReleaseTag =>
+      currentBranch.toLowerCase() == 'flutter' ? 'flutter-latest' : 'test-latest';
+
   static bool get isInstalledBuild => currentCommit.isNotEmpty;
 
   Future<UpdateCheckResult> check() async {
@@ -52,7 +59,7 @@ class UpdateService {
         updateAvailable: false,
         canInstall: false,
         latestCommit: currentCommit,
-        message: 'Build BETA/TEST: gli aggiornamenti OTA stabili sono disattivati. Usa la prerelease test-latest.',
+        message: 'Build BETA: gli aggiornamenti OTA stabili sono disattivati. Usa la prerelease $betaReleaseTag.',
       );
     }
 
@@ -107,7 +114,7 @@ class UpdateService {
   }
 
   Future<void> install(UpdateCheckResult update) async {
-    if (isBetaBuild) throw StateError('Gli aggiornamenti OTA stabili sono disattivati nelle build BETA/TEST.');
+    if (isBetaBuild) throw StateError('Gli aggiornamenti OTA stabili sono disattivati nelle build BETA.');
     if (!update.updateAvailable || !update.canInstall || update.assetUrl == null) {
       throw StateError('Nessun aggiornamento installabile selezionato.');
     }
