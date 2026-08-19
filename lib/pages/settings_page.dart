@@ -143,12 +143,12 @@ class _SettingsPageState extends State<SettingsPage> {
     );
     var protocol = existing?.protocol ?? 'bpl-z';
     var enabled = existing?.enabled ?? true;
+    String? validationError;
 
     final result = await showDialog<LabelPrinterProfile>(
       context: context,
       builder: (dialogContext) => StatefulBuilder(
         builder: (context, setDialogState) {
-          String? validationError;
           return AlertDialog(
             title: Text(
               existing == null
@@ -214,7 +214,7 @@ class _SettingsPageState extends State<SettingsPage> {
                       children: [
                         Expanded(
                           child: DropdownButtonFormField<String>(
-                            value: protocol,
+                            initialValue: protocol,
                             decoration: InputDecoration(
                               border: const OutlineInputBorder(),
                               labelText: _itEn('Protocollo', 'Protocol'),
@@ -291,7 +291,7 @@ class _SettingsPageState extends State<SettingsPage> {
                     ),
                     if (validationError != null)
                       Text(
-                        validationError,
+                        validationError!,
                         style: TextStyle(
                           color: Theme.of(context).colorScheme.error,
                         ),
