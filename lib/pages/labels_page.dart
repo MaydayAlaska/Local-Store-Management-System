@@ -244,7 +244,7 @@ class _LabelsPageState extends State<LabelsPage> {
     final code = _selected?.barcode ?? _selected?.sku;
     final widthMm = double.tryParse(_width.text.replaceAll(',', '.')) ?? 40;
     final heightMm = double.tryParse(_height.text.replaceAll(',', '.')) ?? 30;
-    final directProfile = widget.services.labels.profileForPrinter(_printer);
+    final configuredProfile = widget.services.labels.profileForPrinter(_printer);
 
     return HidBarcodeListener(
       enabled: widget.isActive,
@@ -445,15 +445,20 @@ class _LabelsPageState extends State<LabelsPage> {
                           ),
                         const SizedBox(height: 6),
                         Text(
-                          directProfile != null
+                          configuredProfile?.isTcp == true
                               ? _itEn(
-                                  'Stampa diretta TCP/${directProfile.protocolLabel}: ${directProfile.host}:${directProfile.port}, ${directProfile.dpi} dpi. La misura impostata qui viene inviata direttamente alla stampante. Non è necessario alcun driver Windows.',
-                                  'Direct TCP/${directProfile.protocolLabel} printing: ${directProfile.host}:${directProfile.port}, ${directProfile.dpi} dpi. The size set here is sent directly to the printer. No Windows printer driver is required.',
+                                  'Stampa diretta TCP/${configuredProfile!.protocolLabel}: ${configuredProfile.host}:${configuredProfile.port}, ${configuredProfile.dpi} dpi. La misura impostata qui viene inviata direttamente alla stampante. Non è necessario alcun driver Windows.',
+                                  'Direct TCP/${configuredProfile.protocolLabel} printing: ${configuredProfile.host}:${configuredProfile.port}, ${configuredProfile.dpi} dpi. The size set here is sent directly to the printer. No Windows printer driver is required.',
                                 )
-                              : _itEn(
-                                  'Stampa tramite sistema: configura nel driver della stampante la stessa misura impostata qui.',
-                                  'System printing: configure the printer driver with the same size set here.',
-                                ),
+                              : configuredProfile?.isSystem == true
+                                  ? _itEn(
+                                      'Stampa USB/sistema tramite driver: il gestionale usa la stampante installata nel sistema operativo e applica ${_dimensionText(configuredProfile!.defaultWidthMm)}×${_dimensionText(configuredProfile.defaultHeightMm)} mm come misura predefinita del profilo.',
+                                      'USB/system printing through the printer driver: the app uses the printer installed in the operating system and applies ${_dimensionText(configuredProfile!.defaultWidthMm)}×${_dimensionText(configuredProfile.defaultHeightMm)} mm as the profile default size.',
+                                    )
+                                  : _itEn(
+                                      'Stampa tramite sistema: configura nel driver della stampante la stessa misura impostata qui.',
+                                      'System printing: configure the printer driver with the same size set here.',
+                                    ),
                           style: Theme.of(context).textTheme.bodySmall,
                         ),
                       ],
