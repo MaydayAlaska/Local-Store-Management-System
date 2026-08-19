@@ -12,9 +12,9 @@ Le versioni BETA usano la forma leggibile `X.Y.Z.bN` (per esempio `0.1.6.b1`). P
 - Le release di `main` ricevono il commit tramite `GIT_COMMIT` e mantengono il bridge tecnico `ota-<sha>` necessario all'aggiornamento automatico.
 - L'OTA confronta le versioni in modo monotono: un aggiornamento viene proposto solo quando la versione online è realmente successiva a quella installata. Un commit differente, da solo, non è sufficiente.
 - A parità di `X.Y.Z`, una release stabile è successiva a qualunque Beta della stessa versione: `0.1.5 > 0.1.5.b99`.
-- Quando una Beta viene promossa a stabile, il suffisso Beta viene rimosso su `main`; il branch `Flutter` passa quindi alla prima Beta della versione successiva.
-- `avalonia` contiene la precedente implementazione Avalonia ed è un ramo storico/alternativo: non è un branch di testing e non partecipa alla pipeline Flutter BETA.
+- Dopo la promozione di una Beta a stabile, `main` mantiene la versione stabile e `Flutter` passa alla prima Beta della versione successiva.
+- `avalonia` contiene la precedente implementazione Avalonia ed è un ramo storico/alternativo.
 
 Versione stabile corrente su `main`: `0.1.5`.
 
-Ciclo di sviluppo successivo su `Flutter`: `0.1.6.b1` (`0.1.6-b1` in `pubspec.yaml`).
+Versione BETA corrente su `Flutter`: `0.1.6.b1` (`0.1.6-b1` in `pubspec.yaml`).
