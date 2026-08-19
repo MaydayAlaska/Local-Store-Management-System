@@ -261,51 +261,80 @@ class LabelService {
     );
 
     final dotsPerMm = dpi / 25.4;
+    final scale = dpi / 203.0;
     final width = (widthMm * dotsPerMm).round();
     final height = (heightMm * dotsPerMm).round();
-    final margin = (width * 0.055).round().clamp(12, 36).toInt();
+    final marginMin = (12 * scale).round().clamp(1, width).toInt();
+    final marginMax = (36 * scale).round().clamp(marginMin, width).toInt();
+    final margin = (width * 0.055)
+        .round()
+        .clamp(marginMin, marginMax)
+        .toInt();
     final contentWidth = width - (margin * 2);
+    final titleCharWidth = (27 * scale).round().clamp(1, 1000).toInt();
+    final detailCharWidth = (18 * scale).round().clamp(1, 1000).toInt();
     final code = _bplText(_printableCode(product), maxLength: 40);
     final ean13 = isValidEan13(code);
     final title = _bplText(
       product.name,
-      maxLength: _maxChars(contentWidth, 27),
+      maxLength: _maxChars(contentWidth, titleCharWidth),
     );
     final details = _bplText(
       <String>[
         if (product.variant?.trim().isNotEmpty == true) product.variant!.trim(),
         if (product.size?.trim().isNotEmpty == true) product.size!.trim(),
       ].join(' | '),
-      maxLength: _maxChars(contentWidth, 18),
+      maxLength: _maxChars(contentWidth, detailCharWidth),
     );
     final sku = _bplText(
       product.sku,
-      maxLength: _maxChars((contentWidth * 0.55).round(), 18),
+      maxLength: _maxChars(
+        (contentWidth * 0.55).round(),
+        detailCharWidth,
+      ),
     );
     final price = product.salePriceCents == null
         ? ''
         : _formatBplPrice(product.salePriceCents!);
+
+    int scaled(int value) => (value * scale).round().clamp(1, 10000).toInt();
 
     final titleY = (height * 0.06).round();
     final detailsY = (height * 0.21).round();
     final barcodeY = details.isEmpty
         ? (height * 0.28).round()
         : (height * 0.32).round();
-    final barcodeHeight =
-        (height * 0.30).round().clamp(48, 120).toInt();
+    final barcodeHeight = (height * 0.30)
+        .round()
+        .clamp(scaled(48), scaled(120))
+        .toInt();
     final footerY = (height * 0.82).round();
-    final titleFont = (height * 0.105).round().clamp(22, 34).toInt();
-    final detailsFont = (height * 0.07).round().clamp(15, 22).toInt();
-    final footerFont = (height * 0.075).round().clamp(16, 24).toInt();
-    final priceFont = (height * 0.11).round().clamp(22, 34).toInt();
+    final titleFont = (height * 0.105)
+        .round()
+        .clamp(scaled(22), scaled(34))
+        .toInt();
+    final detailsFont = (height * 0.07)
+        .round()
+        .clamp(scaled(15), scaled(22))
+        .toInt();
+    final footerFont = (height * 0.075)
+        .round()
+        .clamp(scaled(16), scaled(24))
+        .toInt();
+    final priceFont = (height * 0.11)
+        .round()
+        .clamp(scaled(22), scaled(34))
+        .toInt();
     final barcode = _barcodeLayout(
       code: code,
       labelWidth: width,
       ean13: ean13,
+      edgePadding: scaled(24),
+      maxModuleWidth: scaled(3),
     );
 
     // Gli EAN-13 hanno guard bar più lunghi a sinistra, al centro e a destra.
-    final codeClearance = 8 + (ean13 ? barcode.moduleWidth * 6 : 0);
+    final codeClearance = scaled(8) + (ean13 ? barcode.moduleWidth * 6 : 0);
     final codeY = barcodeY + barcodeHeight + codeClearance;
 
     final out = StringBuffer()
@@ -464,11 +493,17 @@ class LabelService {
     required String code,
     required int labelWidth,
     required bool ean13,
+    int edgePadding = 24,
+    int maxModuleWidth = 3,
   }) {
     // EAN-13 usa 95 moduli. Per Code 128 subset B: start + dati + check + stop.
     final modules = ean13 ? 95 : (code.length * 11) + 35;
-    final usableWidth = (labelWidth - 24).clamp(1, labelWidth).toInt();
-    final moduleWidth = (usableWidth ~/ modules).clamp(1, 3).toInt();
+    final usableWidth = (labelWidth - edgePadding)
+        .clamp(1, labelWidth)
+        .toInt();
+    final moduleWidth = (usableWidth ~/ modules)
+        .clamp(1, maxModuleWidth)
+        .toInt();
     final widthDots = modules * moduleWidth;
     final x = ((labelWidth - widthDots) / 2)
         .round()
