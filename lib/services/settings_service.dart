@@ -31,18 +31,27 @@ class SettingsService {
     String? logoSourcePath,
   }) {
     final current = load();
-    final name = shopName.trim().isEmpty ? AppSettings.defaults.shopName : shopName.trim();
-    final icon = iconSourcePath == null ? current.iconFileName : _saveAsset(iconSourcePath, 'app-icon');
-    final logo = logoSourcePath == null ? current.logoFileName : _saveAsset(logoSourcePath, 'shop-logo');
-    final normalizedCurrency = AppSettings.supportedCurrencies.contains(currencyCode.toUpperCase())
-        ? currencyCode.toUpperCase()
-        : AppSettings.defaults.currencyCode;
-    final normalizedTheme = AppSettings.supportedThemeModes.contains(themeMode.toLowerCase())
-        ? themeMode.toLowerCase()
-        : AppSettings.defaults.themeMode;
-    final normalizedLanguage = AppSettings.supportedLanguages.contains(languageCode.toLowerCase())
-        ? languageCode.toLowerCase()
-        : AppSettings.defaults.languageCode;
+    final name = shopName.trim().isEmpty
+        ? AppSettings.defaults.shopName
+        : shopName.trim();
+    final icon = iconSourcePath == null
+        ? current.iconFileName
+        : _saveAsset(iconSourcePath, 'app-icon');
+    final logo = logoSourcePath == null
+        ? current.logoFileName
+        : _saveAsset(logoSourcePath, 'shop-logo');
+    final normalizedCurrency =
+        AppSettings.supportedCurrencies.contains(currencyCode.toUpperCase())
+            ? currencyCode.toUpperCase()
+            : AppSettings.defaults.currencyCode;
+    final normalizedTheme =
+        AppSettings.supportedThemeModes.contains(themeMode.toLowerCase())
+            ? themeMode.toLowerCase()
+            : AppSettings.defaults.themeMode;
+    final normalizedLanguage =
+        AppSettings.supportedLanguages.contains(languageCode.toLowerCase())
+            ? languageCode.toLowerCase()
+            : AppSettings.defaults.languageCode;
     final settings = AppSettings(
       shopName: name,
       iconFileName: icon,
@@ -62,9 +71,17 @@ class SettingsService {
 
   void saveLastLabelPrinter({required String url, required String name}) {
     final current = load();
-    final settings = current.copyWith(
+    final settings = AppSettings(
+      shopName: current.shopName,
+      iconFileName: current.iconFileName,
+      logoFileName: current.logoFileName,
+      showShopNameInMenu: current.showShopNameInMenu,
+      showLogoInMenu: current.showLogoInMenu,
       lastLabelPrinterUrl: url.trim().isEmpty ? null : url.trim(),
       lastLabelPrinterName: name.trim().isEmpty ? null : name.trim(),
+      currencyCode: current.currencyCode,
+      themeMode: current.themeMode,
+      languageCode: current.languageCode,
     );
     _writeSettings(settings);
   }
@@ -76,8 +93,10 @@ class SettingsService {
     file.writeAsStringSync(encoder.convert(settings.toJson()), flush: true);
   }
 
-  String? resolveIconPath([AppSettings? settings]) => _resolveAsset((settings ?? load()).iconFileName);
-  String? resolveLogoPath([AppSettings? settings]) => _resolveAsset((settings ?? load()).logoFileName);
+  String? resolveIconPath([AppSettings? settings]) =>
+      _resolveAsset((settings ?? load()).iconFileName);
+  String? resolveLogoPath([AppSettings? settings]) =>
+      _resolveAsset((settings ?? load()).logoFileName);
 
   String? resolveIconPreviewPath([AppSettings? settings]) {
     final value = settings ?? load();
@@ -101,25 +120,47 @@ class SettingsService {
     }
   }
 
-  ({String previewPath, String shellIconPath}) _ensureDerivedIconFiles(AppSettings settings) {
+  ({String previewPath, String shellIconPath}) _ensureDerivedIconFiles(
+    AppSettings settings,
+  ) {
     final sourcePath = resolveIconPath(settings);
-    if (sourcePath == null) throw StateError('Icona applicazione non disponibile.');
+    if (sourcePath == null) {
+      throw StateError('Icona applicazione non disponibile.');
+    }
     final source = File(sourcePath);
     final stamp = source.lastModifiedSync().millisecondsSinceEpoch;
-    final previewPath = p.join(AppPaths.assetsDirectory, 'app-icon-preview-$stamp.png');
-    final shellIconPath = p.join(AppPaths.assetsDirectory, 'app-shell-$stamp.ico');
+    final previewPath =
+        p.join(AppPaths.assetsDirectory, 'app-icon-preview-$stamp.png');
+    final shellIconPath =
+        p.join(AppPaths.assetsDirectory, 'app-shell-$stamp.ico');
 
     final needsPreview = !File(previewPath).existsSync();
     final needsShell = !File(shellIconPath).existsSync();
     if (needsPreview || needsShell) {
       final decoded = img.decodeImage(source.readAsBytesSync());
-      if (decoded == null) throw StateError('Il file scelto non contiene un’immagine valida.');
+      if (decoded == null) {
+        throw StateError('Il file scelto non contiene un’immagine valida.');
+      }
       final longest = decoded.width > decoded.height ? decoded.width : decoded.height;
       final normalized = longest > 256
-          ? img.copyResize(decoded, width: decoded.width >= decoded.height ? 256 : null, height: decoded.height > decoded.width ? 256 : null)
+          ? img.copyResize(
+              decoded,
+              width: decoded.width >= decoded.height ? 256 : null,
+              height: decoded.height > decoded.width ? 256 : null,
+            )
           : decoded;
-      if (needsPreview) File(previewPath).writeAsBytesSync(img.encodePng(normalized), flush: true);
-      if (needsShell) File(shellIconPath).writeAsBytesSync(img.encodeIco(normalized), flush: true);
+      if (needsPreview) {
+        File(previewPath).writeAsBytesSync(
+          img.encodePng(normalized),
+          flush: true,
+        );
+      }
+      if (needsShell) {
+        File(shellIconPath).writeAsBytesSync(
+          img.encodeIco(normalized),
+          flush: true,
+        );
+      }
     }
 
     _cleanDerivedIcons(previewPath, shellIconPath);
@@ -131,8 +172,11 @@ class SettingsService {
       for (final entity in Directory(AppPaths.assetsDirectory).listSync()) {
         if (entity is! File) continue;
         final name = p.basename(entity.path).toLowerCase();
-        final derived = name.startsWith('app-icon-preview-') || name.startsWith('app-shell-');
-        if (derived && entity.path != keepPreview && entity.path != keepShell) {
+        final derived = name.startsWith('app-icon-preview-') ||
+            name.startsWith('app-shell-');
+        if (derived &&
+            entity.path != keepPreview &&
+            entity.path != keepShell) {
           entity.deleteSync();
         }
       }
@@ -151,7 +195,8 @@ class SettingsService {
 
   String _saveAsset(String sourcePath, String baseName) {
     final extension = p.extension(sourcePath).toLowerCase();
-    if (!const {'.png', '.jpg', '.jpeg', '.bmp', '.ico'}.contains(extension)) {
+    if (!const {'.png', '.jpg', '.jpeg', '.bmp', '.ico'}
+        .contains(extension)) {
       throw StateError('Formato immagine non supportato. Usa PNG, JPG, BMP o ICO.');
     }
 
