@@ -73,6 +73,16 @@ String normalizeAppVersion(String value) {
       : '$major.$minor.$patch-b${int.parse(beta)}';
 }
 
+bool versionBelongsToUpdateChannel(String value, {required bool beta}) {
+  try {
+    final normalized = normalizeAppVersion(value);
+    final isBetaVersion = RegExp(r'-b\d+$').hasMatch(normalized);
+    return beta ? isBetaVersion : !isBetaVersion;
+  } on FormatException {
+    return false;
+  }
+}
+
 int compareAppVersions(String left, String right) {
   final a = _ParsedAppVersion.parse(left);
   final b = _ParsedAppVersion.parse(right);
@@ -161,7 +171,7 @@ class UpdateService {
   static const owner = 'MaydayAlaska';
   static const repository = 'Local-Store-Management-System';
   static const stableBranch = 'main';
-  static const currentVersion = '0.1.6-b3';
+  static const currentVersion = '0.1.6-b4';
   static const currentCommit = String.fromEnvironment('GIT_COMMIT');
   static const currentBranch = String.fromEnvironment('BUILD_BRANCH');
   static const tokenEnvironmentVariable = 'LOCAL_STORE_GITHUB_TOKEN';
@@ -199,6 +209,18 @@ class UpdateService {
         message: _itEn(
           'Impossibile determinare la versione della release stabile pubblicata.',
           'Unable to determine the version of the published stable release.',
+        ),
+      );
+    }
+
+    if (!versionBelongsToUpdateChannel(onlineVersion, beta: false)) {
+      return UpdateCheckResult(
+        updateAvailable: false,
+        canInstall: false,
+        latestCommit: latestCommit,
+        message: _itEn(
+          'La versione pubblicata ($onlineVersion) non appartiene al canale STABLE.',
+          'The published version ($onlineVersion) does not belong to the STABLE channel.',
         ),
       );
     }
@@ -253,6 +275,18 @@ class UpdateService {
         message: _itEn(
           'Impossibile determinare la versione della BETA pubblicata: aggiornamento automatico non proposto.',
           'Unable to determine the published BETA version: no automatic update will be offered.',
+        ),
+      );
+    }
+
+    if (!versionBelongsToUpdateChannel(onlineVersion, beta: true)) {
+      return UpdateCheckResult(
+        updateAvailable: false,
+        canInstall: false,
+        latestCommit: currentCommit,
+        message: _itEn(
+          'La versione pubblicata ($onlineVersion) non appartiene al canale BETA.',
+          'The published version ($onlineVersion) does not belong to the BETA channel.',
         ),
       );
     }
