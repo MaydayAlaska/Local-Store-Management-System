@@ -4,11 +4,16 @@ import 'dart:io';
 
 import 'package:path/path.dart' as p;
 
+import '../l10n/app_strings.dart';
+
+String _itEn(String it, String en) => AppStrings.isEnglish ? en : it;
+
 String updateArchitectureForAbi(Abi abi) => switch (abi) {
       Abi.windowsX64 || Abi.macosX64 || Abi.linuxX64 => 'x64',
       Abi.windowsArm64 || Abi.macosArm64 || Abi.linuxArm64 => 'arm64',
-      _ => throw UnsupportedError(
-          'Architettura non supportata per gli aggiornamenti OTA: $abi'),
+      _ => throw UnsupportedError(_itEn(
+          'Architettura non supportata per gli aggiornamenti OTA: $abi',
+          'Unsupported architecture for OTA updates: $abi')),
     };
 
 String updateAssetNameFor({
@@ -20,8 +25,9 @@ String updateAssetNameFor({
     'windows' => 'LocalStoreManagement-Setup-win-$arch.exe',
     'macos' => 'LocalStoreManagement-macos-$arch.dmg',
     'linux' => 'LocalStoreManagement-linux-$arch.AppImage',
-    _ => throw UnsupportedError(
-        'Aggiornamento automatico disponibile solo su Windows, macOS e Linux.'),
+    _ => throw UnsupportedError(_itEn(
+        'Aggiornamento automatico disponibile solo su Windows, macOS e Linux.',
+        'Automatic updates are available only on Windows, macOS and Linux.')),
   };
 }
 
@@ -34,8 +40,9 @@ String betaUpdateAssetSuffixFor({
     'windows' => '-BETA-Setup-win-$arch.exe',
     'macos' => '-BETA-macos-$arch.dmg',
     'linux' => '-BETA-linux-$arch.AppImage',
-    _ => throw UnsupportedError(
-        'Aggiornamento automatico disponibile solo su Windows, macOS e Linux.'),
+    _ => throw UnsupportedError(_itEn(
+        'Aggiornamento automatico disponibile solo su Windows, macOS e Linux.',
+        'Automatic updates are available only on Windows, macOS and Linux.')),
   };
 }
 
@@ -51,7 +58,10 @@ String normalizeAppVersion(String value) {
   final match = RegExp(r'^(\d+)\.(\d+)\.(\d+)(?:-b(\d+))?$')
       .firstMatch(normalized);
   if (match == null) {
-    throw FormatException('Versione applicazione non valida: $value');
+    throw FormatException(_itEn(
+      'Versione applicazione non valida: $value',
+      'Invalid application version: $value',
+    ));
   }
 
   final major = int.parse(match.group(1)!);
@@ -173,7 +183,10 @@ class UpdateService {
         updateAvailable: false,
         canInstall: false,
         latestCommit: latestCommit,
-        message: 'Nessun aggiornamento disponibile.',
+        message: _itEn(
+          'nessun aggiornamento disponibile',
+          'No updates available',
+        ),
       );
     }
 
@@ -183,21 +196,28 @@ class UpdateService {
         updateAvailable: false,
         canInstall: false,
         latestCommit: latestCommit,
-        message:
-            'Impossibile determinare la versione della release stabile pubblicata.',
+        message: _itEn(
+          'Impossibile determinare la versione della release stabile pubblicata.',
+          'Unable to determine the version of the published stable release.',
+        ),
       );
     }
 
-    final versionComparison =
-        compareAppVersions(onlineVersion, currentVersion);
+    final versionComparison = compareAppVersions(onlineVersion, currentVersion);
     if (versionComparison <= 0) {
       return UpdateCheckResult(
         updateAvailable: false,
         canInstall: _canInstall(),
         latestCommit: latestCommit,
         message: versionComparison == 0
-            ? 'Hai già l’ultima versione stabile pubblicata ($onlineVersion).'
-            : 'La versione stabile pubblicata ($onlineVersion) è precedente alla versione installata ($currentVersion).',
+            ? _itEn(
+                'Hai già l’ultima versione stabile pubblicata ($onlineVersion).',
+                'You already have the latest published stable version ($onlineVersion).',
+              )
+            : _itEn(
+                'La versione stabile pubblicata ($onlineVersion) è precedente alla versione installata ($currentVersion).',
+                'The published stable version ($onlineVersion) is older than the installed version ($currentVersion).',
+              ),
       );
     }
 
@@ -206,7 +226,7 @@ class UpdateService {
       latest: latestCommit,
       latestVersion: onlineVersion,
       asset: asset,
-      channelName: 'stabile',
+      channelName: _itEn('stabile', 'stable'),
     );
   }
 
@@ -217,8 +237,10 @@ class UpdateService {
         updateAvailable: false,
         canInstall: false,
         latestCommit: currentCommit,
-        message:
-            'Canale BETA attivo. Non è ancora disponibile una prerelease $betaReleaseTag.',
+        message: _itEn(
+          'Canale BETA attivo. Non è ancora disponibile una prerelease $betaReleaseTag.',
+          'BETA channel active. A $betaReleaseTag prerelease is not available yet.',
+        ),
       );
     }
 
@@ -228,13 +250,14 @@ class UpdateService {
         updateAvailable: false,
         canInstall: false,
         latestCommit: currentCommit,
-        message:
-            'Impossibile determinare la versione della BETA pubblicata: aggiornamento automatico non proposto.',
+        message: _itEn(
+          'Impossibile determinare la versione della BETA pubblicata: aggiornamento automatico non proposto.',
+          'Unable to determine the published BETA version: no automatic update will be offered.',
+        ),
       );
     }
 
-    final versionComparison =
-        compareAppVersions(onlineVersion, currentVersion);
+    final versionComparison = compareAppVersions(onlineVersion, currentVersion);
     if (versionComparison <= 0) {
       final latestCommit = await _resolveReleaseCommit(release);
       return UpdateCheckResult(
@@ -242,8 +265,14 @@ class UpdateService {
         canInstall: _canInstall(),
         latestCommit: latestCommit,
         message: versionComparison == 0
-            ? 'Hai già l’ultima versione BETA pubblicata ($onlineVersion).'
-            : 'La BETA pubblicata ($onlineVersion) è precedente alla versione installata ($currentVersion).',
+            ? _itEn(
+                'Hai già l’ultima versione BETA pubblicata ($onlineVersion).',
+                'You already have the latest published BETA version ($onlineVersion).',
+              )
+            : _itEn(
+                'La BETA pubblicata ($onlineVersion) è precedente alla versione installata ($currentVersion).',
+                'The published BETA ($onlineVersion) is older than the installed version ($currentVersion).',
+              ),
       );
     }
 
@@ -268,8 +297,10 @@ class UpdateService {
         updateAvailable: true,
         canInstall: false,
         latestCommit: latest,
-        message:
-            'È disponibile la versione $latestVersion $channelName, ma il pacchetto OTA per questa piattaforma non è presente.',
+        message: _itEn(
+          'È disponibile la versione $latestVersion $channelName, ma il pacchetto OTA per questa piattaforma non è presente.',
+          '$channelName version $latestVersion is available, but there is no OTA package for this platform.',
+        ),
       );
     }
 
@@ -279,8 +310,10 @@ class UpdateService {
         canInstall: false,
         latestCommit: latest,
         assetUrl: asset,
-        message:
-            'È disponibile la versione $latestVersion $channelName. Questa è una build di sviluppo: installa una release per usare l’OTA.',
+        message: _itEn(
+          'È disponibile la versione $latestVersion $channelName. Questa è una build di sviluppo: installa una release per usare l’OTA.',
+          '$channelName version $latestVersion is available. This is a development build: install a release to use OTA updates.',
+        ),
       );
     }
 
@@ -291,8 +324,14 @@ class UpdateService {
         latestCommit: latest,
         assetUrl: asset,
         message: Platform.isLinux
-            ? 'Aggiornamento $channelName $latestVersion disponibile, ma l’app non è stata avviata da AppImage.'
-            : 'Aggiornamento $channelName $latestVersion disponibile, ma il formato di installazione corrente non è aggiornabile automaticamente.',
+            ? _itEn(
+                'Aggiornamento $channelName $latestVersion disponibile, ma l’app non è stata avviata da AppImage.',
+                '$channelName update $latestVersion is available, but the app was not launched from an AppImage.',
+              )
+            : _itEn(
+                'Aggiornamento $channelName $latestVersion disponibile, ma il formato di installazione corrente non è aggiornabile automaticamente.',
+                '$channelName update $latestVersion is available, but the current installation format cannot be updated automatically.',
+              ),
       );
     }
 
@@ -302,16 +341,23 @@ class UpdateService {
       latestCommit: latest,
       assetUrl: asset,
       message: Platform.isMacOS
-          ? 'Aggiornamento $channelName $latestVersion disponibile. Puoi scaricare e aprire il nuovo DMG.'
-          : 'Aggiornamento $channelName $latestVersion disponibile. Puoi scaricarlo e riavviare l’applicazione.',
+          ? _itEn(
+              'Aggiornamento $channelName $latestVersion disponibile. Puoi scaricare e aprire il nuovo DMG.',
+              '$channelName update $latestVersion is available. You can download and open the new DMG.',
+            )
+          : _itEn(
+              'Aggiornamento $channelName $latestVersion disponibile. Puoi scaricarlo e riavviare l’applicazione.',
+              '$channelName update $latestVersion is available. You can download it and restart the application.',
+            ),
     );
   }
 
   Future<void> install(UpdateCheckResult update) async {
-    if (!update.updateAvailable ||
-        !update.canInstall ||
-        update.assetUrl == null) {
-      throw StateError('Nessun aggiornamento installabile selezionato.');
+    if (!update.updateAvailable || !update.canInstall || update.assetUrl == null) {
+      throw StateError(_itEn(
+        'Nessun aggiornamento installabile selezionato.',
+        'No installable update selected.',
+      ));
     }
 
     final root = Directory(p.join(
@@ -340,9 +386,10 @@ class UpdateService {
       await _download(update.assetUrl!, destination);
       final result = await Process.run('open', [destination]);
       if (result.exitCode != 0) {
-        throw StateError(
+        throw StateError(_itEn(
           'Impossibile aprire il DMG scaricato: ${result.stderr}',
-        );
+          'Unable to open the downloaded DMG: ${result.stderr}',
+        ));
       }
       exit(0);
     }
@@ -350,7 +397,10 @@ class UpdateService {
     if (Platform.isLinux) {
       final current = Platform.environment['APPIMAGE'];
       if (current == null || current.trim().isEmpty) {
-        throw StateError('L’applicazione non è stata avviata da AppImage.');
+        throw StateError(_itEn(
+          'L’applicazione non è stata avviata da AppImage.',
+          'The application was not launched from an AppImage.',
+        ));
       }
       final next = p.join(root.path, assetName);
       await _download(update.assetUrl!, next);
@@ -372,8 +422,10 @@ exec ${_shell(current)}
       exit(0);
     }
 
-    throw UnsupportedError(
-        'Aggiornamento automatico disponibile solo su Windows, macOS e Linux.');
+    throw UnsupportedError(_itEn(
+      'Aggiornamento automatico disponibile solo su Windows, macOS e Linux.',
+      'Automatic updates are available only on Windows, macOS and Linux.',
+    ));
   }
 
   bool _canInstall() =>
@@ -399,7 +451,10 @@ exec ${_shell(current)}
     );
     final sha = json['sha'] as String?;
     if (sha == null || sha.isEmpty) {
-      throw StateError('GitHub non ha restituito il commit di $ref.');
+      throw StateError(_itEn(
+        'GitHub non ha restituito il commit di $ref.',
+        'GitHub did not return the commit for $ref.',
+      ));
     }
     return sha;
   }
@@ -424,8 +479,10 @@ exec ${_shell(current)}
   Future<String> _resolveReleaseCommit(Map<String, dynamic> release) async {
     final target = (release['target_commitish'] as String?)?.trim();
     if (target == null || target.isEmpty) {
-      throw StateError(
-          'GitHub non ha restituito il commit della release BETA.');
+      throw StateError(_itEn(
+        'GitHub non ha restituito il commit della release BETA.',
+        'GitHub did not return the BETA release commit.',
+      ));
     }
     if (RegExp(r'^[0-9a-fA-F]{40}$').hasMatch(target)) return target;
     return _readCommit(target);
@@ -482,9 +539,10 @@ exec ${_shell(current)}
     );
     if (response.statusCode < 200 || response.statusCode >= 300) {
       final body = await utf8.decoder.bind(response).join();
-      throw HttpException(
+      throw HttpException(_itEn(
         'Download aggiornamento fallito: ${response.statusCode} $body',
-      );
+        'Update download failed: ${response.statusCode} $body',
+      ));
     }
     final sink = File(destination).openWrite();
     await response.pipe(sink);
