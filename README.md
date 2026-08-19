@@ -95,12 +95,12 @@ Strategia branch:
 
 ## Versioning
 
-Le versioni usano il formato `X.Y.Z`, senza suffisso `+build`.
+Le versioni stabili usano il formato `X.Y.Z`. Le Beta usano la forma leggibile `X.Y.Z.bN`; nel `pubspec.yaml` la stessa versione viene codificata in SemVer come `X.Y.Z-bN`.
 
 Versione BETA corrente:
 
 ```text
-0.1.4
+0.1.5.b1
 ```
 
 Per le regole complete vedere `VERSIONING.md`.
