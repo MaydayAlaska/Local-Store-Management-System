@@ -1,7 +1,23 @@
 import 'dart:convert';
+import 'dart:ffi' show Abi;
 import 'dart:io';
 
 import 'package:path/path.dart' as p;
+
+String updateArchitectureForAbi(Abi abi) => switch (abi) {
+      Abi.windowsX64 || Abi.linuxX64 => 'x64',
+      Abi.windowsArm64 || Abi.linuxArm64 => 'arm64',
+      _ => throw UnsupportedError('Architettura non supportata per gli aggiornamenti OTA: $abi'),
+    };
+
+String updateAssetNameFor({required String operatingSystem, required Abi abi}) {
+  final arch = updateArchitectureForAbi(abi);
+  return switch (operatingSystem) {
+    'windows' => 'LocalStoreManagement-Setup-win-$arch.exe',
+    'linux' => 'LocalStoreManagement-linux-$arch.AppImage',
+    _ => throw UnsupportedError('Aggiornamento automatico disponibile solo su Windows e Linux.'),
+  };
+}
 
 class UpdateCheckResult {
   const UpdateCheckResult({
@@ -58,7 +74,7 @@ class UpdateService {
         latestCommit: latest,
         message: currentCommit.isEmpty
             ? 'Build di sviluppo rilevata. L’aggiornamento automatico è disponibile sulle versioni pubblicate.'
-            : 'È disponibile una revisione più recente, ma il pacchetto OTA non è ancora presente.',
+            : 'È disponibile una revisione più recente, ma il pacchetto OTA per questa piattaforma non è ancora presente.',
       );
     }
     if (currentCommit.isEmpty) {
@@ -98,9 +114,10 @@ class UpdateService {
     final root = Directory(p.join(Directory.systemTemp.path, 'LocalStoreManagementSystem', 'updates', update.latestCommit));
     if (root.existsSync()) root.deleteSync(recursive: true);
     root.createSync(recursive: true);
+    final assetName = _expectedAssetName();
 
     if (Platform.isWindows) {
-      final destination = p.join(root.path, 'LocalStoreManagement-Setup-win-x64.exe');
+      final destination = p.join(root.path, assetName);
       await _download(update.assetUrl!, destination);
       await Process.start(destination, const [], mode: ProcessStartMode.detached);
       exit(0);
@@ -109,7 +126,7 @@ class UpdateService {
     if (Platform.isLinux) {
       final current = Platform.environment['APPIMAGE'];
       if (current == null || current.trim().isEmpty) throw StateError('L’applicazione non è stata avviata da AppImage.');
-      final next = p.join(root.path, 'LocalStoreManagement-linux-x64.AppImage');
+      final next = p.join(root.path, assetName);
       await _download(update.assetUrl!, next);
       await Process.run('chmod', ['+x', next]);
       final processId = pid;
@@ -129,6 +146,11 @@ exec ${_shell(current)}
 
   bool _canInstall() => Platform.isWindows || (Platform.isLinux && (Platform.environment['APPIMAGE']?.isNotEmpty ?? false));
 
+  String _expectedAssetName() => updateAssetNameFor(
+        operatingSystem: Platform.operatingSystem,
+        abi: Abi.current(),
+      );
+
   Future<String> _readLatestCommit() async {
     final json = await _getJson('https://api.github.com/repos/$owner/$repository/commits/$stableBranch');
     final sha = json['sha'] as String?;
@@ -145,7 +167,7 @@ exec ${_shell(current)}
     final body = await utf8.decoder.bind(response).join();
     if (response.statusCode < 200 || response.statusCode >= 300) throw HttpException('GitHub: ${response.statusCode} $body');
     final json = jsonDecode(body) as Map<String, dynamic>;
-    final expected = Platform.isWindows ? 'LocalStoreManagement-Setup-win-x64.exe' : 'LocalStoreManagement-linux-x64.AppImage';
+    final expected = _expectedAssetName();
     for (final raw in (json['assets'] as List<dynamic>? ?? const [])) {
       final asset = raw as Map<String, dynamic>;
       if (asset['name'] == expected) return asset['url'] as String?;
