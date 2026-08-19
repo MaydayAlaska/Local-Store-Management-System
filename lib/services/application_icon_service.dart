@@ -34,7 +34,7 @@ class ApplicationIconService {
     final target = Platform.resolvedExecutable;
     if (!File(target).existsSync()) return;
 
-    final script = File(p.join(Directory.systemTemp.path, 'lsms-update-shortcuts-${pid}.ps1'));
+    final script = File(p.join(Directory.systemTemp.path, 'lsms-update-shortcuts-$pid.ps1'));
     try {
       script.writeAsStringSync(r'''
 param([string]$Target, [string]$Icon)

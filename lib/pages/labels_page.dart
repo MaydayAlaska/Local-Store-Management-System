@@ -68,6 +68,25 @@ class _LabelsPageState extends State<LabelsPage> {
       ? value.toInt().toString()
       : value.toStringAsFixed(1);
 
+  String _printerDescription(LabelPrinterProfile? profile) {
+    if (profile == null) {
+      return _itEn(
+        'Stampa tramite sistema: configura nel driver della stampante la stessa misura impostata qui.',
+        'System printing: configure the printer driver with the same size set here.',
+      );
+    }
+    if (profile.isTcp) {
+      return _itEn(
+        'Stampa diretta TCP/${profile.protocolLabel}: ${profile.host}:${profile.port}, ${profile.dpi} dpi. La misura impostata qui viene inviata direttamente alla stampante. Non è necessario alcun driver Windows.',
+        'Direct TCP/${profile.protocolLabel} printing: ${profile.host}:${profile.port}, ${profile.dpi} dpi. The size set here is sent directly to the printer. No Windows printer driver is required.',
+      );
+    }
+    return _itEn(
+      'Stampa USB/sistema tramite driver: il gestionale usa la stampante installata nel sistema operativo e applica ${_dimensionText(profile.defaultWidthMm)}×${_dimensionText(profile.defaultHeightMm)} mm come misura predefinita del profilo.',
+      'USB/system printing through the printer driver: the app uses the printer installed in the operating system and applies ${_dimensionText(profile.defaultWidthMm)}×${_dimensionText(profile.defaultHeightMm)} mm as the profile default size.',
+    );
+  }
+
   void _applyProfileDefaults(Printer? printer) {
     final profile = widget.services.labels.profileForPrinter(printer);
     if (profile == null) return;
@@ -445,20 +464,7 @@ class _LabelsPageState extends State<LabelsPage> {
                           ),
                         const SizedBox(height: 6),
                         Text(
-                          configuredProfile?.isTcp == true
-                              ? _itEn(
-                                  'Stampa diretta TCP/${configuredProfile.protocolLabel}: ${configuredProfile.host}:${configuredProfile.port}, ${configuredProfile.dpi} dpi. La misura impostata qui viene inviata direttamente alla stampante. Non è necessario alcun driver Windows.',
-                                  'Direct TCP/${configuredProfile.protocolLabel} printing: ${configuredProfile.host}:${configuredProfile.port}, ${configuredProfile.dpi} dpi. The size set here is sent directly to the printer. No Windows printer driver is required.',
-                                )
-                              : configuredProfile?.isSystem == true
-                                  ? _itEn(
-                                      'Stampa USB/sistema tramite driver: il gestionale usa la stampante installata nel sistema operativo e applica ${_dimensionText(configuredProfile.defaultWidthMm)}×${_dimensionText(configuredProfile.defaultHeightMm)} mm come misura predefinita del profilo.',
-                                      'USB/system printing through the printer driver: the app uses the printer installed in the operating system and applies ${_dimensionText(configuredProfile.defaultWidthMm)}×${_dimensionText(configuredProfile.defaultHeightMm)} mm as the profile default size.',
-                                    )
-                                  : _itEn(
-                                      'Stampa tramite sistema: configura nel driver della stampante la stessa misura impostata qui.',
-                                      'System printing: configure the printer driver with the same size set here.',
-                                    ),
+                          _printerDescription(configuredProfile),
                           style: Theme.of(context).textTheme.bodySmall,
                         ),
                       ],

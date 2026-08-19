@@ -36,7 +36,7 @@ class ProductRepository {
                COALESCE(pv.size, '') COLLATE NOCASE,
                pv.sku COLLATE NOCASE
       $limitClause;
-    ''', [q, for (var i = 0; i < 7; i++) pattern, if (safeLimit != null) safeLimit]);
+    ''', [q, for (var i = 0; i < 7; i++) pattern, ?safeLimit]);
     return rows.map(_readVariant).toList();
   }
 
@@ -62,7 +62,7 @@ class ProductRepository {
                   OR COALESCE(search_pb.barcode, '') LIKE ? COLLATE NOCASE))
       ORDER BY COALESCE(b.name, '') COLLATE NOCASE, p.name COLLATE NOCASE
       $limitClause;
-    ''', [q, pattern, pattern, pattern, pattern, pattern, pattern, pattern, if (safeLimit != null) safeLimit]);
+    ''', [q, pattern, pattern, pattern, pattern, pattern, pattern, pattern, ?safeLimit]);
     return rows.map(_readSummary).toList();
   }
 

@@ -74,7 +74,7 @@ class _ProductsPageState extends State<ProductsPage> {
                   )
                 : ListView.separated(
                     itemCount: products.length,
-                    separatorBuilder: (_, __) => const Divider(height: 1),
+                    separatorBuilder: (_, _) => const Divider(height: 1),
                     itemBuilder: (context, index) {
                       final product = products[index];
                       final noBrand = AppStrings.isEnglish ? 'No brand' : 'Senza marca';
