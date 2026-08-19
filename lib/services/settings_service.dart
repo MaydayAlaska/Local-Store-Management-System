@@ -24,6 +24,9 @@ class SettingsService {
     required String shopName,
     required bool showShopNameInMenu,
     required bool showLogoInMenu,
+    required String currencyCode,
+    required String themeMode,
+    required String languageCode,
     String? iconSourcePath,
     String? logoSourcePath,
   }) {
@@ -31,6 +34,15 @@ class SettingsService {
     final name = shopName.trim().isEmpty ? AppSettings.defaults.shopName : shopName.trim();
     final icon = iconSourcePath == null ? current.iconFileName : _saveAsset(iconSourcePath, 'app-icon');
     final logo = logoSourcePath == null ? current.logoFileName : _saveAsset(logoSourcePath, 'shop-logo');
+    final normalizedCurrency = AppSettings.supportedCurrencies.contains(currencyCode.toUpperCase())
+        ? currencyCode.toUpperCase()
+        : AppSettings.defaults.currencyCode;
+    final normalizedTheme = AppSettings.supportedThemeModes.contains(themeMode.toLowerCase())
+        ? themeMode.toLowerCase()
+        : AppSettings.defaults.themeMode;
+    final normalizedLanguage = AppSettings.supportedLanguages.contains(languageCode.toLowerCase())
+        ? languageCode.toLowerCase()
+        : AppSettings.defaults.languageCode;
     final settings = AppSettings(
       shopName: name,
       iconFileName: icon,
@@ -39,6 +51,9 @@ class SettingsService {
       showLogoInMenu: showLogoInMenu,
       lastLabelPrinterUrl: current.lastLabelPrinterUrl,
       lastLabelPrinterName: current.lastLabelPrinterName,
+      currencyCode: normalizedCurrency,
+      themeMode: normalizedTheme,
+      languageCode: normalizedLanguage,
     );
     _writeSettings(settings);
     if (icon != null) _ensureDerivedIconFiles(settings);
@@ -47,12 +62,7 @@ class SettingsService {
 
   void saveLastLabelPrinter({required String url, required String name}) {
     final current = load();
-    final settings = AppSettings(
-      shopName: current.shopName,
-      iconFileName: current.iconFileName,
-      logoFileName: current.logoFileName,
-      showShopNameInMenu: current.showShopNameInMenu,
-      showLogoInMenu: current.showLogoInMenu,
+    final settings = current.copyWith(
       lastLabelPrinterUrl: url.trim().isEmpty ? null : url.trim(),
       lastLabelPrinterName: name.trim().isEmpty ? null : name.trim(),
     );
