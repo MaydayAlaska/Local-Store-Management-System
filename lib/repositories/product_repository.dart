@@ -128,11 +128,12 @@ class ProductRepository {
           .toRadixString(16)
           .toUpperCase()
           .padLeft(6, '0');
-      final partB = _skuRandom.nextInt(0x1000000)
+      final partB = _skuRandom.nextInt(0x100000)
           .toRadixString(16)
           .toUpperCase()
-          .padLeft(6, '0');
-      final sku = 'ART-$partA$partB';
+          .padLeft(5, '0');
+      final finalDigit = _skuRandom.nextInt(10);
+      final sku = 'ART-$partA$partB$finalDigit';
       final exists = _db.select(
         'SELECT 1 FROM product_variants WHERE sku = ? COLLATE NOCASE LIMIT 1;',
         [sku],
