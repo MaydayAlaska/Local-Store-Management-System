@@ -58,11 +58,11 @@ class LabelPrinterProfile {
           : 'tcp-${host.toLowerCase()}-$rawPort',
       name: name.isEmpty ? host : name,
       host: host,
-      port: rawPort.clamp(1, 65535),
+      port: rawPort.clamp(1, 65535).toInt(),
       protocol: protocol,
-      dpi: rawDpi.clamp(100, 600),
-      defaultWidthMm: rawWidth.clamp(20, 120),
-      defaultHeightMm: rawHeight.clamp(15, 200),
+      dpi: rawDpi.clamp(100, 600).toInt(),
+      defaultWidthMm: rawWidth.clamp(20, 120).toDouble(),
+      defaultHeightMm: rawHeight.clamp(15, 200).toDouble(),
       enabled: json['Enabled'] as bool? ?? true,
     );
   }
