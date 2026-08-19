@@ -2,7 +2,7 @@
 
 Gestionale desktop **offline** per negozi, sviluppato in **Flutter/Dart** con database locale **SQLite**.
 
-Il branch `Flutter` è il canale **BETA/TEST** del progetto. La versione BETA corrente è **0.1.6-b2**. Le build di questo branch vengono pubblicate come prerelease `beta-latest`, mostrano `BETA` nell'applicazione e ricevono aggiornamenti esclusivamente dal canale OTA BETA.
+Il branch `Flutter` è il canale **BETA/TEST** del progetto. La versione BETA corrente è **0.1.6-b3**. Le build di questo branch vengono pubblicate come prerelease `beta-latest`, mostrano `BETA` nell'applicazione e ricevono aggiornamenti esclusivamente dal canale OTA BETA.
 
 La versione stabile corrente su `main` è **0.1.5**.
 
@@ -32,7 +32,7 @@ All'avvio viene eseguito automaticamente un controllo aggiornamenti. Se è dispo
 
 Il confronto OTA è monotono per versione: un aggiornamento viene proposto solo quando `versione_online > versione_installata`. Un commit differente, da solo, non è sufficiente. Per esempio:
 
-- `0.1.6-b2 > 0.1.6-b1`
+- `0.1.6-b3 > 0.1.6-b2`
 - `0.1.6-b1 > 0.1.5`
 - `0.1.5 > 0.1.5-b99`
 
@@ -46,7 +46,28 @@ L'applicazione gestisce catalogo prodotti e varianti, SKU e barcode multipli, pr
 
 Gli scanner USB HID funzionano senza focus obbligatorio. Dashboard, Cassa, Magazzino ed Etichette possono ricevere direttamente i barcode dallo scanner.
 
-La sezione Etichette supporta stampante persistente, dimensioni fisiche, anteprima, EAN-13, Code 128 B e stampa diretta.
+La sezione Etichette supporta stampante persistente, dimensioni fisiche, anteprima, EAN-13, Code 128 B e stampa diretta TCP/BPL-Z quando configurata.
+
+### Novità 0.1.6-b3
+
+- scelta persistente della **valuta**: EUR, USD, GBP o CHF;
+- scelta del **tema**: sistema, chiaro o scuro;
+- interfaccia selezionabile in **Italiano o Inglese**;
+- menu laterale verticalmente scorrevole quando l'altezza della finestra non permette di mostrare tutte le voci;
+- esportazione inventario con selezione delle colonne da includere;
+- nomi export nel formato `Inventario - YYYY-MM-DD_HH-MM-SS`;
+- nuovi SKU generati in formato esadecimale, mantenendo validi gli SKU già esistenti;
+- la sezione **Aggiornamenti** resta sempre l'ultima nelle Impostazioni.
+
+## Esportazione inventario
+
+Prima dei filtri per marca e categoria è possibile scegliere quali campi esportare: prodotto, variante, SKU, barcode, categoria, giacenza, prezzo di acquisto, prezzo di vendita e stato. La selezione viene rispettata sia nell'export Excel sia nel PDF.
+
+I prezzi esportati e visualizzati usano la valuta configurata nelle Impostazioni.
+
+## Impostazioni
+
+Le preferenze di negozio, tema, lingua, valuta, logo, icona e ultima stampante etichette vengono salvate localmente. I vecchi file di impostazioni restano compatibili: i nuovi campi mancanti assumono automaticamente i valori predefiniti `EUR`, tema di sistema e Italiano.
 
 ## Database
 
