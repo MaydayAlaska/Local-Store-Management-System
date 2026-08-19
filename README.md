@@ -2,7 +2,7 @@
 
 Gestionale desktop **offline** per negozi, sviluppato in **Flutter/Dart** con database locale **SQLite**.
 
-Il branch `Flutter` è il canale **BETA/TEST** del progetto. La versione BETA corrente è **0.1.6-b3**. Le build di questo branch vengono pubblicate come prerelease `beta-latest`, mostrano `BETA` nell'applicazione e ricevono aggiornamenti esclusivamente dal canale OTA BETA.
+Il branch `Flutter` è il canale **BETA/TEST** del progetto. La versione BETA corrente è **0.1.6-b4**. Le build di questo branch vengono pubblicate come prerelease `beta-latest`, mostrano `BETA` nell'applicazione e ricevono aggiornamenti esclusivamente dal canale OTA BETA.
 
 La versione stabile corrente su `main` è **0.1.5**.
 
@@ -26,13 +26,13 @@ Sono presenti due canali OTA indipendenti:
 - `main` → canale **STABILE**
 - `Flutter` → canale **BETA**, pubblicato come `beta-latest`
 
-Una build BETA non installa release stabili e una build stabile non installa Beta.
+La separazione è rigida anche a livello di versione: il canale BETA accetta esclusivamente versioni nel formato `X.Y.Z-bN`, mentre il canale STABILE accetta esclusivamente versioni `X.Y.Z` senza suffisso Beta. Una build BETA non propone né installa release stabili e una build stabile non propone né installa Beta, anche in presenza di tag o metadata GitHub incoerenti.
 
 All'avvio viene eseguito automaticamente un controllo aggiornamenti. Se è disponibile una versione realmente più recente, compare una notifica in basso a destra; cliccandola si apre direttamente **Impostazioni**.
 
 Il confronto OTA è monotono per versione: un aggiornamento viene proposto solo quando `versione_online > versione_installata`. Un commit differente, da solo, non è sufficiente. Per esempio:
 
-- `0.1.6-b3 > 0.1.6-b2`
+- `0.1.6-b4 > 0.1.6-b3`
 - `0.1.6-b1 > 0.1.5`
 - `0.1.5 > 0.1.5-b99`
 
@@ -48,16 +48,20 @@ Gli scanner USB HID funzionano senza focus obbligatorio. Dashboard, Cassa, Magaz
 
 La sezione Etichette supporta stampante persistente, dimensioni fisiche, anteprima, EAN-13, Code 128 B e stampa diretta TCP/BPL-Z quando configurata.
 
-### Novità 0.1.6-b3
+### Novità 0.1.6-b4
 
 - scelta persistente della **valuta**: EUR, USD, GBP o CHF;
 - scelta del **tema**: sistema, chiaro o scuro;
 - interfaccia selezionabile in **Italiano o Inglese**;
 - menu laterale verticalmente scorrevole quando l'altezza della finestra non permette di mostrare tutte le voci;
+- logo del negozio più grande nel menu laterale;
+- controlli finestra ridisegnati con icone vettoriali più pulite;
+- pulsante **Salva impostazioni** spostato nell'intestazione in alto a destra;
 - esportazione inventario con selezione delle colonne da includere;
 - nomi export nel formato `Inventario - YYYY-MM-DD_HH-MM-SS`;
 - nuovi SKU generati in formato esadecimale, mantenendo validi gli SKU già esistenti;
-- la sezione **Aggiornamenti** resta sempre l'ultima nelle Impostazioni.
+- la sezione **Aggiornamenti** resta sempre l'ultima nelle Impostazioni;
+- separazione rigida tra versioni OTA BETA e STABLE.
 
 ## Esportazione inventario
 
@@ -110,7 +114,7 @@ flutter analyze --no-fatal-infos
 flutter test
 ```
 
-I test dell'updater coprono selezione dell'asset per sistema/architettura, canale Beta, normalizzazione delle versioni e confronto monotono fra Beta e release stabili.
+I test dell'updater coprono selezione dell'asset per sistema/architettura, separazione dei canali Beta/Stable, normalizzazione delle versioni e confronto monotono fra Beta e release stabili.
 
 ## CI e release
 
