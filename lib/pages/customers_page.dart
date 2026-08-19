@@ -6,6 +6,7 @@ import '../models/customer.dart';
 import '../repositories/customer_repository.dart';
 import '../repositories/sales_order_search.dart';
 import '../services/app_services.dart';
+import '../services/birth_place_service.dart';
 import '../services/fiscal_code_service.dart';
 import '../widgets/hid_barcode_listener.dart';
 import 'customer_editor_dialog.dart';
@@ -247,13 +248,21 @@ class _CustomersPageState extends State<CustomersPage> {
                               separatorBuilder: (_, _) => const Divider(height: 1),
                               itemBuilder: (context, index) {
                                 final customer = customers[index];
+                                final birthPlaceName = BirthPlaceService.resolve(
+                                  customer.birthPlaceCode,
+                                  customer.birthDate,
+                                );
                                 return ListTile(
                                   selected: selected?.id == customer.id,
                                   leading: const CircleAvatar(
                                     child: Icon(Icons.person_outline),
                                   ),
                                   title: Text(customer.displayName),
-                                  subtitle: Text(customer.fiscalCode),
+                                  subtitle: Text(
+                                    birthPlaceName == null
+                                        ? customer.fiscalCode
+                                        : '${customer.fiscalCode} · $birthPlaceName',
+                                  ),
                                   onTap: () =>
                                       setState(() => _selected = customer),
                                 );
@@ -333,6 +342,10 @@ class _CustomerDetailState extends State<_CustomerDetail> {
     );
     final spent = orders.fold<int>(0, (sum, order) => sum + order.finalTotalCents);
     final hasFilter = _historySearch.text.trim().isNotEmpty;
+    final birthPlaceName = BirthPlaceService.resolve(
+      widget.customer.birthPlaceCode,
+      widget.customer.birthDate,
+    );
     return Card(
       clipBehavior: Clip.antiAlias,
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
@@ -366,7 +379,10 @@ class _CustomerDetailState extends State<_CustomerDetail> {
               Text('${_itEn('CF', 'Tax code')}: ${widget.customer.fiscalCode}'),
               Text('${_itEn('Nascita', 'Birth date')}: ${widget.customer.birthDateDisplay}'),
               Text('${_itEn('Sesso', 'Sex')}: ${widget.customer.sex}'),
-              Text('${_itEn('Codice luogo', 'Place code')}: ${widget.customer.birthPlaceCode}'),
+              Text(
+                '${_itEn('Luogo di nascita', 'Birth place')}: '
+                '${birthPlaceName ?? _itEn('Non disponibile', 'Not available')}',
+              ),
             ]),
             if (widget.customer.notes?.trim().isNotEmpty == true) ...[
               const SizedBox(height: 8),

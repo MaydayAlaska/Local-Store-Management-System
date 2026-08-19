@@ -9,6 +9,7 @@ import 'core/app_paths.dart';
 import 'core/database_service.dart';
 import 'pages/startup_error_page.dart';
 import 'services/app_services.dart';
+import 'services/birth_place_service.dart';
 
 void main() {
   runZonedGuarded(() async {
@@ -28,6 +29,7 @@ Future<void> _bootstrap() async {
   try {
     await windowManager.ensureInitialized();
     await AppPaths.initialize();
+    await BirthPlaceService.initialize();
 
     database = DatabaseService(AppPaths.databasePath);
     await database.initialize();

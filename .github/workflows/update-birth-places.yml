@@ -1,0 +1,44 @@
+name: Update ANPR birth place dataset
+
+on:
+  push:
+    branches: [Flutter]
+    paths:
+      - tool/update_birth_places.py
+      - .github/workflows/update-birth-places.yml
+  schedule:
+    - cron: '17 5 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    name: Refresh official ANPR dataset
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Flutter
+        uses: actions/checkout@v7
+        with:
+          ref: Flutter
+          fetch-depth: 0
+
+      - name: Generate and validate dataset
+        run: python3 tool/update_birth_places.py
+
+      - name: Commit only when ANPR changed
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git diff --quiet -- assets/data/birth_places.json assets/data/birth_places_manifest.json; then
+            echo "Archivio ANPR invariato."
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add assets/data/birth_places.json assets/data/birth_places_manifest.json
+          git commit -m "data: update ANPR birth places"
+          git pull --rebase origin Flutter
+          git push origin HEAD:Flutter

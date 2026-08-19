@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../l10n/app_strings.dart';
 import '../models/customer.dart';
 import '../repositories/customer_repository.dart';
+import '../services/birth_place_service.dart';
 import '../services/fiscal_code_service.dart';
 
 Future<Customer?> showCustomerEditorDialog(
@@ -119,6 +120,12 @@ class _CustomerEditorDialogState extends State<_CustomerEditorDialog> {
   @override
   Widget build(BuildContext context) {
     final preview = _preview;
+    final birthPlaceName = preview == null
+        ? null
+        : BirthPlaceService.resolve(
+            preview.birthPlaceCode,
+            preview.birthDate,
+          );
     final lockedFiscalCode = widget.customer != null || widget.scanned != null;
     return AlertDialog(
       title: Text(
@@ -178,7 +185,10 @@ class _CustomerEditorDialogState extends State<_CustomerEditorDialog> {
                       children: [
                         Text('${_itEn('Nascita', 'Birth date')}: ${preview.birthDateDisplay}'),
                         Text('${_itEn('Sesso', 'Sex')}: ${preview.sex}'),
-                        Text('${_itEn('Codice luogo', 'Place code')}: ${preview.birthPlaceCode}'),
+                        Text(
+                          '${_itEn('Luogo di nascita', 'Birth place')}: '
+                          '${birthPlaceName ?? _itEn('Non disponibile', 'Not available')}',
+                        ),
                       ],
                     ),
                   ),

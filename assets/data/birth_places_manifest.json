@@ -1,0 +1,9 @@
+{
+  "code_count": 1,
+  "record_count": 1,
+  "schema_version": 1,
+  "source": "ANPR - Anagrafe Nazionale della Popolazione Residente",
+  "source_sha256": "8cf82c23e96426dbc91a7b9c3a6f25319b10b59972a3962fc7b7e9792efa8a2",
+  "source_size_bytes": 2359465,
+  "source_url": "https://raw.githubusercontent.com/italia/anpr/refs/heads/master/src/archivi/ANPR_archivio_comuni.csv"
+}
