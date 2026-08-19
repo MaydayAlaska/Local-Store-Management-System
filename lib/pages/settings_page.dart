@@ -33,12 +33,15 @@ class _SettingsPageState extends State<SettingsPage> {
   late String _currencyCode;
   late String _themeMode;
   late String _languageCode;
+  late List<LabelPrinterProfile> _labelPrinters;
   String? _iconSource;
   String? _logoSource;
   String? _status;
   UpdateCheckResult? _update;
   bool _checking = false;
   bool _saving = false;
+
+  String _itEn(String it, String en) => AppStrings.isEnglish ? en : it;
 
   @override
   void initState() {
@@ -49,6 +52,9 @@ class _SettingsPageState extends State<SettingsPage> {
     _currencyCode = widget.current.currencyCode;
     _themeMode = widget.current.themeMode;
     _languageCode = widget.current.languageCode;
+    _labelPrinters = List<LabelPrinterProfile>.of(
+      widget.current.labelPrinterProfiles,
+    );
     _update = widget.initialUpdate;
     _status = widget.initialUpdate?.message;
   }
@@ -56,9 +62,15 @@ class _SettingsPageState extends State<SettingsPage> {
   @override
   void didUpdateWidget(covariant SettingsPage oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.initialUpdate != null && widget.initialUpdate != oldWidget.initialUpdate) {
+    if (widget.initialUpdate != null &&
+        widget.initialUpdate != oldWidget.initialUpdate) {
       _update = widget.initialUpdate;
       _status = widget.initialUpdate!.message;
+    }
+    if (!identical(widget.current, oldWidget.current)) {
+      _labelPrinters = List<LabelPrinterProfile>.of(
+        widget.current.labelPrinterProfiles,
+      );
     }
   }
 
@@ -90,6 +102,7 @@ class _SettingsPageState extends State<SettingsPage> {
         currencyCode: _currencyCode,
         themeMode: _themeMode,
         languageCode: _languageCode,
+        labelPrinterProfiles: _labelPrinters,
         iconSourcePath: _iconSource,
         logoSourcePath: _logoSource,
       );
@@ -99,12 +112,379 @@ class _SettingsPageState extends State<SettingsPage> {
       setState(() {
         _iconSource = null;
         _logoSource = null;
+        _labelPrinters = List<LabelPrinterProfile>.of(
+          settings.labelPrinterProfiles,
+        );
         _status = AppStrings.t('settings_saved');
       });
     } catch (error) {
-      if (mounted) setState(() => _status = '${AppStrings.t('error')}: $error');
+      if (mounted) {
+        setState(() => _status = '${AppStrings.t('error')}: $error');
+      }
     } finally {
       if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  Future<void> _editPrinter([LabelPrinterProfile? existing]) async {
+    final name = TextEditingController(text: existing?.name ?? '');
+    final host = TextEditingController(text: existing?.host ?? '');
+    final port = TextEditingController(
+      text: (existing?.port ?? 9100).toString(),
+    );
+    final dpi = TextEditingController(
+      text: (existing?.dpi ?? 203).toString(),
+    );
+    final width = TextEditingController(
+      text: _dimensionText(existing?.defaultWidthMm ?? 40),
+    );
+    final height = TextEditingController(
+      text: _dimensionText(existing?.defaultHeightMm ?? 30),
+    );
+    var protocol = existing?.protocol ?? 'bpl-z';
+    var enabled = existing?.enabled ?? true;
+
+    final result = await showDialog<LabelPrinterProfile>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialogState) {
+          String? validationError;
+          return AlertDialog(
+            title: Text(
+              existing == null
+                  ? _itEn(
+                      'Aggiungi stampante etichette',
+                      'Add label printer',
+                    )
+                  : _itEn(
+                      'Modifica stampante etichette',
+                      'Edit label printer',
+                    ),
+            ),
+            content: SizedBox(
+              width: 520,
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    TextField(
+                      controller: name,
+                      decoration: InputDecoration(
+                        border: const OutlineInputBorder(),
+                        labelText: _itEn('Nome profilo', 'Profile name'),
+                        hintText: _itEn(
+                          'Es. Stampante negozio',
+                          'E.g. Shop printer',
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        Expanded(
+                          flex: 3,
+                          child: TextField(
+                            controller: host,
+                            decoration: InputDecoration(
+                              border: const OutlineInputBorder(),
+                              labelText: _itEn(
+                                'IP / hostname',
+                                'IP / hostname',
+                              ),
+                              hintText: '192.168.1.63',
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: TextField(
+                            controller: port,
+                            keyboardType: TextInputType.number,
+                            decoration: InputDecoration(
+                              border: const OutlineInputBorder(),
+                              labelText: _itEn('Porta', 'Port'),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: DropdownButtonFormField<String>(
+                            value: protocol,
+                            decoration: InputDecoration(
+                              border: const OutlineInputBorder(),
+                              labelText: _itEn('Protocollo', 'Protocol'),
+                            ),
+                            items: const [
+                              DropdownMenuItem(
+                                value: 'bpl-z',
+                                child: Text('BPL-Z / ZPL'),
+                              ),
+                            ],
+                            onChanged: (value) {
+                              if (value != null) {
+                                setDialogState(() => protocol = value);
+                              }
+                            },
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: TextField(
+                            controller: dpi,
+                            keyboardType: TextInputType.number,
+                            decoration: const InputDecoration(
+                              border: OutlineInputBorder(),
+                              labelText: 'DPI',
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: width,
+                            keyboardType: const TextInputType.numberWithOptions(
+                              decimal: true,
+                            ),
+                            decoration: InputDecoration(
+                              border: const OutlineInputBorder(),
+                              labelText: _itEn(
+                                'Larghezza predefinita mm',
+                                'Default width mm',
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: TextField(
+                            controller: height,
+                            keyboardType: const TextInputType.numberWithOptions(
+                              decimal: true,
+                            ),
+                            decoration: InputDecoration(
+                              border: const OutlineInputBorder(),
+                              labelText: _itEn(
+                                'Altezza predefinita mm',
+                                'Default height mm',
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    SwitchListTile(
+                      contentPadding: EdgeInsets.zero,
+                      value: enabled,
+                      onChanged: (value) =>
+                          setDialogState(() => enabled = value),
+                      title: Text(_itEn('Profilo attivo', 'Profile enabled')),
+                    ),
+                    if (validationError != null)
+                      Text(
+                        validationError,
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.error,
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext),
+                child: Text(AppStrings.t('cancel')),
+              ),
+              FilledButton(
+                onPressed: () {
+                  final normalizedName = name.text.trim();
+                  final normalizedHost = host.text.trim();
+                  final parsedPort = int.tryParse(port.text.trim());
+                  final parsedDpi = int.tryParse(dpi.text.trim());
+                  final parsedWidth = double.tryParse(
+                    width.text.trim().replaceAll(',', '.'),
+                  );
+                  final parsedHeight = double.tryParse(
+                    height.text.trim().replaceAll(',', '.'),
+                  );
+
+                  String? error;
+                  if (normalizedName.isEmpty) {
+                    error = _itEn(
+                      'Inserisci un nome per il profilo.',
+                      'Enter a profile name.',
+                    );
+                  } else if (normalizedHost.isEmpty ||
+                      normalizedHost.contains(' ')) {
+                    error = _itEn(
+                      'Inserisci un IP o hostname valido.',
+                      'Enter a valid IP or hostname.',
+                    );
+                  } else if (parsedPort == null ||
+                      parsedPort < 1 ||
+                      parsedPort > 65535) {
+                    error = _itEn(
+                      'La porta deve essere compresa tra 1 e 65535.',
+                      'Port must be between 1 and 65535.',
+                    );
+                  } else if (parsedDpi == null ||
+                      parsedDpi < 100 ||
+                      parsedDpi > 600) {
+                    error = _itEn(
+                      'I DPI devono essere compresi tra 100 e 600.',
+                      'DPI must be between 100 and 600.',
+                    );
+                  } else if (parsedWidth == null ||
+                      parsedWidth < 20 ||
+                      parsedWidth > 120) {
+                    error = _itEn(
+                      'La larghezza deve essere tra 20 e 120 mm.',
+                      'Width must be between 20 and 120 mm.',
+                    );
+                  } else if (parsedHeight == null ||
+                      parsedHeight < 15 ||
+                      parsedHeight > 200) {
+                    error = _itEn(
+                      'L’altezza deve essere tra 15 e 200 mm.',
+                      'Height must be between 15 and 200 mm.',
+                    );
+                  }
+
+                  if (error != null) {
+                    setDialogState(() => validationError = error);
+                    return;
+                  }
+
+                  Navigator.pop(
+                    dialogContext,
+                    LabelPrinterProfile(
+                      id: existing?.id ??
+                          'printer-${DateTime.now().microsecondsSinceEpoch}',
+                      name: normalizedName,
+                      host: normalizedHost,
+                      port: parsedPort!,
+                      protocol: protocol,
+                      dpi: parsedDpi!,
+                      defaultWidthMm: parsedWidth!,
+                      defaultHeightMm: parsedHeight!,
+                      enabled: enabled,
+                    ),
+                  );
+                },
+                child: Text(AppStrings.t('save')),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+
+    name.dispose();
+    host.dispose();
+    port.dispose();
+    dpi.dispose();
+    width.dispose();
+    height.dispose();
+
+    if (result == null || !mounted) return;
+
+    final duplicate = _labelPrinters.any(
+      (profile) =>
+          profile.id != result.id &&
+          profile.host.toLowerCase() == result.host.toLowerCase() &&
+          profile.port == result.port,
+    );
+    if (duplicate) {
+      setState(() => _status = _itEn(
+            'Esiste già un profilo per ${result.host}:${result.port}.',
+            'A profile for ${result.host}:${result.port} already exists.',
+          ));
+      return;
+    }
+
+    setState(() {
+      final index = _labelPrinters.indexWhere(
+        (profile) => profile.id == result.id,
+      );
+      if (index >= 0) {
+        _labelPrinters[index] = result;
+      } else {
+        _labelPrinters.add(result);
+      }
+      _status = _itEn(
+        'Profilo stampante modificato. Premi “Salva impostazioni” per applicare le modifiche.',
+        'Printer profile changed. Press “Save settings” to apply the changes.',
+      );
+    });
+  }
+
+  String _dimensionText(double value) => value == value.roundToDouble()
+      ? value.toInt().toString()
+      : value.toStringAsFixed(1);
+
+  Future<void> _deletePrinter(LabelPrinterProfile profile) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(_itEn('Rimuovi stampante', 'Remove printer')),
+        content: Text(
+          _itEn(
+            'Rimuovere il profilo “${profile.name}”?',
+            'Remove the “${profile.name}” profile?',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text(AppStrings.t('cancel')),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: Text(AppStrings.t('remove')),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    setState(() {
+      _labelPrinters.removeWhere((item) => item.id == profile.id);
+      _status = _itEn(
+        'Profilo rimosso. Premi “Salva impostazioni” per applicare le modifiche.',
+        'Profile removed. Press “Save settings” to apply the changes.',
+      );
+    });
+  }
+
+  Future<void> _testPrinter(LabelPrinterProfile profile) async {
+    setState(() => _status = _itEn(
+          'Test connessione a ${profile.host}:${profile.port}…',
+          'Testing connection to ${profile.host}:${profile.port}…',
+        ));
+    try {
+      await widget.services.labels.testConnection(profile);
+      if (mounted) {
+        setState(() => _status = _itEn(
+              'Connessione riuscita a ${profile.name} (${profile.host}:${profile.port}).',
+              'Connection successful to ${profile.name} (${profile.host}:${profile.port}).',
+            ));
+      }
+    } catch (error) {
+      if (mounted) {
+        setState(() => _status = _itEn(
+              'Test connessione fallito: $error',
+              'Connection test failed: $error',
+            ));
+      }
     }
   }
 
@@ -262,11 +642,21 @@ class _SettingsPageState extends State<SettingsPage> {
                           value: _themeMode,
                           labelText: AppStrings.t('theme'),
                           items: [
-                            GlassDropdownItem(value: 'system', label: AppStrings.t('theme_system')),
-                            GlassDropdownItem(value: 'light', label: AppStrings.t('theme_light')),
-                            GlassDropdownItem(value: 'dark', label: AppStrings.t('theme_dark')),
+                            GlassDropdownItem(
+                              value: 'system',
+                              label: AppStrings.t('theme_system'),
+                            ),
+                            GlassDropdownItem(
+                              value: 'light',
+                              label: AppStrings.t('theme_light'),
+                            ),
+                            GlassDropdownItem(
+                              value: 'dark',
+                              label: AppStrings.t('theme_dark'),
+                            ),
                           ],
-                          onChanged: (value) => setState(() => _themeMode = value ?? 'system'),
+                          onChanged: (value) =>
+                              setState(() => _themeMode = value ?? 'system'),
                         ),
                       ),
                       const SizedBox(width: 10),
@@ -275,10 +665,17 @@ class _SettingsPageState extends State<SettingsPage> {
                           value: _languageCode,
                           labelText: AppStrings.t('language'),
                           items: [
-                            GlassDropdownItem(value: 'it', label: AppStrings.t('italian')),
-                            GlassDropdownItem(value: 'en', label: AppStrings.t('english')),
+                            GlassDropdownItem(
+                              value: 'it',
+                              label: AppStrings.t('italian'),
+                            ),
+                            GlassDropdownItem(
+                              value: 'en',
+                              label: AppStrings.t('english'),
+                            ),
                           ],
-                          onChanged: (value) => setState(() => _languageCode = value ?? 'it'),
+                          onChanged: (value) =>
+                              setState(() => _languageCode = value ?? 'it'),
                         ),
                       ),
                       const SizedBox(width: 10),
@@ -292,11 +689,132 @@ class _SettingsPageState extends State<SettingsPage> {
                             GlassDropdownItem(value: 'GBP', label: 'GBP · £'),
                             GlassDropdownItem(value: 'CHF', label: 'CHF'),
                           ],
-                          onChanged: (value) => setState(() => _currencyCode = value ?? 'EUR'),
+                          onChanged: (value) =>
+                              setState(() => _currencyCode = value ?? 'EUR'),
                         ),
                       ),
                     ],
                   ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              _itEn(
+                                'Stampanti etichette di rete',
+                                'Network label printers',
+                              ),
+                              style: Theme.of(context).textTheme.titleMedium,
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              _itEn(
+                                'Configura più profili TCP. Le stampanti di sistema restano disponibili automaticamente nella pagina Etichette.',
+                                'Configure multiple TCP profiles. System printers remain automatically available on the Labels page.',
+                              ),
+                              style: Theme.of(context).textTheme.bodySmall,
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      OutlinedButton.icon(
+                        onPressed: _saving ? null : () => _editPrinter(),
+                        icon: const Icon(Icons.add),
+                        label: Text(_itEn('Aggiungi', 'Add')),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  if (_labelPrinters.isEmpty)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      child: Text(
+                        _itEn(
+                          'Nessun profilo TCP configurato.',
+                          'No TCP profiles configured.',
+                        ),
+                      ),
+                    )
+                  else
+                    ..._labelPrinters.map(
+                      (profile) => Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: Card(
+                          margin: EdgeInsets.zero,
+                          child: ListTile(
+                            leading: Icon(
+                              profile.enabled
+                                  ? Icons.print_rounded
+                                  : Icons.print_disabled_outlined,
+                            ),
+                            title: Text(profile.name),
+                            subtitle: Text(
+                              '${profile.host}:${profile.port} · ${profile.protocolLabel} · ${profile.dpi} dpi · ${_dimensionText(profile.defaultWidthMm)}×${_dimensionText(profile.defaultHeightMm)} mm',
+                            ),
+                            trailing: Wrap(
+                              spacing: 2,
+                              crossAxisAlignment: WrapCrossAlignment.center,
+                              children: [
+                                Switch(
+                                  value: profile.enabled,
+                                  onChanged: _saving
+                                      ? null
+                                      : (value) {
+                                          setState(() {
+                                            final index = _labelPrinters.indexWhere(
+                                              (item) => item.id == profile.id,
+                                            );
+                                            if (index >= 0) {
+                                              _labelPrinters[index] =
+                                                  profile.copyWith(enabled: value);
+                                            }
+                                          });
+                                        },
+                                ),
+                                IconButton(
+                                  tooltip: _itEn(
+                                    'Test connessione',
+                                    'Test connection',
+                                  ),
+                                  onPressed: _saving
+                                      ? null
+                                      : () => _testPrinter(profile),
+                                  icon: const Icon(Icons.network_check),
+                                ),
+                                IconButton(
+                                  tooltip: _itEn('Modifica', 'Edit'),
+                                  onPressed: _saving
+                                      ? null
+                                      : () => _editPrinter(profile),
+                                  icon: const Icon(Icons.edit_outlined),
+                                ),
+                                IconButton(
+                                  tooltip: AppStrings.t('remove'),
+                                  onPressed: _saving
+                                      ? null
+                                      : () => _deletePrinter(profile),
+                                  icon: const Icon(Icons.delete_outline),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
                 ],
               ),
             ),
