@@ -20,15 +20,20 @@ class CashPage extends StatefulWidget {
   State<CashPage> createState() => _CashPageState();
 }
 
+enum _KeypadTarget { search, totalPercent, fixedDiscount }
+
 class _CashPageState extends State<CashPage> {
   final _search = TextEditingController();
   final _searchFocus = FocusNode();
   final _totalPercent = TextEditingController();
+  final _totalPercentFocus = FocusNode();
   final _fixedDiscount = TextEditingController();
+  final _fixedDiscountFocus = FocusNode();
   final List<_CashLine> _cart = [];
   final List<_FixedDiscountLine> _fixedDiscounts = [];
   Customer? _customer;
   int _nextDiscountId = 1;
+  _KeypadTarget _keypadTarget = _KeypadTarget.search;
   late String _searchStatus;
   late String _cartStatus;
 
@@ -44,13 +49,111 @@ class _CashPageState extends State<CashPage> {
     _search.dispose();
     _searchFocus.dispose();
     _totalPercent.dispose();
+    _totalPercentFocus.dispose();
     _fixedDiscount.dispose();
+    _fixedDiscountFocus.dispose();
     super.dispose();
   }
 
   List<ProductVariant> get _results => widget.services.products.search(_search.text, 50);
 
   String _itEn(String it, String en) => AppStrings.isEnglish ? en : it;
+
+  TextEditingController get _keypadController => switch (_keypadTarget) {
+        _KeypadTarget.search => _search,
+        _KeypadTarget.totalPercent => _totalPercent,
+        _KeypadTarget.fixedDiscount => _fixedDiscount,
+      };
+
+  FocusNode get _keypadFocus => switch (_keypadTarget) {
+        _KeypadTarget.search => _searchFocus,
+        _KeypadTarget.totalPercent => _totalPercentFocus,
+        _KeypadTarget.fixedDiscount => _fixedDiscountFocus,
+      };
+
+  void _selectKeypadTarget(
+    _KeypadTarget target, {
+    bool requestFocus = true,
+  }) {
+    if (target != _KeypadTarget.search && _cart.isEmpty) return;
+    setState(() => _keypadTarget = target);
+    if (requestFocus) _keypadFocus.requestFocus();
+  }
+
+  void _keypadInsert(String value) {
+    if (_keypadTarget == _KeypadTarget.search &&
+        (value == ',' || value == '.')) {
+      return;
+    }
+    final controller = _keypadController;
+    if ((value == ',' || value == '.') &&
+        (controller.text.contains(',') || controller.text.contains('.'))) {
+      return;
+    }
+
+    final text = controller.text;
+    final selection = controller.selection;
+    final start = !selection.isValid || selection.start < 0
+        ? text.length
+        : selection.start > text.length
+            ? text.length
+            : selection.start;
+    final end = !selection.isValid || selection.end < start
+        ? start
+        : selection.end > text.length
+            ? text.length
+            : selection.end;
+    final next = text.replaceRange(start, end, value);
+    controller.value = TextEditingValue(
+      text: next,
+      selection: TextSelection.collapsed(offset: start + value.length),
+    );
+    _keypadFocus.requestFocus();
+    setState(() {});
+  }
+
+  void _keypadBackspace() {
+    final controller = _keypadController;
+    final text = controller.text;
+    if (text.isEmpty) return;
+    final selection = controller.selection;
+    var start = !selection.isValid || selection.start < 0
+        ? text.length
+        : selection.start > text.length
+            ? text.length
+            : selection.start;
+    var end = !selection.isValid || selection.end < start
+        ? start
+        : selection.end > text.length
+            ? text.length
+            : selection.end;
+    if (start == end && start > 0) start--;
+    if (start == end) return;
+    final next = text.replaceRange(start, end, '');
+    controller.value = TextEditingValue(
+      text: next,
+      selection: TextSelection.collapsed(offset: start),
+    );
+    _keypadFocus.requestFocus();
+    setState(() {});
+  }
+
+  void _keypadClear() {
+    _keypadController.clear();
+    _keypadFocus.requestFocus();
+    setState(() {});
+  }
+
+  void _keypadSubmit() {
+    switch (_keypadTarget) {
+      case _KeypadTarget.search:
+        _submitSearch(_search.text);
+      case _KeypadTarget.totalPercent:
+        _addPercentDiscount();
+      case _KeypadTarget.fixedDiscount:
+        _addFixedDiscount();
+    }
+  }
 
   void _submitSearch(String value) {
     final query = value.trim();
@@ -356,6 +459,7 @@ class _CashPageState extends State<CashPage> {
     _customer = null;
     _totalPercent.clear();
     _fixedDiscount.clear();
+    _keypadTarget = _KeypadTarget.search;
     if (!keepStatus) {
       setState(() => _cartStatus = _itEn(
             'Carrello svuotato. Nessun movimento di magazzino è stato registrato.',
@@ -368,6 +472,8 @@ class _CashPageState extends State<CashPage> {
     if (_cart.isEmpty) {
       _fixedDiscounts.clear();
       _totalPercent.clear();
+      _fixedDiscount.clear();
+      _keypadTarget = _KeypadTarget.search;
     }
   }
 
@@ -477,6 +583,10 @@ class _CashPageState extends State<CashPage> {
                   TextField(
                     controller: _search,
                     focusNode: _searchFocus,
+                    onTap: () => _selectKeypadTarget(
+                      _KeypadTarget.search,
+                      requestFocus: false,
+                    ),
                     onChanged: (_) => setState(() {}),
                     onSubmitted: _submitSearch,
                     decoration: InputDecoration(
@@ -510,6 +620,17 @@ class _CashPageState extends State<CashPage> {
                               },
                             ),
                     ),
+                  ),
+                  const SizedBox(height: 8),
+                  _CashKeypad(
+                    target: _keypadTarget,
+                    currencySymbol: AppRuntime.currencySymbol,
+                    discountsEnabled: _cart.isNotEmpty,
+                    onTargetChanged: _selectKeypadTarget,
+                    onKey: _keypadInsert,
+                    onBackspace: _keypadBackspace,
+                    onClear: _keypadClear,
+                    onSubmit: _keypadSubmit,
                   ),
                 ]),
               ),
@@ -621,9 +742,14 @@ class _CashPageState extends State<CashPage> {
                             Expanded(
                               child: TextField(
                                 controller: _totalPercent,
+                                focusNode: _totalPercentFocus,
                                 enabled: _cart.isNotEmpty,
                                 keyboardType: const TextInputType.numberWithOptions(
                                   decimal: true,
+                                ),
+                                onTap: () => _selectKeypadTarget(
+                                  _KeypadTarget.totalPercent,
+                                  requestFocus: false,
                                 ),
                                 onChanged: (_) => setState(() {}),
                                 onSubmitted: (_) => _addPercentDiscount(),
@@ -638,9 +764,14 @@ class _CashPageState extends State<CashPage> {
                             Expanded(
                               child: TextField(
                                 controller: _fixedDiscount,
+                                focusNode: _fixedDiscountFocus,
                                 enabled: _cart.isNotEmpty,
                                 keyboardType: const TextInputType.numberWithOptions(
                                   decimal: true,
+                                ),
+                                onTap: () => _selectKeypadTarget(
+                                  _KeypadTarget.fixedDiscount,
+                                  requestFocus: false,
                                 ),
                                 onSubmitted: (_) => _addFixedDiscount(),
                                 decoration: InputDecoration(
@@ -713,6 +844,195 @@ class _CashPageState extends State<CashPage> {
   }
 }
 
+class _CashKeypad extends StatelessWidget {
+  const _CashKeypad({
+    required this.target,
+    required this.currencySymbol,
+    required this.discountsEnabled,
+    required this.onTargetChanged,
+    required this.onKey,
+    required this.onBackspace,
+    required this.onClear,
+    required this.onSubmit,
+  });
+
+  final _KeypadTarget target;
+  final String currencySymbol;
+  final bool discountsEnabled;
+  final ValueChanged<_KeypadTarget> onTargetChanged;
+  final ValueChanged<String> onKey;
+  final VoidCallback onBackspace;
+  final VoidCallback onClear;
+  final VoidCallback onSubmit;
+
+  Widget _targetButton(
+    BuildContext context,
+    _KeypadTarget value,
+    String label, {
+    bool enabled = true,
+  }) {
+    final selected = target == value;
+    final child = Text(label, maxLines: 1, overflow: TextOverflow.ellipsis);
+    return Expanded(
+      child: selected
+          ? FilledButton.tonal(
+              onPressed: enabled ? () => onTargetChanged(value) : null,
+              child: child,
+            )
+          : OutlinedButton(
+              onPressed: enabled ? () => onTargetChanged(value) : null,
+              child: child,
+            ),
+    );
+  }
+
+  Widget _numberButton(String value) => Expanded(
+        child: SizedBox(
+          height: 38,
+          child: OutlinedButton(
+            onPressed: () => onKey(value),
+            child: Text(value),
+          ),
+        ),
+      );
+
+  @override
+  Widget build(BuildContext context) {
+    final decimal = AppStrings.isEnglish ? '.' : ',';
+    return Card(
+      margin: EdgeInsets.zero,
+      child: Padding(
+        padding: const EdgeInsets.all(10),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.dialpad_rounded, size: 18),
+                const SizedBox(width: 6),
+                Text(
+                  AppStrings.isEnglish ? 'Keypad' : 'Tastierino',
+                  style: Theme.of(context).textTheme.titleSmall,
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                _targetButton(
+                  context,
+                  _KeypadTarget.search,
+                  AppStrings.isEnglish ? 'Search' : 'Ricerca',
+                ),
+                const SizedBox(width: 6),
+                _targetButton(
+                  context,
+                  _KeypadTarget.totalPercent,
+                  AppStrings.isEnglish ? 'Discount %' : 'Sconto %',
+                  enabled: discountsEnabled,
+                ),
+                const SizedBox(width: 6),
+                _targetButton(
+                  context,
+                  _KeypadTarget.fixedDiscount,
+                  '${AppStrings.isEnglish ? 'Discount' : 'Sconto'} $currencySymbol',
+                  enabled: discountsEnabled,
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            SizedBox(
+              height: 146,
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Expanded(
+                    child: Column(
+                      children: [
+                        Row(children: [
+                          _numberButton('7'),
+                          const SizedBox(width: 6),
+                          _numberButton('8'),
+                          const SizedBox(width: 6),
+                          _numberButton('9'),
+                        ]),
+                        const SizedBox(height: 6),
+                        Row(children: [
+                          _numberButton('4'),
+                          const SizedBox(width: 6),
+                          _numberButton('5'),
+                          const SizedBox(width: 6),
+                          _numberButton('6'),
+                        ]),
+                        const SizedBox(height: 6),
+                        Row(children: [
+                          _numberButton('1'),
+                          const SizedBox(width: 6),
+                          _numberButton('2'),
+                          const SizedBox(width: 6),
+                          _numberButton('3'),
+                        ]),
+                        const SizedBox(height: 6),
+                        Row(children: [
+                          _numberButton('0'),
+                          const SizedBox(width: 6),
+                          _numberButton('00'),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: SizedBox(
+                              height: 38,
+                              child: OutlinedButton(
+                                onPressed: target == _KeypadTarget.search
+                                    ? null
+                                    : () => onKey(decimal),
+                                child: Text(decimal),
+                              ),
+                            ),
+                          ),
+                        ]),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  SizedBox(
+                    width: 54,
+                    child: Column(
+                      children: [
+                        Expanded(
+                          child: IconButton.outlined(
+                            tooltip: AppStrings.isEnglish ? 'Backspace' : 'Cancella cifra',
+                            onPressed: onBackspace,
+                            icon: const Icon(Icons.backspace_outlined),
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: onClear,
+                            child: const Text('C'),
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Expanded(
+                          child: FilledButton(
+                            onPressed: onSubmit,
+                            child: const Icon(Icons.keyboard_return_rounded),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _CartTile extends StatelessWidget {
   const _CartTile({
     required this.line,
@@ -766,7 +1086,7 @@ class _CartTile extends StatelessWidget {
               onFieldSubmitted: onDiscount,
               decoration: InputDecoration(
                 isDense: true,
-                labelText: AppStrings.t('discount_percent'),
+                labelText: AppStrings.isEnglish ? 'Discount' : 'Sconto',
                 floatingLabelBehavior: FloatingLabelBehavior.always,
                 suffixText: '%',
               ),
