@@ -60,6 +60,27 @@ class CustomerRepository {
       CREATE INDEX IF NOT EXISTS ix_sales_orders_customer_date ON sales_orders(customer_id, created_at_utc DESC, id DESC);
       CREATE INDEX IF NOT EXISTS ix_sales_order_items_order ON sales_order_items(order_id, id);
     ''');
+
+    _ensureColumn('sales_orders', 'customer_display_name', 'TEXT');
+    _ensureColumn('sales_orders', 'customer_fiscal_code', 'TEXT');
+    _backfillCustomerSnapshots();
+  }
+
+  void _backfillCustomerSnapshots() {
+    database.db.execute('''
+      UPDATE sales_orders
+      SET customer_display_name = (
+            SELECT TRIM(c.last_name || ' ' || c.first_name)
+            FROM customers c WHERE c.id = sales_orders.customer_id
+          ),
+          customer_fiscal_code = (
+            SELECT c.fiscal_code
+            FROM customers c WHERE c.id = sales_orders.customer_id
+          )
+      WHERE customer_id IS NOT NULL
+        AND (customer_display_name IS NULL OR TRIM(customer_display_name) = ''
+          OR customer_fiscal_code IS NULL OR TRIM(customer_fiscal_code) = '');
+    ''');
   }
 
   List<Customer> search([String? query, int limit = 500]) {
@@ -144,6 +165,44 @@ class CustomerRepository {
     return updated;
   }
 
+  bool deleteCustomer(int customerId) {
+    final db = database.db;
+    db.execute('BEGIN IMMEDIATE;');
+    try {
+      final rows = db.select(
+        'SELECT first_name, last_name, fiscal_code FROM customers WHERE id=? LIMIT 1;',
+        [customerId],
+      );
+      if (rows.isEmpty) {
+        db.execute('ROLLBACK;');
+        return false;
+      }
+
+      final row = rows.first;
+      final displayName = '${row['last_name']} ${row['first_name']}'.trim();
+      final fiscalCode = row['fiscal_code'] as String;
+      db.execute('''
+        UPDATE sales_orders
+        SET customer_display_name = CASE
+              WHEN customer_display_name IS NULL OR TRIM(customer_display_name) = '' THEN ?
+              ELSE customer_display_name
+            END,
+            customer_fiscal_code = CASE
+              WHEN customer_fiscal_code IS NULL OR TRIM(customer_fiscal_code) = '' THEN ?
+              ELSE customer_fiscal_code
+            END,
+            customer_id = NULL
+        WHERE customer_id=?;
+      ''', [displayName, fiscalCode, customerId]);
+      db.execute('DELETE FROM customers WHERE id=?;', [customerId]);
+      db.execute('COMMIT;');
+      return true;
+    } catch (_) {
+      db.execute('ROLLBACK;');
+      rethrow;
+    }
+  }
+
   List<SalesOrderSummary> ordersForCustomer(int customerId, [int limit = 500]) {
     final rows = database.db.select('''
       SELECT so.*,
@@ -153,6 +212,45 @@ class CustomerRepository {
       ORDER BY so.created_at_utc DESC, so.id DESC
       LIMIT ?;
     ''', [customerId, limit.clamp(1, 5000)]);
+    return rows.map(_orderSummaryFromRow).toList();
+  }
+
+  List<SalesOrderSummary> searchOrders([String? query, int limit = 1000]) {
+    final q = query?.trim() ?? '';
+    final pattern = '%$q%';
+    final rows = database.db.select('''
+      SELECT so.*,
+        COALESCE((SELECT SUM(soi.quantity) FROM sales_order_items soi WHERE soi.order_id=so.id), 0) AS item_count
+      FROM sales_orders so
+      WHERE ?=''
+         OR so.order_number LIKE ? COLLATE NOCASE
+         OR COALESCE(so.customer_display_name, '') LIKE ? COLLATE NOCASE
+         OR COALESCE(so.customer_fiscal_code, '') LIKE ? COLLATE NOCASE
+         OR so.created_at_utc LIKE ? COLLATE NOCASE
+         OR EXISTS (
+           SELECT 1 FROM sales_order_items soi
+           WHERE soi.order_id=so.id
+             AND (
+               soi.sku LIKE ? COLLATE NOCASE
+               OR COALESCE(soi.barcode, '') LIKE ? COLLATE NOCASE
+               OR soi.product_name LIKE ? COLLATE NOCASE
+               OR soi.variant_display LIKE ? COLLATE NOCASE
+             )
+         )
+      ORDER BY so.created_at_utc DESC, so.id DESC
+      LIMIT ?;
+    ''', [
+      q,
+      pattern,
+      pattern,
+      pattern,
+      pattern,
+      pattern,
+      pattern,
+      pattern,
+      pattern,
+      limit.clamp(1, 10000),
+    ]);
     return rows.map(_orderSummaryFromRow).toList();
   }
 
@@ -178,9 +276,17 @@ class CustomerRepository {
     final db = database.db;
     db.execute('BEGIN IMMEDIATE;');
     try {
+      String? customerDisplayName;
+      String? customerFiscalCode;
       if (draft.customerId != null) {
-        final customer = db.select('SELECT id FROM customers WHERE id=? LIMIT 1;', [draft.customerId]);
-        if (customer.isEmpty) throw StateError('Il cliente selezionato non esiste più.');
+        final customers = db.select(
+          'SELECT first_name, last_name, fiscal_code FROM customers WHERE id=? LIMIT 1;',
+          [draft.customerId],
+        );
+        if (customers.isEmpty) throw StateError('Il cliente selezionato non esiste più.');
+        final customer = customers.first;
+        customerDisplayName = '${customer['last_name']} ${customer['first_name']}'.trim();
+        customerFiscalCode = customer['fiscal_code'] as String;
       }
 
       for (final line in draft.lines) {
@@ -198,13 +304,16 @@ class CustomerRepository {
       final orderNumber = _newOrderNumber(now);
       db.execute('''
         INSERT INTO sales_orders (
-          order_number, customer_id, gross_total_cents, item_discount_cents,
-          order_discount_basis_points, order_percent_discount_cents,
-          fixed_discount_cents, final_total_cents, created_at_utc)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
+          order_number, customer_id, customer_display_name, customer_fiscal_code,
+          gross_total_cents, item_discount_cents, order_discount_basis_points,
+          order_percent_discount_cents, fixed_discount_cents, final_total_cents,
+          created_at_utc)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
       ''', [
         orderNumber,
         draft.customerId,
+        customerDisplayName,
+        customerFiscalCode,
         draft.grossTotalCents,
         draft.itemDiscountCents,
         draft.orderDiscountBasisPoints,
@@ -292,6 +401,8 @@ class CustomerRepository {
         id: row['id'] as int,
         orderNumber: row['order_number'] as String,
         customerId: row['customer_id'] as int?,
+        customerDisplayName: row['customer_display_name'] as String?,
+        customerFiscalCode: row['customer_fiscal_code'] as String?,
         itemCount: row['item_count'] as int,
         grossTotalCents: row['gross_total_cents'] as int,
         itemDiscountCents: row['item_discount_cents'] as int,
@@ -317,6 +428,15 @@ class CustomerRepository {
         grossTotalCents: row['gross_total_cents'] as int,
         finalTotalCents: row['final_total_cents'] as int,
       );
+
+  void _ensureColumn(String table, String column, String definition) {
+    if (_hasColumn(table, column)) return;
+    database.db.execute('ALTER TABLE $table ADD COLUMN $column $definition;');
+  }
+
+  bool _hasColumn(String table, String column) => database.db
+      .select('PRAGMA table_info($table);')
+      .any((row) => (row['name'] as String).toLowerCase() == column.toLowerCase());
 
   static String _dateOnly(DateTime value) =>
       '${value.year.toString().padLeft(4, '0')}-${value.month.toString().padLeft(2, '0')}-${value.day.toString().padLeft(2, '0')}';

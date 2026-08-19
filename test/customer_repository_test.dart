@@ -17,7 +17,7 @@ void main() {
     expect(FiscalCodeService.tryParse('RSSMRA85T10A562X'), isNull);
   });
 
-  test('customer order stores immutable sale snapshot, updates stock and keeps receipt in database', () async {
+  test('customer order stores immutable sale snapshot, is globally searchable and survives customer deletion', () async {
     final temp = await Directory.systemTemp.createTemp('lsms-flutter-customers-');
     final path = '${temp.path}${Platform.pathSeparator}store.db';
     final service = DatabaseService(path);
@@ -83,10 +83,18 @@ void main() {
 
       final detail = repository.getOrder(order.id)!;
       expect(detail.summary.customerId, customer.id);
+      expect(detail.summary.customerDisplayName, 'Rossi Mario');
+      expect(detail.summary.customerFiscalCode, 'RSSMRA85T10A562S');
       expect(detail.summary.finalTotalCents, 4000);
       expect(detail.items.single.productName, 'Maglietta');
       expect(detail.items.single.unitPriceCents, 2500);
       expect(detail.items.single.discountBasisPoints, 1000);
+
+      expect(repository.searchOrders('Rossi').single.id, order.id);
+      expect(repository.searchOrders('RSSMRA85T10A562S').single.id, order.id);
+      expect(repository.searchOrders('Maglietta').single.id, order.id);
+      expect(repository.searchOrders('MAG-001').single.id, order.id);
+      expect(repository.searchOrders('8000000000001').single.id, order.id);
 
       service.db.execute('UPDATE products SET name=?, sale_price_cents=? WHERE id=?;', ['Nome nuovo', 9999, productId]);
       final unchanged = repository.getOrder(order.id)!;
@@ -99,6 +107,17 @@ void main() {
       expect(receipt.filename, 'scontrino.pdf');
       expect(receipt.bytes, orderedEquals(bytes));
       expect(repository.ordersForCustomer(customer.id).single.hasReceipt, isTrue);
+
+      expect(repository.deleteCustomer(customer.id), isTrue);
+      expect(repository.getById(customer.id), isNull);
+      expect(repository.ordersForCustomer(customer.id), isEmpty);
+
+      final preserved = repository.getOrder(order.id)!;
+      expect(preserved.summary.customerId, isNull);
+      expect(preserved.summary.customerDisplayName, 'Rossi Mario');
+      expect(preserved.summary.customerFiscalCode, 'RSSMRA85T10A562S');
+      expect(preserved.items.single.productName, 'Maglietta');
+      expect(repository.searchOrders('Rossi').single.id, order.id);
     } finally {
       service.dispose();
       await temp.delete(recursive: true);

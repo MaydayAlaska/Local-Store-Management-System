@@ -118,6 +118,8 @@ class SalesOrderSummary {
     required this.id,
     required this.orderNumber,
     required this.customerId,
+    this.customerDisplayName,
+    this.customerFiscalCode,
     required this.itemCount,
     required this.grossTotalCents,
     required this.itemDiscountCents,
@@ -132,6 +134,8 @@ class SalesOrderSummary {
   final int id;
   final String orderNumber;
   final int? customerId;
+  final String? customerDisplayName;
+  final String? customerFiscalCode;
   final int itemCount;
   final int grossTotalCents;
   final int itemDiscountCents;
@@ -144,6 +148,7 @@ class SalesOrderSummary {
 
   String get totalDisplay => formatMoney(finalTotalCents);
   bool get hasReceipt => receiptFilename?.trim().isNotEmpty == true;
+  bool get hasCustomerSnapshot => customerDisplayName?.trim().isNotEmpty == true;
 }
 
 class SalesOrderItem {

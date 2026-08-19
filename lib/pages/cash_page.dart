@@ -7,6 +7,7 @@ import '../services/app_services.dart';
 import '../services/fiscal_code_service.dart';
 import '../widgets/hid_barcode_listener.dart';
 import 'customer_editor_dialog.dart';
+import 'customer_picker_dialog.dart';
 
 class CashPage extends StatefulWidget {
   const CashPage({super.key, required this.services, required this.isActive});
@@ -86,6 +87,18 @@ class _CashPageState extends State<CashPage> {
     setState(() {
       _customer = created;
       _searchStatus = 'Nuovo cliente associato: ${created.displayName}.';
+    });
+  }
+
+  Future<void> _pickCustomer() async {
+    final customer = await showCustomerPickerDialog(
+      context,
+      repository: widget.services.customers,
+    );
+    if (!mounted || customer == null) return;
+    setState(() {
+      _customer = customer;
+      _searchStatus = 'Cliente associato: ${customer.displayName}.';
     });
   }
 
@@ -278,7 +291,7 @@ class _CashPageState extends State<CashPage> {
                     decoration: const InputDecoration(
                       border: OutlineInputBorder(),
                       prefixIcon: Icon(Icons.qr_code_scanner),
-                      labelText: 'Scansiona prodotto, Tessera Sanitaria o cerca',
+                      labelText: 'Scansiona prodotto o cerca',
                       hintText: 'Lo scanner HID funziona anche senza cliccare questo campo',
                     ),
                   ),
@@ -333,12 +346,19 @@ class _CashPageState extends State<CashPage> {
                                   Text(_customer!.fiscalCode),
                                 ]),
                         ),
-                        if (_customer != null)
+                        OutlinedButton.icon(
+                          onPressed: _pickCustomer,
+                          icon: const Icon(Icons.search),
+                          label: Text(_customer == null ? 'Cerca cliente' : 'Cambia cliente'),
+                        ),
+                        if (_customer != null) ...[
+                          const SizedBox(width: 4),
                           IconButton(
                             tooltip: 'Rimuovi cliente dalla vendita',
                             onPressed: () => setState(() => _customer = null),
                             icon: const Icon(Icons.close),
                           ),
+                        ],
                       ]),
                     ),
                     const Divider(height: 1),

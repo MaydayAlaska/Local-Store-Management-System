@@ -12,6 +12,7 @@ import 'dashboard_page.dart';
 import 'export_page.dart';
 import 'labels_page.dart';
 import 'lookups_page.dart';
+import 'orders_page.dart';
 import 'products_page.dart';
 import 'settings_page.dart';
 import 'stock_page.dart';
@@ -45,10 +46,11 @@ class _ShellPageState extends State<ShellPage> {
     final pages = <Widget>[
       DashboardPage(services: widget.services, isActive: _index == 0),
       CashPage(services: widget.services, isActive: _index == 1),
-      CustomersPage(services: widget.services, isActive: _index == 2),
-      LabelsPage(services: widget.services, settings: widget.settings, isActive: _index == 3),
+      OrdersPage(services: widget.services),
+      CustomersPage(services: widget.services, isActive: _index == 3),
+      LabelsPage(services: widget.services, settings: widget.settings, isActive: _index == 4),
       ProductsPage(services: widget.services),
-      StockPage(services: widget.services, isActive: _index == 5),
+      StockPage(services: widget.services, isActive: _index == 6),
       LookupsPage(services: widget.services),
       ExportPage(services: widget.services, settings: widget.settings),
       SettingsPage(
@@ -80,6 +82,7 @@ class _ShellPageState extends State<ShellPage> {
                         destinations: const [
                           NavigationRailDestination(icon: Icon(Icons.dashboard_outlined), selectedIcon: Icon(Icons.dashboard), label: Text('Dashboard')),
                           NavigationRailDestination(icon: Icon(Icons.point_of_sale_outlined), selectedIcon: Icon(Icons.point_of_sale), label: Text('Cassa')),
+                          NavigationRailDestination(icon: Icon(Icons.receipt_long_outlined), selectedIcon: Icon(Icons.receipt_long), label: Text('Vendite')),
                           NavigationRailDestination(icon: Icon(Icons.people_outline), selectedIcon: Icon(Icons.people), label: Text('Clienti')),
                           NavigationRailDestination(icon: Icon(Icons.label_outline), selectedIcon: Icon(Icons.label), label: Text('Etichette')),
                           NavigationRailDestination(icon: Icon(Icons.inventory_2_outlined), selectedIcon: Icon(Icons.inventory_2), label: Text('Prodotti')),

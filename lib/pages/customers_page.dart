@@ -1,6 +1,3 @@
-import 'dart:io';
-
-import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
 
 import '../core/formatters.dart';
@@ -9,6 +6,7 @@ import '../services/app_services.dart';
 import '../services/fiscal_code_service.dart';
 import '../widgets/hid_barcode_listener.dart';
 import 'customer_editor_dialog.dart';
+import 'order_dialog.dart';
 
 class CustomersPage extends StatefulWidget {
   const CustomersPage({super.key, required this.services, required this.isActive});
@@ -87,11 +85,50 @@ class _CustomersPageState extends State<CustomersPage> {
     });
   }
 
-  Future<void> _openOrder(int orderId) async {
-    await showDialog<void>(
+  Future<void> _deleteCustomer() async {
+    final selected = _selected;
+    if (selected == null) return;
+    final orders = widget.services.customers.ordersForCustomer(selected.id);
+    final confirmed = await showDialog<bool>(
       context: context,
-      builder: (_) => _OrderDialog(services: widget.services, orderId: orderId),
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Eliminare il cliente?'),
+        content: Text(
+          orders.isEmpty
+              ? 'Vuoi eliminare definitivamente ${selected.displayName} (${selected.fiscalCode})?'
+              : 'Vuoi eliminare definitivamente ${selected.displayName} (${selected.fiscalCode})?\n\n'
+                  'I ${orders.length} ordini associati resteranno nello storico Vendite con nome e codice fiscale memorizzati, ma non saranno più collegati a un cliente attivo.',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(dialogContext).pop(false), child: const Text('Annulla')),
+          FilledButton.icon(
+            style: FilledButton.styleFrom(backgroundColor: Theme.of(dialogContext).colorScheme.error),
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            icon: const Icon(Icons.delete_outline),
+            label: const Text('Elimina cliente'),
+          ),
+        ],
+      ),
     );
+    if (confirmed != true || !mounted) return;
+
+    try {
+      final deleted = widget.services.customers.deleteCustomer(selected.id);
+      if (!mounted) return;
+      setState(() {
+        _selected = null;
+        _status = deleted
+            ? 'Cliente ${selected.displayName} eliminato. Lo storico vendite è stato conservato.'
+            : 'Il cliente non esiste più.';
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _status = 'Impossibile eliminare il cliente: $error');
+    }
+  }
+
+  Future<void> _openOrder(int orderId) async {
+    await showSalesOrderDialog(context, services: widget.services, orderId: orderId);
     if (mounted) setState(() {});
   }
 
@@ -101,7 +138,7 @@ class _CustomersPageState extends State<CustomersPage> {
     final selected = _selected;
     return HidBarcodeListener(
       enabled: widget.isActive,
-      onBarcode: (value) => _scan(value),
+      onBarcode: _scan,
       child: Padding(
         padding: const EdgeInsets.all(24),
         child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
@@ -128,6 +165,7 @@ class _CustomersPageState extends State<CustomersPage> {
                       child: TextField(
                         controller: _search,
                         onChanged: (_) => setState(() {}),
+                        onSubmitted: _scan,
                         decoration: const InputDecoration(
                           border: OutlineInputBorder(),
                           prefixIcon: Icon(Icons.search),
@@ -162,14 +200,13 @@ class _CustomersPageState extends State<CustomersPage> {
               Expanded(
                 child: selected == null
                     ? const Card(
-                        child: Center(
-                          child: Text('Seleziona un cliente oppure scansiona la Tessera Sanitaria.'),
-                        ),
+                        child: Center(child: Text('Seleziona un cliente oppure scansiona la Tessera Sanitaria.')),
                       )
                     : _CustomerDetail(
                         customer: selected,
                         orders: widget.services.customers.ordersForCustomer(selected.id),
                         onEdit: _editCustomer,
+                        onDelete: _deleteCustomer,
                         onOpenOrder: _openOrder,
                       ),
               ),
@@ -186,12 +223,14 @@ class _CustomerDetail extends StatelessWidget {
     required this.customer,
     required this.orders,
     required this.onEdit,
+    required this.onDelete,
     required this.onOpenOrder,
   });
 
   final Customer customer;
   final List<SalesOrderSummary> orders;
   final VoidCallback onEdit;
+  final VoidCallback onDelete;
   final ValueChanged<int> onOpenOrder;
 
   @override
@@ -206,6 +245,13 @@ class _CustomerDetail extends StatelessWidget {
             Row(children: [
               Expanded(child: Text(customer.displayName, style: Theme.of(context).textTheme.headlineSmall)),
               OutlinedButton.icon(onPressed: onEdit, icon: const Icon(Icons.edit_outlined), label: const Text('Modifica')),
+              const SizedBox(width: 8),
+              OutlinedButton.icon(
+                style: OutlinedButton.styleFrom(foregroundColor: Theme.of(context).colorScheme.error),
+                onPressed: onDelete,
+                icon: const Icon(Icons.delete_outline),
+                label: const Text('Elimina'),
+              ),
             ]),
             const SizedBox(height: 8),
             Wrap(spacing: 22, runSpacing: 8, children: [
@@ -255,124 +301,4 @@ class _CustomerDetail extends StatelessWidget {
       ]),
     );
   }
-}
-
-class _OrderDialog extends StatefulWidget {
-  const _OrderDialog({required this.services, required this.orderId});
-  final AppServices services;
-  final int orderId;
-
-  @override
-  State<_OrderDialog> createState() => _OrderDialogState();
-}
-
-class _OrderDialogState extends State<_OrderDialog> {
-  String? _status;
-
-  SalesOrderDetail? get _detail => widget.services.customers.getOrder(widget.orderId);
-
-  Future<void> _attachReceipt() async {
-    const types = XTypeGroup(
-      label: 'Scontrino',
-      extensions: ['pdf', 'png', 'jpg', 'jpeg'],
-    );
-    final file = await openFile(acceptedTypeGroups: const [types]);
-    if (file == null) return;
-    final bytes = await file.readAsBytes();
-    if (!mounted) return;
-    try {
-      widget.services.customers.attachReceipt(widget.orderId, file.name, bytes);
-      setState(() => _status = 'Scontrino salvato nel database.');
-    } catch (error) {
-      setState(() => _status = 'Impossibile allegare lo scontrino: $error');
-    }
-  }
-
-  Future<void> _saveReceipt() async {
-    final receipt = widget.services.customers.getReceipt(widget.orderId);
-    if (receipt == null) return;
-    final location = await getSaveLocation(suggestedName: receipt.filename);
-    if (location == null) return;
-    await File(location.path).writeAsBytes(receipt.bytes, flush: true);
-    if (!mounted) return;
-    setState(() => _status = 'Scontrino esportato in ${location.path}.');
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final detail = _detail;
-    if (detail == null) {
-      return const AlertDialog(content: Text('Ordine non trovato.'));
-    }
-    final order = detail.summary;
-    final percent = order.orderDiscountBasisPoints / 100;
-    return AlertDialog(
-      title: Text(order.orderNumber),
-      content: SizedBox(
-        width: 760,
-        height: 560,
-        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-          Wrap(spacing: 20, runSpacing: 6, children: [
-            Text('Lordo: ${formatMoney(order.grossTotalCents)}'),
-            if (order.itemDiscountCents > 0) Text('Sconti articoli: −${formatMoney(order.itemDiscountCents)}'),
-            if (order.orderPercentDiscountCents > 0)
-              Text('Sconto totale ${_percentText(percent)}%: −${formatMoney(order.orderPercentDiscountCents)}'),
-            if (order.fixedDiscountCents > 0) Text('Sconti fissi: −${formatMoney(order.fixedDiscountCents)}'),
-            Text('Pagato: ${formatMoney(order.finalTotalCents)}', style: const TextStyle(fontWeight: FontWeight.w700)),
-          ]),
-          const SizedBox(height: 12),
-          const Divider(height: 1),
-          Expanded(
-            child: ListView.separated(
-              itemCount: detail.items.length,
-              separatorBuilder: (_, _) => const Divider(height: 1),
-              itemBuilder: (context, index) {
-                final item = detail.items[index];
-                final itemDiscount = item.discountBasisPoints / 100;
-                return ListTile(
-                  title: Text(item.productName),
-                  subtitle: Text('${item.variantDisplay} · SKU ${item.sku}'
-                      '${item.barcode == null ? '' : ' · ${item.barcode}'}\n'
-                      '${item.quantity} × ${formatMoney(item.unitPriceCents)}'
-                      '${item.discountBasisPoints == 0 ? '' : ' · sconto ${_percentText(itemDiscount)}%'}'),
-                  trailing: Text(formatMoney(item.finalTotalCents)),
-                );
-              },
-            ),
-          ),
-          const Divider(height: 1),
-          const SizedBox(height: 10),
-          Row(children: [
-            Expanded(
-              child: Text(
-                order.hasReceipt ? 'Scontrino: ${order.receiptFilename}' : 'Nessuno scontrino allegato.',
-              ),
-            ),
-            OutlinedButton.icon(
-              onPressed: _attachReceipt,
-              icon: const Icon(Icons.attach_file),
-              label: Text(order.hasReceipt ? 'Sostituisci' : 'Allega scontrino'),
-            ),
-            if (order.hasReceipt) ...[
-              const SizedBox(width: 8),
-              OutlinedButton.icon(
-                onPressed: _saveReceipt,
-                icon: const Icon(Icons.save_alt),
-                label: const Text('Esporta'),
-              ),
-            ],
-          ]),
-          if (_status != null) ...[
-            const SizedBox(height: 8),
-            Text(_status!, style: Theme.of(context).textTheme.bodySmall),
-          ],
-        ]),
-      ),
-      actions: [TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Chiudi'))],
-    );
-  }
-
-  static String _percentText(double value) => value == value.roundToDouble()
-      ? value.toInt().toString()
-      : value.toStringAsFixed(2).replaceAll('.', ',');
 }
