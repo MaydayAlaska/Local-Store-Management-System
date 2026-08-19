@@ -2,7 +2,7 @@
 
 Gestionale desktop **offline** per negozi, sviluppato in **Flutter/Dart** con database locale **SQLite**.
 
-Il branch `Flutter` è il canale **BETA/TEST** del progetto. La versione BETA corrente è **0.1.6-b5**. Le build di questo branch vengono pubblicate come prerelease `beta-latest`, mostrano `BETA` nell'applicazione e ricevono aggiornamenti esclusivamente dal canale OTA BETA.
+Il branch `Flutter` è il canale **BETA/TEST** del progetto. La versione BETA corrente è **0.1.6-b6**. Le build di questo branch vengono pubblicate come prerelease `beta-latest`, mostrano `BETA` nell'applicazione e ricevono aggiornamenti esclusivamente dal canale OTA BETA.
 
 La versione stabile corrente su `main` è **0.1.5**.
 
@@ -32,7 +32,7 @@ All'avvio viene eseguito automaticamente un controllo aggiornamenti. Se è dispo
 
 Il confronto OTA è monotono per versione: un aggiornamento viene proposto solo quando `versione_online > versione_installata`. Un commit differente, da solo, non è sufficiente. Per esempio:
 
-- `0.1.6-b5 > 0.1.6-b4`
+- `0.1.6-b6 > 0.1.6-b5`
 - `0.1.6-b1 > 0.1.5`
 - `0.1.5 > 0.1.5-b99`
 
@@ -48,20 +48,21 @@ Gli scanner USB HID funzionano senza focus obbligatorio. Dashboard, Cassa, Magaz
 
 La sezione Etichette supporta stampante persistente, dimensioni fisiche, anteprima, EAN-13, Code 128 B e stampa diretta TCP/BPL-Z quando configurata.
 
-### Novità 0.1.6-b5
+### Novità 0.1.6-b6
 
 - scelta persistente della **valuta**: EUR, USD, GBP o CHF;
 - scelta del **tema**: sistema, chiaro o scuro;
 - interfaccia selezionabile in **Italiano o Inglese**;
 - menu laterale verticalmente scorrevole quando l'altezza della finestra non permette di mostrare tutte le voci, senza scrollbar visibile;
-- logo del negozio più grande nel menu laterale;
+- logo del negozio ulteriormente ingrandito nel menu laterale;
 - controlli finestra ridisegnati con icone vettoriali più pulite;
 - pulsante **Salva impostazioni** spostato nell'intestazione in alto a destra;
 - esportazione inventario con selezione delle colonne da includere;
 - nomi export nel formato `Inventario - YYYY-MM-DD_HH-MM-SS`;
 - nuovi SKU generati in formato esadecimale, mantenendo validi gli SKU già esistenti;
 - la sezione **Aggiornamenti** resta sempre l'ultima nelle Impostazioni;
-- separazione rigida tra versioni OTA BETA e STABLE.
+- separazione rigida tra versioni OTA BETA e STABLE;
+- corretti warning dell'analizzatore nel popup delle stampanti e sostituite API SQLite deprecate con `close()`.
 
 ## Esportazione inventario
 
