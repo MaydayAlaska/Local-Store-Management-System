@@ -7,6 +7,7 @@ import '../services/app_services.dart';
 import '../widgets/app_title_bar.dart';
 import '../widgets/glass.dart';
 import 'cash_page.dart';
+import 'customers_page.dart';
 import 'dashboard_page.dart';
 import 'export_page.dart';
 import 'labels_page.dart';
@@ -44,9 +45,10 @@ class _ShellPageState extends State<ShellPage> {
     final pages = <Widget>[
       DashboardPage(services: widget.services, isActive: _index == 0),
       CashPage(services: widget.services, isActive: _index == 1),
-      LabelsPage(services: widget.services, settings: widget.settings, isActive: _index == 2),
+      CustomersPage(services: widget.services, isActive: _index == 2),
+      LabelsPage(services: widget.services, settings: widget.settings, isActive: _index == 3),
       ProductsPage(services: widget.services),
-      StockPage(services: widget.services, isActive: _index == 4),
+      StockPage(services: widget.services, isActive: _index == 5),
       LookupsPage(services: widget.services),
       ExportPage(services: widget.services, settings: widget.settings),
       SettingsPage(
@@ -78,6 +80,7 @@ class _ShellPageState extends State<ShellPage> {
                         destinations: const [
                           NavigationRailDestination(icon: Icon(Icons.dashboard_outlined), selectedIcon: Icon(Icons.dashboard), label: Text('Dashboard')),
                           NavigationRailDestination(icon: Icon(Icons.point_of_sale_outlined), selectedIcon: Icon(Icons.point_of_sale), label: Text('Cassa')),
+                          NavigationRailDestination(icon: Icon(Icons.people_outline), selectedIcon: Icon(Icons.people), label: Text('Clienti')),
                           NavigationRailDestination(icon: Icon(Icons.label_outline), selectedIcon: Icon(Icons.label), label: Text('Etichette')),
                           NavigationRailDestination(icon: Icon(Icons.inventory_2_outlined), selectedIcon: Icon(Icons.inventory_2), label: Text('Prodotti')),
                           NavigationRailDestination(icon: Icon(Icons.warehouse_outlined), selectedIcon: Icon(Icons.warehouse), label: Text('Magazzino')),
