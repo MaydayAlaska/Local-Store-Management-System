@@ -2,8 +2,11 @@ class LabelPrinterProfile {
   const LabelPrinterProfile({
     required this.id,
     required this.name,
-    required this.host,
+    this.connectionType = 'tcp',
+    this.host = '',
     this.port = 9100,
+    this.systemPrinterUrl,
+    this.systemPrinterName,
     this.protocol = 'bpl-z',
     this.dpi = 203,
     this.defaultWidthMm = 40,
@@ -13,19 +16,24 @@ class LabelPrinterProfile {
 
   final String id;
   final String name;
+  final String connectionType;
   final String host;
   final int port;
+  final String? systemPrinterUrl;
+  final String? systemPrinterName;
   final String protocol;
   final int dpi;
   final double defaultWidthMm;
   final double defaultHeightMm;
   final bool enabled;
 
+  static const supportedConnectionTypes = ['tcp', 'system'];
   static const supportedProtocols = ['bpl-z'];
 
   static const legacyApiX110 = LabelPrinterProfile(
     id: 'apix110-default',
     name: 'BIXOLON ApiX110 (rete)',
+    connectionType: 'tcp',
     host: '192.168.1.63',
     port: 9100,
     protocol: 'bpl-z',
@@ -34,12 +42,24 @@ class LabelPrinterProfile {
     defaultHeightMm: 30,
   );
 
-  String get url =>
-      'tcp://$host:$port?profile=${Uri.encodeQueryComponent(id)}';
+  bool get isTcp => connectionType == 'tcp';
+  bool get isSystem => connectionType == 'system';
+
+  String get url => isTcp
+      ? 'tcp://$host:$port?profile=${Uri.encodeQueryComponent(id)}'
+      : (systemPrinterUrl ??
+          'system-profile://${Uri.encodeComponent(id)}');
 
   String get protocolLabel => protocol == 'bpl-z' ? 'BPL-Z / ZPL' : protocol;
 
+  String get connectionLabel => isTcp ? 'TCP/IP' : 'USB / sistema';
+
   factory LabelPrinterProfile.fromJson(Map<String, dynamic> json) {
+    final rawConnection =
+        (json['ConnectionType'] as String?)?.trim().toLowerCase();
+    final connectionType = supportedConnectionTypes.contains(rawConnection)
+        ? rawConnection!
+        : 'tcp';
     final rawProtocol = (json['Protocol'] as String?)?.trim().toLowerCase();
     final protocol = supportedProtocols.contains(rawProtocol)
         ? rawProtocol!
@@ -49,16 +69,32 @@ class LabelPrinterProfile {
     final rawWidth = (json['DefaultWidthMm'] as num?)?.toDouble() ?? 40;
     final rawHeight = (json['DefaultHeightMm'] as num?)?.toDouble() ?? 30;
     final host = (json['Host'] as String?)?.trim() ?? '';
+    final systemPrinterUrl =
+        (json['SystemPrinterUrl'] as String?)?.trim().isNotEmpty == true
+            ? (json['SystemPrinterUrl'] as String).trim()
+            : null;
+    final systemPrinterName =
+        (json['SystemPrinterName'] as String?)?.trim().isNotEmpty == true
+            ? (json['SystemPrinterName'] as String).trim()
+            : null;
     final name = (json['Name'] as String?)?.trim() ?? '';
     final id = (json['Id'] as String?)?.trim();
+    final fallbackKey = connectionType == 'tcp'
+        ? '${host.toLowerCase()}-$rawPort'
+        : (systemPrinterName ?? systemPrinterUrl ?? 'system').toLowerCase();
 
     return LabelPrinterProfile(
-      id: id?.isNotEmpty == true
-          ? id!
-          : 'tcp-${host.toLowerCase()}-$rawPort',
-      name: name.isEmpty ? host : name,
-      host: host,
+      id: id?.isNotEmpty == true ? id! : '$connectionType-$fallbackKey',
+      name: name.isEmpty
+          ? (connectionType == 'tcp'
+              ? host
+              : (systemPrinterName ?? 'Stampante USB'))
+          : name,
+      connectionType: connectionType,
+      host: connectionType == 'tcp' ? host : '',
       port: rawPort.clamp(1, 65535).toInt(),
+      systemPrinterUrl: connectionType == 'system' ? systemPrinterUrl : null,
+      systemPrinterName: connectionType == 'system' ? systemPrinterName : null,
       protocol: protocol,
       dpi: rawDpi.clamp(100, 600).toInt(),
       defaultWidthMm: rawWidth.clamp(20, 120).toDouble(),
@@ -70,8 +106,11 @@ class LabelPrinterProfile {
   Map<String, dynamic> toJson() => {
         'Id': id,
         'Name': name,
+        'ConnectionType': connectionType,
         'Host': host,
         'Port': port,
+        'SystemPrinterUrl': systemPrinterUrl,
+        'SystemPrinterName': systemPrinterName,
         'Protocol': protocol,
         'Dpi': dpi,
         'DefaultWidthMm': defaultWidthMm,
@@ -82,8 +121,11 @@ class LabelPrinterProfile {
   LabelPrinterProfile copyWith({
     String? id,
     String? name,
+    String? connectionType,
     String? host,
     int? port,
+    String? systemPrinterUrl,
+    String? systemPrinterName,
     String? protocol,
     int? dpi,
     double? defaultWidthMm,
@@ -93,8 +135,11 @@ class LabelPrinterProfile {
       LabelPrinterProfile(
         id: id ?? this.id,
         name: name ?? this.name,
+        connectionType: connectionType ?? this.connectionType,
         host: host ?? this.host,
         port: port ?? this.port,
+        systemPrinterUrl: systemPrinterUrl ?? this.systemPrinterUrl,
+        systemPrinterName: systemPrinterName ?? this.systemPrinterName,
         protocol: protocol ?? this.protocol,
         dpi: dpi ?? this.dpi,
         defaultWidthMm: defaultWidthMm ?? this.defaultWidthMm,
@@ -151,7 +196,12 @@ class AppSettings {
                 Map<String, dynamic>.from(item),
               ),
             )
-            .where((profile) => profile.host.trim().isNotEmpty)
+            .where(
+              (profile) => profile.isTcp
+                  ? profile.host.trim().isNotEmpty
+                  : (profile.systemPrinterUrl?.trim().isNotEmpty == true ||
+                      profile.systemPrinterName?.trim().isNotEmpty == true),
+            )
             .toList(growable: false)
         : const <LabelPrinterProfile>[LabelPrinterProfile.legacyApiX110];
 
@@ -186,7 +236,8 @@ class AppSettings {
         'ShowLogoInMenu': showLogoInMenu,
         'LastLabelPrinterUrl': lastLabelPrinterUrl,
         'LastLabelPrinterName': lastLabelPrinterName,
-        'LabelPrinters': labelPrinterProfiles.map((profile) => profile.toJson()).toList(),
+        'LabelPrinters':
+            labelPrinterProfiles.map((profile) => profile.toJson()).toList(),
         'CurrencyCode': currencyCode,
         'ThemeMode': themeMode,
         'LanguageCode': languageCode,
@@ -194,17 +245,25 @@ class AppSettings {
 
   LabelPrinterProfile? labelPrinterForUrl(String? value) {
     if (value == null || value.trim().isEmpty) return null;
-    final uri = Uri.tryParse(value.trim());
+    final normalized = value.trim();
+
+    for (final profile in labelPrinterProfiles.where((item) => item.isSystem)) {
+      if (profile.systemPrinterUrl == normalized || profile.url == normalized) {
+        return profile;
+      }
+    }
+
+    final uri = Uri.tryParse(normalized);
     if (uri == null || uri.scheme != 'tcp') return null;
 
     final profileId = uri.queryParameters['profile'];
     if (profileId != null && profileId.isNotEmpty) {
-      for (final profile in labelPrinterProfiles) {
+      for (final profile in labelPrinterProfiles.where((item) => item.isTcp)) {
         if (profile.id == profileId) return profile;
       }
     }
 
-    for (final profile in labelPrinterProfiles) {
+    for (final profile in labelPrinterProfiles.where((item) => item.isTcp)) {
       if (profile.host.toLowerCase() == uri.host.toLowerCase() &&
           profile.port == uri.port) {
         return profile;
