@@ -46,13 +46,17 @@ class _ProductEditorDialogState extends State<ProductEditorDialog> {
 
     final scannedBarcode = widget.initialBarcode?.trim();
     if (product != null) {
-      _variants = widget.services.products.getVariants(product.id).map(_VariantForm.fromDraft).toList();
+      _variants = widget.services.products
+          .getVariants(product.id)
+          .map(_VariantForm.fromDraft)
+          .toList();
       if (scannedBarcode?.isNotEmpty == true &&
           !_variants.any((variant) => variant.containsBarcode(scannedBarcode!))) {
         _variants.add(_VariantForm(
           id: null,
           sku: widget.services.products.generateSku(),
           barcodes: scannedBarcode!,
+          expanded: true,
         ));
       }
     } else {
@@ -61,6 +65,7 @@ class _ProductEditorDialogState extends State<ProductEditorDialog> {
           id: null,
           sku: widget.services.products.generateSku(),
           barcodes: scannedBarcode?.isNotEmpty == true ? scannedBarcode! : '',
+          expanded: true,
         ),
       ];
     }
@@ -93,7 +98,11 @@ class _ProductEditorDialogState extends State<ProductEditorDialog> {
     return result;
   }
 
-  void _addVariant() => setState(() => _variants.add(_VariantForm(id: null, sku: _nextSku())));
+  void _addVariant() => setState(() => _variants.add(_VariantForm(
+        id: null,
+        sku: _nextSku(),
+        expanded: true,
+      )));
 
   void _removeVariant(int index) {
     if (_variants.length == 1 || _variants[index].id != null) return;
@@ -118,7 +127,10 @@ class _ProductEditorDialogState extends State<ProductEditorDialog> {
       widget.services.products.save(draft);
       Navigator.of(context).pop(true);
     } catch (error) {
-      setState(() => _error = error.toString().replaceFirst('Bad state: ', '').replaceFirst('Invalid argument(s): ', ''));
+      setState(() => _error = error
+          .toString()
+          .replaceFirst('Bad state: ', '')
+          .replaceFirst('Invalid argument(s): ', ''));
     }
   }
 
@@ -128,15 +140,23 @@ class _ProductEditorDialogState extends State<ProductEditorDialog> {
     final categories = widget.services.lookups.getAll(LookupKind.category);
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return Dialog(
-      backgroundColor: isDark ? const Color(0xFA1E2430) : const Color(0xFAFFFFFF),
+      backgroundColor:
+          isDark ? const Color(0xFA1E2430) : const Color(0xFAFFFFFF),
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 1080, maxHeight: 780),
         child: Padding(
           padding: const EdgeInsets.all(20),
           child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
             Row(children: [
-              Expanded(child: Text(widget.product == null ? 'Nuovo prodotto' : 'Modifica prodotto', style: Theme.of(context).textTheme.headlineSmall)),
-              IconButton(onPressed: () => Navigator.pop(context, false), icon: const Icon(Icons.close)),
+              Expanded(
+                  child: Text(
+                      widget.product == null
+                          ? 'Nuovo prodotto'
+                          : 'Modifica prodotto',
+                      style: Theme.of(context).textTheme.headlineSmall)),
+              IconButton(
+                  onPressed: () => Navigator.pop(context, false),
+                  icon: const Icon(Icons.close)),
             ]),
             if (widget.initialBarcode?.trim().isNotEmpty == true) ...[
               const SizedBox(height: 8),
@@ -144,44 +164,79 @@ class _ProductEditorDialogState extends State<ProductEditorDialog> {
                 widget.product == null
                     ? 'Barcode scansionato: ${widget.initialBarcode!.trim()}'
                     : 'Nuova variante precompilata con barcode: ${widget.initialBarcode!.trim()}',
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+                style: Theme.of(context)
+                    .textTheme
+                    .bodyMedium
+                    ?.copyWith(fontWeight: FontWeight.w600),
               ),
             ],
             const SizedBox(height: 12),
             Row(children: [
-              Expanded(flex: 2, child: TextField(controller: _name, decoration: const InputDecoration(border: OutlineInputBorder(), labelText: 'Nome *'))),
+              Expanded(
+                  flex: 2,
+                  child: TextField(
+                      controller: _name,
+                      decoration: const InputDecoration(
+                          border: OutlineInputBorder(), labelText: 'Nome *'))),
               const SizedBox(width: 10),
-              Expanded(child: DropdownButtonFormField<int?>(
+              Expanded(
+                  child: DropdownButtonFormField<int?>(
                 initialValue: _brandId,
-                decoration: const InputDecoration(border: OutlineInputBorder(), labelText: 'Marca'),
-                items: [const DropdownMenuItem<int?>(value: null, child: Text('—')), ...brands.map((b) => DropdownMenuItem<int?>(value: b.id, child: Text(b.name)))],
+                decoration: const InputDecoration(
+                    border: OutlineInputBorder(), labelText: 'Marca'),
+                items: [
+                  const DropdownMenuItem<int?>(value: null, child: Text('—')),
+                  ...brands.map((b) =>
+                      DropdownMenuItem<int?>(value: b.id, child: Text(b.name)))
+                ],
                 onChanged: (v) => _brandId = v,
               )),
               const SizedBox(width: 10),
-              Expanded(child: DropdownButtonFormField<int?>(
+              Expanded(
+                  child: DropdownButtonFormField<int?>(
                 initialValue: _categoryId,
-                decoration: const InputDecoration(border: OutlineInputBorder(), labelText: 'Categoria'),
-                items: [const DropdownMenuItem<int?>(value: null, child: Text('—')), ...categories.map((c) => DropdownMenuItem<int?>(value: c.id, child: Text(c.name)))],
+                decoration: const InputDecoration(
+                    border: OutlineInputBorder(), labelText: 'Categoria'),
+                items: [
+                  const DropdownMenuItem<int?>(value: null, child: Text('—')),
+                  ...categories.map((c) =>
+                      DropdownMenuItem<int?>(value: c.id, child: Text(c.name)))
+                ],
                 onChanged: (v) => _categoryId = v,
               )),
             ]),
             const SizedBox(height: 10),
             Row(children: [
-              Expanded(child: TextField(
+              Expanded(
+                  child: TextField(
                 controller: _purchase,
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                decoration: const InputDecoration(border: OutlineInputBorder(), labelText: 'Prezzo acquisto prodotto €'),
+                keyboardType:
+                    const TextInputType.numberWithOptions(decimal: true),
+                decoration: const InputDecoration(
+                    border: OutlineInputBorder(),
+                    labelText: 'Prezzo acquisto prodotto €'),
               )),
               const SizedBox(width: 10),
-              Expanded(child: TextField(
+              Expanded(
+                  child: TextField(
                 controller: _sale,
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                decoration: const InputDecoration(border: OutlineInputBorder(), labelText: 'Prezzo vendita prodotto €'),
+                keyboardType:
+                    const TextInputType.numberWithOptions(decimal: true),
+                decoration: const InputDecoration(
+                    border: OutlineInputBorder(),
+                    labelText: 'Prezzo vendita prodotto €'),
               )),
               const SizedBox(width: 10),
-              Expanded(flex: 2, child: TextField(controller: _notes, decoration: const InputDecoration(border: OutlineInputBorder(), labelText: 'Note'))),
+              Expanded(
+                  flex: 2,
+                  child: TextField(
+                      controller: _notes,
+                      decoration: const InputDecoration(
+                          border: OutlineInputBorder(), labelText: 'Note'))),
               const SizedBox(width: 12),
-              Switch(value: _active, onChanged: (v) => setState(() => _active = v)),
+              Switch(
+                  value: _active,
+                  onChanged: (v) => setState(() => _active = v)),
               const Text('Attivo'),
             ]),
             const SizedBox(height: 8),
@@ -191,27 +246,45 @@ class _ProductEditorDialogState extends State<ProductEditorDialog> {
             ),
             const SizedBox(height: 14),
             Row(children: [
-              Expanded(child: Text('Varianti', style: Theme.of(context).textTheme.titleMedium)),
-              OutlinedButton.icon(onPressed: _addVariant, icon: const Icon(Icons.add), label: const Text('Aggiungi variante')),
+              Expanded(
+                  child: Text('Varianti',
+                      style: Theme.of(context).textTheme.titleMedium)),
+              OutlinedButton.icon(
+                  onPressed: _addVariant,
+                  icon: const Icon(Icons.add),
+                  label: const Text('Aggiungi variante')),
             ]),
             const SizedBox(height: 8),
             Expanded(
               child: ListView.separated(
                 itemCount: _variants.length,
-                separatorBuilder: (_, _) => const SizedBox(height: 10),
+                separatorBuilder: (_, _) => const SizedBox(height: 8),
                 itemBuilder: (context, index) => _VariantEditor(
+                  key: ObjectKey(_variants[index]),
                   form: _variants[index],
-                  canRemove: _variants[index].id == null && _variants.length > 1,
+                  index: index,
+                  canRemove:
+                      _variants[index].id == null && _variants.length > 1,
                   onRemove: () => _removeVariant(index),
                 ),
               ),
             ),
-            if (_error != null) Padding(padding: const EdgeInsets.only(top: 8), child: Text(_error!, style: TextStyle(color: Theme.of(context).colorScheme.error))),
+            if (_error != null)
+              Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Text(_error!,
+                      style: TextStyle(
+                          color: Theme.of(context).colorScheme.error))),
             const SizedBox(height: 12),
             Row(mainAxisAlignment: MainAxisAlignment.end, children: [
-              TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Annulla')),
+              TextButton(
+                  onPressed: () => Navigator.pop(context, false),
+                  child: const Text('Annulla')),
               const SizedBox(width: 8),
-              FilledButton.icon(onPressed: _save, icon: const Icon(Icons.save), label: const Text('Salva')),
+              FilledButton.icon(
+                  onPressed: _save,
+                  icon: const Icon(Icons.save),
+                  label: const Text('Salva')),
             ]),
           ]),
         ),
@@ -219,55 +292,130 @@ class _ProductEditorDialogState extends State<ProductEditorDialog> {
     );
   }
 
-  static String _moneyInput(int? cents) =>
-      cents == null ? '' : (cents / 100).toStringAsFixed(2).replaceAll('.', ',');
+  static String _moneyInput(int? cents) => cents == null
+      ? ''
+      : (cents / 100).toStringAsFixed(2).replaceAll('.', ',');
 }
 
-class _VariantEditor extends StatelessWidget {
-  const _VariantEditor({required this.form, required this.canRemove, required this.onRemove});
+class _VariantEditor extends StatefulWidget {
+  const _VariantEditor({
+    super.key,
+    required this.form,
+    required this.index,
+    required this.canRemove,
+    required this.onRemove,
+  });
+
   final _VariantForm form;
+  final int index;
   final bool canRemove;
   final VoidCallback onRemove;
 
   @override
+  State<_VariantEditor> createState() => _VariantEditorState();
+}
+
+class _VariantEditorState extends State<_VariantEditor> {
+  @override
   Widget build(BuildContext context) => Card(
         margin: EdgeInsets.zero,
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Column(children: [
+        clipBehavior: Clip.antiAlias,
+        child: ExpansionTile(
+          initiallyExpanded: widget.form.expanded,
+          maintainState: true,
+          tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
+          childrenPadding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+          shape: const Border(),
+          collapsedShape: const Border(),
+          onExpansionChanged: (expanded) => widget.form.expanded = expanded,
+          title: ValueListenableBuilder<TextEditingValue>(
+            valueListenable: widget.form.variant,
+            builder: (context, value, _) {
+              final name = value.text.trim();
+              return Text(
+                name.isEmpty ? 'Variante ${widget.index + 1}' : name,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context)
+                    .textTheme
+                    .titleSmall
+                    ?.copyWith(fontWeight: FontWeight.w600),
+              );
+            },
+          ),
+          children: [
             Row(children: [
-              Expanded(child: TextField(controller: form.sku, decoration: const InputDecoration(border: OutlineInputBorder(), labelText: 'SKU *'))),
+              Expanded(
+                  child: TextField(
+                      controller: widget.form.sku,
+                      decoration: const InputDecoration(
+                          border: OutlineInputBorder(), labelText: 'SKU *'))),
               const SizedBox(width: 8),
-              Expanded(child: TextField(controller: form.variant, decoration: const InputDecoration(border: OutlineInputBorder(), labelText: 'Variante'))),
+              Expanded(
+                  child: TextField(
+                      controller: widget.form.variant,
+                      decoration: const InputDecoration(
+                          border: OutlineInputBorder(),
+                          labelText: 'Variante'))),
               const SizedBox(width: 8),
-              Expanded(child: TextField(controller: form.size, decoration: const InputDecoration(border: OutlineInputBorder(), labelText: 'Taglia'))),
+              Expanded(
+                  child: TextField(
+                      controller: widget.form.size,
+                      decoration: const InputDecoration(
+                          border: OutlineInputBorder(), labelText: 'Taglia'))),
               const SizedBox(width: 8),
-              IconButton(onPressed: canRemove ? onRemove : null, tooltip: canRemove ? 'Rimuovi variante nuova' : 'Le varianti già salvate non vengono eliminate per preservare lo storico', icon: const Icon(Icons.delete_outline)),
+              IconButton(
+                  onPressed: widget.canRemove ? widget.onRemove : null,
+                  tooltip: widget.canRemove
+                      ? 'Rimuovi variante nuova'
+                      : 'Le varianti già salvate non vengono eliminate per preservare lo storico',
+                  icon: const Icon(Icons.delete_outline)),
             ]),
             const SizedBox(height: 8),
             Row(children: [
-              Expanded(flex: 2, child: TextField(controller: form.barcodes, decoration: const InputDecoration(border: OutlineInputBorder(), labelText: 'Barcode (uno per riga o separati da virgola)'))),
+              Expanded(
+                  flex: 2,
+                  child: TextField(
+                      controller: widget.form.barcodes,
+                      decoration: const InputDecoration(
+                          border: OutlineInputBorder(),
+                          labelText:
+                              'Barcode (uno per riga o separati da virgola)'))),
               const SizedBox(width: 8),
-              Expanded(child: TextField(
-                controller: form.purchase,
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                decoration: const InputDecoration(border: OutlineInputBorder(), labelText: 'Override acquisto €', hintText: 'Eredita prodotto'),
+              Expanded(
+                  child: TextField(
+                controller: widget.form.purchase,
+                keyboardType:
+                    const TextInputType.numberWithOptions(decimal: true),
+                decoration: const InputDecoration(
+                    border: OutlineInputBorder(),
+                    labelText: 'Override acquisto €',
+                    hintText: 'Eredita prodotto'),
               )),
               const SizedBox(width: 8),
-              Expanded(child: TextField(
-                controller: form.sale,
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                decoration: const InputDecoration(border: OutlineInputBorder(), labelText: 'Override vendita €', hintText: 'Eredita prodotto'),
+              Expanded(
+                  child: TextField(
+                controller: widget.form.sale,
+                keyboardType:
+                    const TextInputType.numberWithOptions(decimal: true),
+                decoration: const InputDecoration(
+                    border: OutlineInputBorder(),
+                    labelText: 'Override vendita €',
+                    hintText: 'Eredita prodotto'),
               )),
               const SizedBox(width: 12),
-              StatefulBuilder(builder: (context, setLocal) => Row(children: [
-                Switch(value: form.active, onChanged: (v) => setLocal(() => form.active = v)),
-                const Text('Attiva'),
-              ])),
+              StatefulBuilder(
+                  builder: (context, setLocal) => Row(children: [
+                        Switch(
+                            value: widget.form.active,
+                            onChanged: (v) =>
+                                setLocal(() => widget.form.active = v)),
+                        const Text('Attiva'),
+                      ])),
               const SizedBox(width: 12),
-              Text('Giacenza: ${form.stock}'),
+              Text('Giacenza: ${widget.form.stock}'),
             ]),
-          ]),
+          ],
         ),
       );
 }
@@ -283,6 +431,7 @@ class _VariantForm {
     String barcodes = '',
     this.active = true,
     this.stock = 0,
+    this.expanded = false,
   })  : sku = TextEditingController(text: sku),
         variant = TextEditingController(text: variant),
         size = TextEditingController(text: size),
@@ -295,8 +444,16 @@ class _VariantForm {
         sku: draft.sku,
         variant: draft.variant ?? '',
         size: draft.size ?? '',
-        purchase: draft.purchasePriceCents == null ? '' : (draft.purchasePriceCents! / 100).toStringAsFixed(2).replaceAll('.', ','),
-        sale: draft.salePriceCents == null ? '' : (draft.salePriceCents! / 100).toStringAsFixed(2).replaceAll('.', ','),
+        purchase: draft.purchasePriceCents == null
+            ? ''
+            : (draft.purchasePriceCents! / 100)
+                .toStringAsFixed(2)
+                .replaceAll('.', ','),
+        sale: draft.salePriceCents == null
+            ? ''
+            : (draft.salePriceCents! / 100)
+                .toStringAsFixed(2)
+                .replaceAll('.', ','),
         barcodes: draft.barcodes.join('\n'),
         active: draft.isActive,
         stock: draft.stockQuantity,
@@ -311,6 +468,7 @@ class _VariantForm {
   final TextEditingController barcodes;
   bool active;
   final int stock;
+  bool expanded;
 
   bool containsBarcode(String value) => barcodes.text
       .split(RegExp(r'[,;\n\r]+'))
@@ -325,7 +483,11 @@ class _VariantForm {
         purchasePriceCents: parseEuroCents(purchase.text),
         salePriceCents: parseEuroCents(sale.text),
         isActive: active,
-        barcodes: barcodes.text.split(RegExp(r'[,;\n\r]+')).map((e) => e.trim()).where((e) => e.isNotEmpty).toList(),
+        barcodes: barcodes.text
+            .split(RegExp(r'[,;\n\r]+'))
+            .map((e) => e.trim())
+            .where((e) => e.isNotEmpty)
+            .toList(),
         stockQuantity: stock,
       );
 
