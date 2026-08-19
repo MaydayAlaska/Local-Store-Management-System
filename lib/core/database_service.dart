@@ -45,7 +45,7 @@ class DatabaseService {
     _database.execute('PRAGMA user_version = 3;');
   }
 
-  void dispose() => _database.dispose();
+  void dispose() => _database.close();
 
   void _createLookupTables() {
     _database.execute('''
@@ -163,7 +163,7 @@ class DatabaseService {
       AppPaths.backupsDirectory,
       'store-pre-$reason-${_timestamp(DateTime.now())}.db',
     );
-    _database.dispose();
+    _database.close();
     await File(path).copy(destination);
     _database = sqlite3.open(path);
     _database.execute('PRAGMA journal_mode = DELETE;');
