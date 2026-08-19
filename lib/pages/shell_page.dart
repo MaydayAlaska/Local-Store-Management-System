@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 
+import '../l10n/app_strings.dart';
 import '../models/app_settings.dart';
 import '../services/app_services.dart';
 import '../services/update_service.dart';
@@ -37,6 +38,7 @@ class ShellPage extends StatefulWidget {
 
 class _ShellPageState extends State<ShellPage> {
   static const _settingsIndex = 9;
+  static const _minimumRailHeight = 760.0;
 
   int _index = 0;
   UpdateCheckResult? _startupUpdate;
@@ -107,7 +109,7 @@ class _ShellPageState extends State<ShellPage> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                'Aggiornamento disponibile',
+                                AppStrings.t('update_available'),
                                 style: theme.textTheme.titleSmall?.copyWith(
                                   fontWeight: FontWeight.w700,
                                 ),
@@ -121,7 +123,7 @@ class _ShellPageState extends State<ShellPage> {
                               ),
                               const SizedBox(height: 6),
                               Text(
-                                'Clicca per aprire Impostazioni',
+                                AppStrings.t('open_settings_update'),
                                 style: theme.textTheme.bodySmall?.copyWith(
                                   color: theme.colorScheme.primary,
                                   fontWeight: FontWeight.w600,
@@ -131,7 +133,7 @@ class _ShellPageState extends State<ShellPage> {
                           ),
                         ),
                         IconButton(
-                          tooltip: 'Chiudi',
+                          tooltip: AppStrings.t('close'),
                           visualDensity: VisualDensity.compact,
                           onPressed: _dismissUpdateNotification,
                           icon: const Icon(Icons.close_rounded, size: 18),
@@ -172,6 +174,59 @@ class _ShellPageState extends State<ShellPage> {
     setState(() => _index = value);
   }
 
+  List<NavigationRailDestination> _destinations() => [
+        NavigationRailDestination(
+          icon: const Icon(Icons.dashboard_outlined),
+          selectedIcon: const Icon(Icons.dashboard),
+          label: Text(AppStrings.t('dashboard')),
+        ),
+        NavigationRailDestination(
+          icon: const Icon(Icons.point_of_sale_outlined),
+          selectedIcon: const Icon(Icons.point_of_sale),
+          label: Text(AppStrings.t('cash')),
+        ),
+        NavigationRailDestination(
+          icon: const Icon(Icons.receipt_long_outlined),
+          selectedIcon: const Icon(Icons.receipt_long),
+          label: Text(AppStrings.t('sales')),
+        ),
+        NavigationRailDestination(
+          icon: const Icon(Icons.people_outline),
+          selectedIcon: const Icon(Icons.people),
+          label: Text(AppStrings.t('customers')),
+        ),
+        NavigationRailDestination(
+          icon: const Icon(Icons.label_outline),
+          selectedIcon: const Icon(Icons.label),
+          label: Text(AppStrings.t('labels')),
+        ),
+        NavigationRailDestination(
+          icon: const Icon(Icons.inventory_2_outlined),
+          selectedIcon: const Icon(Icons.inventory_2),
+          label: Text(AppStrings.t('products')),
+        ),
+        NavigationRailDestination(
+          icon: const Icon(Icons.warehouse_outlined),
+          selectedIcon: const Icon(Icons.warehouse),
+          label: Text(AppStrings.t('stock')),
+        ),
+        NavigationRailDestination(
+          icon: const Icon(Icons.category_outlined),
+          selectedIcon: const Icon(Icons.category),
+          label: Text(AppStrings.t('lookups')),
+        ),
+        NavigationRailDestination(
+          icon: const Icon(Icons.archive_outlined),
+          selectedIcon: const Icon(Icons.archive),
+          label: Text(AppStrings.t('export')),
+        ),
+        NavigationRailDestination(
+          icon: const Icon(Icons.settings_outlined),
+          selectedIcon: const Icon(Icons.settings),
+          label: Text(AppStrings.t('settings')),
+        ),
+      ];
+
   @override
   Widget build(BuildContext context) {
     final pages = <Widget>[
@@ -206,23 +261,27 @@ class _ShellPageState extends State<ShellPage> {
                   children: [
                     GlassSurface(
                       borderRadius: BorderRadius.circular(24),
-                      child: NavigationRail(
-                        selectedIndex: _index,
-                        onDestinationSelected: _selectPage,
-                        labelType: NavigationRailLabelType.all,
-                        leading: _MenuBrand(settings: widget.settings, services: widget.services),
-                        destinations: const [
-                          NavigationRailDestination(icon: Icon(Icons.dashboard_outlined), selectedIcon: Icon(Icons.dashboard), label: Text('Dashboard')),
-                          NavigationRailDestination(icon: Icon(Icons.point_of_sale_outlined), selectedIcon: Icon(Icons.point_of_sale), label: Text('Cassa')),
-                          NavigationRailDestination(icon: Icon(Icons.receipt_long_outlined), selectedIcon: Icon(Icons.receipt_long), label: Text('Vendite')),
-                          NavigationRailDestination(icon: Icon(Icons.people_outline), selectedIcon: Icon(Icons.people), label: Text('Clienti')),
-                          NavigationRailDestination(icon: Icon(Icons.label_outline), selectedIcon: Icon(Icons.label), label: Text('Etichette')),
-                          NavigationRailDestination(icon: Icon(Icons.inventory_2_outlined), selectedIcon: Icon(Icons.inventory_2), label: Text('Prodotti')),
-                          NavigationRailDestination(icon: Icon(Icons.warehouse_outlined), selectedIcon: Icon(Icons.warehouse), label: Text('Magazzino')),
-                          NavigationRailDestination(icon: Icon(Icons.category_outlined), selectedIcon: Icon(Icons.category), label: Text('Anagrafiche')),
-                          NavigationRailDestination(icon: Icon(Icons.archive_outlined), selectedIcon: Icon(Icons.archive), label: Text('Export')),
-                          NavigationRailDestination(icon: Icon(Icons.settings_outlined), selectedIcon: Icon(Icons.settings), label: Text('Impostazioni')),
-                        ],
+                      child: LayoutBuilder(
+                        builder: (context, constraints) {
+                          final railHeight = constraints.maxHeight < _minimumRailHeight
+                              ? _minimumRailHeight
+                              : constraints.maxHeight;
+                          return SingleChildScrollView(
+                            child: SizedBox(
+                              height: railHeight,
+                              child: NavigationRail(
+                                selectedIndex: _index,
+                                onDestinationSelected: _selectPage,
+                                labelType: NavigationRailLabelType.all,
+                                leading: _MenuBrand(
+                                  settings: widget.settings,
+                                  services: widget.services,
+                                ),
+                                destinations: _destinations(),
+                              ),
+                            ),
+                          );
+                        },
                       ),
                     ),
                     const SizedBox(width: 10),
