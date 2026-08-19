@@ -21,7 +21,7 @@ class CashPage extends StatefulWidget {
 class _CashPageState extends State<CashPage> {
   final _search = TextEditingController();
   final _searchFocus = FocusNode();
-  final _totalPercent = TextEditingController(text: '0');
+  final _totalPercent = TextEditingController();
   final _fixedDiscount = TextEditingController();
   final List<_CashLine> _cart = [];
   final List<_FixedDiscountLine> _fixedDiscounts = [];
@@ -159,6 +159,40 @@ class _CashPageState extends State<CashPage> {
         : 'Sconto del ${_percentText(percent)}% applicato a ${line.product.name}.');
   }
 
+  void _addPercentDiscount() {
+    if (_cart.isEmpty) {
+      return _cartMessage('Aggiungi almeno un articolo prima di inserire uno sconto percentuale.');
+    }
+    final parsed = double.tryParse(_totalPercent.text.trim().replaceAll(',', '.'))?.abs() ?? 0;
+    final percent = _clampPercent(parsed);
+    if (percent <= 0) {
+      return _cartMessage('Inserisci uno sconto maggiore di 0% e premi Invio.');
+    }
+
+    final requestedCents = (_subtotalCents * percent / 100).round();
+    final alreadyDiscounted = _fixedDiscounts.fold<int>(0, (sum, line) => sum + line.amountCents);
+    final rawRemaining = _subtotalCents - alreadyDiscounted;
+    final remaining = rawRemaining < 0 ? 0 : rawRemaining;
+    if (remaining <= 0) {
+      return _cartMessage('Il totale è già interamente coperto dagli sconti inseriti.');
+    }
+
+    final cents = requestedCents > remaining ? remaining : requestedCents;
+    if (cents <= 0) {
+      return _cartMessage('Lo sconto percentuale calcolato è inferiore a un centesimo.');
+    }
+
+    _fixedDiscounts.add(
+      _FixedDiscountLine(
+        id: _nextDiscountId++,
+        amountCents: cents,
+        label: 'Sconto ${_percentText(percent)}%',
+      ),
+    );
+    _totalPercent.clear();
+    setState(() => _cartStatus = 'Sconto ${_percentText(percent)}% aggiunto al carrello come −${formatMoney(cents)}.');
+  }
+
   void _addFixedDiscount() {
     if (_cart.isEmpty) return _cartMessage('Aggiungi almeno un articolo prima di inserire uno sconto in euro.');
     final parsed = double.tryParse(_fixedDiscount.text.trim().replaceAll(',', '.'))?.abs() ?? 0;
@@ -167,7 +201,13 @@ class _CashPageState extends State<CashPage> {
     final rawRemaining = _afterPercentCents - _fixedDiscounts.fold<int>(0, (sum, line) => sum + line.amountCents);
     final remaining = rawRemaining < 0 ? 0 : rawRemaining;
     if (cents > remaining) return _cartMessage('Lo sconto supera il totale residuo di ${formatMoney(remaining)}.');
-    _fixedDiscounts.add(_FixedDiscountLine(id: _nextDiscountId++, amountCents: cents));
+    _fixedDiscounts.add(
+      _FixedDiscountLine(
+        id: _nextDiscountId++,
+        amountCents: cents,
+        label: 'Sconto €',
+      ),
+    );
     _fixedDiscount.clear();
     setState(() => _cartStatus = 'Sconto di ${formatMoney(cents)} aggiunto al carrello come −${formatMoney(cents)}.');
   }
@@ -187,7 +227,7 @@ class _CashPageState extends State<CashPage> {
     _cart.clear();
     _fixedDiscounts.clear();
     _customer = null;
-    _totalPercent.text = '0';
+    _totalPercent.clear();
     _fixedDiscount.clear();
     if (!keepStatus) {
       setState(() => _cartStatus = 'Carrello svuotato. Nessun movimento di magazzino è stato registrato.');
@@ -197,7 +237,7 @@ class _CashPageState extends State<CashPage> {
   void _normalizeDiscounts() {
     if (_cart.isEmpty) {
       _fixedDiscounts.clear();
-      _totalPercent.text = '0';
+      _totalPercent.clear();
     }
   }
 
@@ -375,7 +415,7 @@ class _CashPageState extends State<CashPage> {
                                   )),
                               ..._fixedDiscounts.map((line) => ListTile(
                                     leading: const Icon(Icons.discount_outlined),
-                                    title: const Text('Sconto fisso'),
+                                    title: Text(line.label),
                                     trailing: Row(mainAxisSize: MainAxisSize.min, children: [
                                       Text('−${formatMoney(line.amountCents)}'),
                                       IconButton(onPressed: () => _removeFixed(line), icon: const Icon(Icons.close)),
@@ -393,7 +433,12 @@ class _CashPageState extends State<CashPage> {
                             enabled: _cart.isNotEmpty,
                             keyboardType: const TextInputType.numberWithOptions(decimal: true),
                             onChanged: (_) => setState(() {}),
-                            decoration: const InputDecoration(border: OutlineInputBorder(), labelText: 'Sconto totale %', suffixText: '%'),
+                            onSubmitted: (_) => _addPercentDiscount(),
+                            decoration: const InputDecoration(
+                              border: OutlineInputBorder(),
+                              labelText: 'Sconto %',
+                              prefixText: '% ',
+                            ),
                           )),
                           const SizedBox(width: 8),
                           Expanded(child: TextField(
@@ -401,7 +446,11 @@ class _CashPageState extends State<CashPage> {
                             enabled: _cart.isNotEmpty,
                             keyboardType: const TextInputType.numberWithOptions(decimal: true),
                             onSubmitted: (_) => _addFixedDiscount(),
-                            decoration: const InputDecoration(border: OutlineInputBorder(), labelText: 'Sconto €', prefixText: '− € '),
+                            decoration: const InputDecoration(
+                              border: OutlineInputBorder(),
+                              labelText: 'Sconto €',
+                              prefixText: '€ ',
+                            ),
                           )),
                         ]),
                         const SizedBox(height: 10),
@@ -474,7 +523,12 @@ class _CartTile extends StatelessWidget {
               initialValue: line.discountPercent == 0 ? '' : line.discountPercent.toString().replaceAll('.', ','),
               keyboardType: const TextInputType.numberWithOptions(decimal: true),
               onFieldSubmitted: onDiscount,
-              decoration: const InputDecoration(isDense: true, labelText: 'Sconto', suffixText: '%'),
+              decoration: const InputDecoration(
+                isDense: true,
+                labelText: 'Sconto %',
+                floatingLabelBehavior: FloatingLabelBehavior.always,
+                suffixText: '%',
+              ),
             ),
           ),
           const SizedBox(width: 10),
@@ -496,7 +550,12 @@ class _CashLine {
 }
 
 class _FixedDiscountLine {
-  const _FixedDiscountLine({required this.id, required this.amountCents});
+  const _FixedDiscountLine({
+    required this.id,
+    required this.amountCents,
+    required this.label,
+  });
   final int id;
   final int amountCents;
+  final String label;
 }
