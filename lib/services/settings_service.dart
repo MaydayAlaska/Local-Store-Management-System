@@ -27,6 +27,7 @@ class SettingsService {
     required String currencyCode,
     required String themeMode,
     required String languageCode,
+    List<LabelPrinterProfile>? labelPrinterProfiles,
     String? iconSourcePath,
     String? logoSourcePath,
   }) {
@@ -60,6 +61,10 @@ class SettingsService {
       showLogoInMenu: showLogoInMenu,
       lastLabelPrinterUrl: current.lastLabelPrinterUrl,
       lastLabelPrinterName: current.lastLabelPrinterName,
+      labelPrinterProfiles:
+          List<LabelPrinterProfile>.unmodifiable(
+        labelPrinterProfiles ?? current.labelPrinterProfiles,
+      ),
       currencyCode: normalizedCurrency,
       themeMode: normalizedTheme,
       languageCode: normalizedLanguage,
@@ -79,6 +84,7 @@ class SettingsService {
       showLogoInMenu: current.showLogoInMenu,
       lastLabelPrinterUrl: url.trim().isEmpty ? null : url.trim(),
       lastLabelPrinterName: name.trim().isEmpty ? null : name.trim(),
+      labelPrinterProfiles: current.labelPrinterProfiles,
       currencyCode: current.currencyCode,
       themeMode: current.themeMode,
       languageCode: current.languageCode,
