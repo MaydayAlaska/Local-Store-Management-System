@@ -95,15 +95,18 @@ jobs:
         run: |
           $source = Join-Path $env:FLUTTER_ROOT 'packages/flutter_tools/lib/src/base/os.dart'
           $text = Get-Content -Raw $source
-          $pattern = "HostPlatform get hostPlatform \{\s*return switch \(_currentAbi\) \{"
-          if (-not [regex]::IsMatch($text, $pattern)) {
-            throw 'Impossibile applicare il workaround Windows ARM64: il codice Flutter atteso è cambiato.'
+          $pattern = '(?s)HostPlatform get hostPlatform \{\s*return switch \(_currentAbi\) \{.*?\n\s*\};\s*\n\s*\}'
+          $matches = [regex]::Matches($text, $pattern)
+          if ($matches.Count -ne 1) {
+            throw "Impossibile applicare il workaround Windows ARM64: trovati $($matches.Count) getter hostPlatform compatibili."
           }
-          $replacement = "HostPlatform get hostPlatform {`n    if (_platform.isWindows &&`n        _platform.environment['PROCESSOR_ARCHITECTURE']?.toUpperCase() == 'ARM64') {`n      return HostPlatform.windows_arm64;`n    }`n    return switch (_currentAbi) {"
+          $replacement = "HostPlatform get hostPlatform {`n    return HostPlatform.windows_arm64;`n  }"
           $patched = [regex]::Replace($text, $pattern, $replacement, 1)
           [IO.File]::WriteAllText($source, $patched)
+
           Remove-Item (Join-Path $env:FLUTTER_ROOT 'bin/cache/flutter_tools.snapshot') -Force -ErrorAction SilentlyContinue
           Remove-Item (Join-Path $env:FLUTTER_ROOT 'bin/cache/flutter_tools.stamp') -Force -ErrorAction SilentlyContinue
+
           flutter --version
           flutter precache --windows --force
 
