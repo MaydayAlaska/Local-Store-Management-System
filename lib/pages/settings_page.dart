@@ -61,9 +61,13 @@ class _SettingsPageState extends State<SettingsPage> {
   }
 
   Future<String?> _pickImage({required bool allowIco}) async {
-    final extensions = allowIco ? ['png', 'jpg', 'jpeg', 'bmp', 'ico'] : ['png', 'jpg', 'jpeg', 'bmp'];
+    final extensions = allowIco
+        ? ['png', 'jpg', 'jpeg', 'bmp', 'ico']
+        : ['png', 'jpg', 'jpeg', 'bmp'];
     final file = await openFile(
-      acceptedTypeGroups: [XTypeGroup(label: 'Immagini', extensions: extensions)],
+      acceptedTypeGroups: [
+        XTypeGroup(label: 'Immagini', extensions: extensions),
+      ],
     );
     return file?.path;
   }
@@ -104,7 +108,9 @@ class _SettingsPageState extends State<SettingsPage> {
         });
       }
     } catch (error) {
-      if (mounted) setState(() => _status = 'Controllo aggiornamenti fallito: $error');
+      if (mounted) {
+        setState(() => _status = 'Controllo aggiornamenti fallito: $error');
+      }
     } finally {
       if (mounted) setState(() => _checking = false);
     }
@@ -130,7 +136,10 @@ class _SettingsPageState extends State<SettingsPage> {
   Widget build(BuildContext context) => ListView(
         padding: const EdgeInsets.all(24),
         children: [
-          Text('Impostazioni', style: Theme.of(context).textTheme.headlineMedium),
+          Text(
+            'Impostazioni',
+            style: Theme.of(context).textTheme.headlineMedium,
+          ),
           const SizedBox(height: 14),
           Card(
             child: Padding(
@@ -138,7 +147,10 @@ class _SettingsPageState extends State<SettingsPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Text('Negozio e interfaccia', style: Theme.of(context).textTheme.titleMedium),
+                  Text(
+                    'Negozio e interfaccia',
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
                   const SizedBox(height: 10),
                   TextField(
                     controller: _shopName,
@@ -170,30 +182,47 @@ class _SettingsPageState extends State<SettingsPage> {
                             ? null
                             : () async {
                                 final path = await _pickImage(allowIco: true);
-                                if (path != null && mounted) setState(() => _iconSource = path);
+                                if (path != null && mounted) {
+                                  setState(() => _iconSource = path);
+                                }
                               },
                         icon: const Icon(Icons.app_shortcut),
-                        label: Text(_iconSource == null ? 'Cambia icona applicazione' : 'Icona selezionata'),
+                        label: Text(
+                          _iconSource == null
+                              ? 'Cambia icona applicazione'
+                              : 'Icona selezionata',
+                        ),
                       ),
                       OutlinedButton.icon(
                         onPressed: _saving
                             ? null
                             : () async {
                                 final path = await _pickImage(allowIco: false);
-                                if (path != null && mounted) setState(() => _logoSource = path);
+                                if (path != null && mounted) {
+                                  setState(() => _logoSource = path);
+                                }
                               },
                         icon: const Icon(Icons.image_outlined),
-                        label: Text(_logoSource == null ? 'Cambia logo negozio' : 'Logo selezionato'),
+                        label: Text(
+                          _logoSource == null
+                              ? 'Cambia logo negozio'
+                              : 'Logo selezionato',
+                        ),
                       ),
                       FilledButton.icon(
                         onPressed: _saving ? null : _save,
                         icon: const Icon(Icons.save),
-                        label: Text(_saving ? 'Salvataggio…' : 'Salva impostazioni'),
+                        label: Text(
+                          _saving ? 'Salvataggio…' : 'Salva impostazioni',
+                        ),
                       ),
                     ],
                   ),
                   const SizedBox(height: 8),
-                  Text('Dati: ${AppPaths.dataDirectory}', style: Theme.of(context).textTheme.bodySmall),
+                  Text(
+                    'Dati: ${AppPaths.dataDirectory}',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
                 ],
               ),
             ),
@@ -205,17 +234,24 @@ class _SettingsPageState extends State<SettingsPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Text('Aggiornamenti', style: Theme.of(context).textTheme.titleMedium),
+                  Text(
+                    'Aggiornamenti',
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
                   const SizedBox(height: 6),
-                  Text('Versione v${UpdateService.currentVersion}${UpdateService.isBetaBuild ? ' BETA' : ''}'),
+                  Text(
+                    'Versione v${UpdateService.currentVersion}${UpdateService.isBetaBuild ? ' BETA' : ''}',
+                  ),
                   if (UpdateService.currentCommit.isNotEmpty)
-                    Text('Commit: ${UpdateService.currentCommit.substring(0, 7)}'),
+                    Text(
+                      'Commit: ${UpdateService.currentCommit.substring(0, 7)}',
+                    ),
                   const SizedBox(height: 6),
                   Text(
                     UpdateService.isBetaBuild
-                        ? 'Build BETA dal branch ${UpdateService.currentBranch}. Gli aggiornamenti OTA stabili sono disattivati.'
+                        ? 'Canale aggiornamenti: BETA (${UpdateService.betaReleaseTag}), branch Flutter. Le build BETA ricevono solo altre BETA.'
                         : UpdateService.isInstalledBuild
-                            ? 'Canale aggiornamenti: GitHub, branch main.'
+                            ? 'Canale aggiornamenti: STABILE, branch main. Le build stabili ricevono solo release stabili.'
                             : 'Build di sviluppo: il controllo è disponibile, l’installazione OTA richiede una release pubblicata.',
                   ),
                   const SizedBox(height: 10),
@@ -223,9 +259,13 @@ class _SettingsPageState extends State<SettingsPage> {
                     spacing: 8,
                     children: [
                       OutlinedButton.icon(
-                        onPressed: _checking || UpdateService.isBetaBuild ? null : _checkUpdates,
+                        onPressed: _checking ? null : _checkUpdates,
                         icon: const Icon(Icons.system_update),
-                        label: Text(_checking ? 'Controllo…' : 'Controlla aggiornamenti'),
+                        label: Text(
+                          _checking
+                              ? 'Controllo…'
+                              : 'Controlla aggiornamenti',
+                        ),
                       ),
                       if (_update?.canInstall == true)
                         FilledButton.icon(
