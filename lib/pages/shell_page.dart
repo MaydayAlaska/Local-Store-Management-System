@@ -1,9 +1,11 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
 
 import '../models/app_settings.dart';
 import '../services/app_services.dart';
+import '../services/update_service.dart';
 import '../widgets/app_title_bar.dart';
 import '../widgets/glass.dart';
 import 'cash_page.dart';
@@ -34,7 +36,136 @@ class ShellPage extends StatefulWidget {
 }
 
 class _ShellPageState extends State<ShellPage> {
+  static const _settingsIndex = 9;
+
   int _index = 0;
+  UpdateCheckResult? _startupUpdate;
+  OverlayEntry? _updateNotification;
+  Timer? _updateNotificationTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _checkUpdatesOnStartup());
+  }
+
+  @override
+  void dispose() {
+    _updateNotificationTimer?.cancel();
+    _updateNotification?.remove();
+    _updateNotification = null;
+    super.dispose();
+  }
+
+  Future<void> _checkUpdatesOnStartup() async {
+    try {
+      final result = await widget.services.updates.check();
+      if (!mounted || !result.updateAvailable) return;
+
+      setState(() => _startupUpdate = result);
+      _showUpdateNotification(result);
+    } catch (error) {
+      debugPrint('Controllo aggiornamenti automatico non riuscito: $error');
+    }
+  }
+
+  void _showUpdateNotification(UpdateCheckResult update) {
+    _dismissUpdateNotification();
+
+    final overlay = Overlay.of(context, rootOverlay: true);
+    final entry = OverlayEntry(
+      builder: (context) {
+        final theme = Theme.of(context);
+        final isDark = theme.brightness == Brightness.dark;
+        return Positioned(
+          right: 24,
+          bottom: 24,
+          child: Material(
+            type: MaterialType.transparency,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 360),
+              child: GlassSurface(
+                blur: 30,
+                opacity: isDark ? 0.18 : 0.58,
+                borderRadius: BorderRadius.circular(18),
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(18),
+                  onTap: _openUpdateSettings,
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 14, 10, 14),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(
+                          Icons.system_update_alt_rounded,
+                          color: theme.colorScheme.primary,
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Aggiornamento disponibile',
+                                style: theme.textTheme.titleSmall?.copyWith(
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                update.message,
+                                maxLines: 3,
+                                overflow: TextOverflow.ellipsis,
+                                style: theme.textTheme.bodySmall,
+                              ),
+                              const SizedBox(height: 6),
+                              Text(
+                                'Clicca per aprire Impostazioni',
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  color: theme.colorScheme.primary,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        IconButton(
+                          tooltip: 'Chiudi',
+                          visualDensity: VisualDensity.compact,
+                          onPressed: _dismissUpdateNotification,
+                          icon: const Icon(Icons.close_rounded, size: 18),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+
+    _updateNotification = entry;
+    overlay.insert(entry);
+    _updateNotificationTimer = Timer(
+      const Duration(seconds: 15),
+      _dismissUpdateNotification,
+    );
+  }
+
+  void _dismissUpdateNotification() {
+    _updateNotificationTimer?.cancel();
+    _updateNotificationTimer = null;
+    _updateNotification?.remove();
+    _updateNotification = null;
+  }
+
+  void _openUpdateSettings() {
+    _dismissUpdateNotification();
+    _selectPage(_settingsIndex);
+  }
 
   void _selectPage(int value) {
     FocusManager.instance.primaryFocus?.unfocus();
@@ -57,6 +188,7 @@ class _ShellPageState extends State<ShellPage> {
         services: widget.services,
         current: widget.settings,
         onSaved: widget.onSettingsChanged,
+        initialUpdate: _startupUpdate,
       ),
     ];
 
