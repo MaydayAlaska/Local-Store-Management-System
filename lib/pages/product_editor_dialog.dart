@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../core/app_runtime.dart';
 import '../core/formatters.dart';
+import '../l10n/app_strings.dart';
 import '../models/catalog.dart';
 import '../repositories/lookup_repository.dart';
 import '../services/app_services.dart';
@@ -32,6 +34,8 @@ class _ProductEditorDialogState extends State<ProductEditorDialog> {
   int? _categoryId;
   bool _active = true;
   String? _error;
+
+  String _itEn(String it, String en) => AppStrings.isEnglish ? en : it;
 
   @override
   void initState() {
@@ -140,6 +144,7 @@ class _ProductEditorDialogState extends State<ProductEditorDialog> {
     final brands = widget.services.lookups.getAll(LookupKind.brand);
     final categories = widget.services.lookups.getAll(LookupKind.category);
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final currency = AppRuntime.currencySymbol;
 
     return Dialog(
       backgroundColor: isDark ? const Color(0xFA1E2430) : const Color(0xFAFFFFFF),
@@ -153,11 +158,14 @@ class _ProductEditorDialogState extends State<ProductEditorDialog> {
               Row(children: [
                 Expanded(
                   child: Text(
-                    widget.product == null ? 'Nuovo prodotto' : 'Modifica prodotto',
+                    widget.product == null
+                        ? AppStrings.t('new_product')
+                        : AppStrings.t('edit_product'),
                     style: Theme.of(context).textTheme.headlineSmall,
                   ),
                 ),
                 IconButton(
+                  tooltip: AppStrings.t('close'),
                   onPressed: () => Navigator.pop(context, false),
                   icon: const Icon(Icons.close),
                 ),
@@ -166,8 +174,14 @@ class _ProductEditorDialogState extends State<ProductEditorDialog> {
                 const SizedBox(height: 8),
                 Text(
                   widget.product == null
-                      ? 'Barcode scansionato: ${widget.initialBarcode!.trim()}'
-                      : 'Nuova variante precompilata con barcode: ${widget.initialBarcode!.trim()}',
+                      ? _itEn(
+                          'Barcode scansionato: ${widget.initialBarcode!.trim()}',
+                          'Scanned barcode: ${widget.initialBarcode!.trim()}',
+                        )
+                      : _itEn(
+                          'Nuova variante precompilata con barcode: ${widget.initialBarcode!.trim()}',
+                          'New variant pre-filled with barcode: ${widget.initialBarcode!.trim()}',
+                        ),
                   style: Theme.of(context)
                       .textTheme
                       .bodyMedium
@@ -180,9 +194,9 @@ class _ProductEditorDialogState extends State<ProductEditorDialog> {
                   flex: 2,
                   child: TextField(
                     controller: _name,
-                    decoration: const InputDecoration(
-                      border: OutlineInputBorder(),
-                      labelText: 'Nome *',
+                    decoration: InputDecoration(
+                      border: const OutlineInputBorder(),
+                      labelText: '${AppStrings.t('name')} *',
                     ),
                   ),
                 ),
@@ -190,10 +204,15 @@ class _ProductEditorDialogState extends State<ProductEditorDialog> {
                 Expanded(
                   child: GlassDropdown<int>(
                     value: _brandId,
-                    labelText: 'Marca',
+                    labelText: AppStrings.t('brand'),
                     items: [
                       const GlassDropdownItem<int>(value: null, label: '—'),
-                      ...brands.map((b) => GlassDropdownItem<int>(value: b.id, label: b.name)),
+                      ...brands.map(
+                        (brand) => GlassDropdownItem<int>(
+                          value: brand.id,
+                          label: brand.name,
+                        ),
+                      ),
                     ],
                     onChanged: (value) => setState(() => _brandId = value),
                   ),
@@ -202,10 +221,15 @@ class _ProductEditorDialogState extends State<ProductEditorDialog> {
                 Expanded(
                   child: GlassDropdown<int>(
                     value: _categoryId,
-                    labelText: 'Categoria',
+                    labelText: AppStrings.t('category'),
                     items: [
                       const GlassDropdownItem<int>(value: null, label: '—'),
-                      ...categories.map((c) => GlassDropdownItem<int>(value: c.id, label: c.name)),
+                      ...categories.map(
+                        (category) => GlassDropdownItem<int>(
+                          value: category.id,
+                          label: category.name,
+                        ),
+                      ),
                     ],
                     onChanged: (value) => setState(() => _categoryId = value),
                   ),
@@ -217,9 +241,12 @@ class _ProductEditorDialogState extends State<ProductEditorDialog> {
                   child: TextField(
                     controller: _purchase,
                     keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                    decoration: const InputDecoration(
-                      border: OutlineInputBorder(),
-                      labelText: 'Prezzo acquisto prodotto €',
+                    decoration: InputDecoration(
+                      border: const OutlineInputBorder(),
+                      labelText: _itEn(
+                        'Prezzo acquisto prodotto $currency',
+                        'Product purchase price $currency',
+                      ),
                     ),
                   ),
                 ),
@@ -228,9 +255,12 @@ class _ProductEditorDialogState extends State<ProductEditorDialog> {
                   child: TextField(
                     controller: _sale,
                     keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                    decoration: const InputDecoration(
-                      border: OutlineInputBorder(),
-                      labelText: 'Prezzo vendita prodotto €',
+                    decoration: InputDecoration(
+                      border: const OutlineInputBorder(),
+                      labelText: _itEn(
+                        'Prezzo vendita prodotto $currency',
+                        'Product sale price $currency',
+                      ),
                     ),
                   ),
                 ),
@@ -239,30 +269,36 @@ class _ProductEditorDialogState extends State<ProductEditorDialog> {
                   flex: 2,
                   child: TextField(
                     controller: _notes,
-                    decoration: const InputDecoration(
-                      border: OutlineInputBorder(),
-                      labelText: 'Note',
+                    decoration: InputDecoration(
+                      border: const OutlineInputBorder(),
+                      labelText: AppStrings.t('notes'),
                     ),
                   ),
                 ),
                 const SizedBox(width: 12),
-                Switch(value: _active, onChanged: (v) => setState(() => _active = v)),
-                const Text('Attivo'),
+                Switch(value: _active, onChanged: (value) => setState(() => _active = value)),
+                Text(AppStrings.t('active')),
               ]),
               const SizedBox(height: 12),
               Text(
-                'I prezzi del prodotto vengono usati da tutte le varianti. Compila un prezzo nella variante solo se deve sovrascrivere quello del prodotto.',
+                _itEn(
+                  'I prezzi del prodotto vengono usati da tutte le varianti. Compila un prezzo nella variante solo se deve sovrascrivere quello del prodotto.',
+                  'Product prices are used by all variants. Enter a price in a variant only when it must override the product price.',
+                ),
                 style: Theme.of(context).textTheme.bodySmall,
               ),
               const SizedBox(height: 16),
               Row(children: [
                 Expanded(
-                  child: Text('Varianti', style: Theme.of(context).textTheme.titleMedium),
+                  child: Text(
+                    AppStrings.isEnglish ? 'Variants' : 'Varianti',
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
                 ),
                 OutlinedButton.icon(
                   onPressed: _addVariant,
                   icon: const Icon(Icons.add),
-                  label: const Text('Aggiungi variante'),
+                  label: Text(AppStrings.t('add_variant')),
                 ),
               ]),
               const SizedBox(height: 10),
@@ -293,13 +329,13 @@ class _ProductEditorDialogState extends State<ProductEditorDialog> {
                 children: [
                   TextButton(
                     onPressed: () => Navigator.pop(context, false),
-                    child: const Text('Annulla'),
+                    child: Text(AppStrings.t('cancel')),
                   ),
                   const SizedBox(width: 8),
                   FilledButton.icon(
                     onPressed: _save,
                     icon: const Icon(Icons.save),
-                    label: const Text('Salva'),
+                    label: Text(AppStrings.t('save')),
                   ),
                 ],
               ),
@@ -310,8 +346,11 @@ class _ProductEditorDialogState extends State<ProductEditorDialog> {
     );
   }
 
-  static String _moneyInput(int? cents) =>
-      cents == null ? '' : (cents / 100).toStringAsFixed(2).replaceAll('.', ',');
+  static String _moneyInput(int? cents) {
+    if (cents == null) return '';
+    final value = (cents / 100).toStringAsFixed(2);
+    return AppStrings.isEnglish ? value : value.replaceAll('.', ',');
+  }
 }
 
 class _VariantEditor extends StatefulWidget {
@@ -333,125 +372,145 @@ class _VariantEditor extends StatefulWidget {
 }
 
 class _VariantEditorState extends State<_VariantEditor> {
+  String _itEn(String it, String en) => AppStrings.isEnglish ? en : it;
+
   @override
-  Widget build(BuildContext context) => Card(
-        margin: EdgeInsets.zero,
-        clipBehavior: Clip.antiAlias,
-        child: ExpansionTile(
-          initiallyExpanded: widget.form.expanded,
-          maintainState: true,
-          tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 3),
-          childrenPadding: const EdgeInsets.fromLTRB(12, 12, 12, 14),
-          shape: const Border(),
-          collapsedShape: const Border(),
-          onExpansionChanged: (expanded) => widget.form.expanded = expanded,
-          title: ValueListenableBuilder<TextEditingValue>(
-            valueListenable: widget.form.variant,
-            builder: (context, value, _) {
-              final name = value.text.trim();
-              return Text(
-                name.isEmpty ? 'Variante ${widget.index + 1}' : name,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: Theme.of(context)
-                    .textTheme
-                    .titleSmall
-                    ?.copyWith(fontWeight: FontWeight.w600),
-              );
-            },
-          ),
-          children: [
-            Row(children: [
-              Expanded(
-                child: TextField(
-                  controller: widget.form.sku,
-                  decoration: const InputDecoration(
-                    border: OutlineInputBorder(),
-                    labelText: 'SKU *',
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: TextField(
-                  controller: widget.form.variant,
-                  decoration: const InputDecoration(
-                    border: OutlineInputBorder(),
-                    labelText: 'Variante',
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: TextField(
-                  controller: widget.form.size,
-                  decoration: const InputDecoration(
-                    border: OutlineInputBorder(),
-                    labelText: 'Taglia',
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              IconButton(
-                onPressed: widget.canRemove ? widget.onRemove : null,
-                tooltip: widget.canRemove
-                    ? 'Rimuovi variante nuova'
-                    : 'Le varianti già salvate non vengono eliminate per preservare lo storico',
-                icon: const Icon(Icons.delete_outline),
-              ),
-            ]),
-            const SizedBox(height: 12),
-            Row(children: [
-              Expanded(
-                flex: 2,
-                child: TextField(
-                  controller: widget.form.barcodes,
-                  decoration: const InputDecoration(
-                    border: OutlineInputBorder(),
-                    labelText: 'Barcode (uno per riga o separati da virgola)',
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: TextField(
-                  controller: widget.form.purchase,
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  decoration: const InputDecoration(
-                    border: OutlineInputBorder(),
-                    labelText: 'Override acquisto €',
-                    hintText: 'Eredita prodotto',
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: TextField(
-                  controller: widget.form.sale,
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  decoration: const InputDecoration(
-                    border: OutlineInputBorder(),
-                    labelText: 'Override vendita €',
-                    hintText: 'Eredita prodotto',
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              StatefulBuilder(
-                builder: (context, setLocal) => Row(children: [
-                  Switch(
-                    value: widget.form.active,
-                    onChanged: (v) => setLocal(() => widget.form.active = v),
-                  ),
-                  const Text('Attiva'),
-                ]),
-              ),
-              const SizedBox(width: 12),
-              Text('Giacenza: ${widget.form.stock}'),
-            ]),
-          ],
+  Widget build(BuildContext context) {
+    final currency = AppRuntime.currencySymbol;
+    return Card(
+      margin: EdgeInsets.zero,
+      clipBehavior: Clip.antiAlias,
+      child: ExpansionTile(
+        initiallyExpanded: widget.form.expanded,
+        maintainState: true,
+        tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 3),
+        childrenPadding: const EdgeInsets.fromLTRB(12, 12, 12, 14),
+        shape: const Border(),
+        collapsedShape: const Border(),
+        onExpansionChanged: (expanded) => widget.form.expanded = expanded,
+        title: ValueListenableBuilder<TextEditingValue>(
+          valueListenable: widget.form.variant,
+          builder: (context, value, _) {
+            final name = value.text.trim();
+            return Text(
+              name.isEmpty
+                  ? '${AppStrings.t('variant')} ${widget.index + 1}'
+                  : name,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context)
+                  .textTheme
+                  .titleSmall
+                  ?.copyWith(fontWeight: FontWeight.w600),
+            );
+          },
         ),
-      );
+        children: [
+          Row(children: [
+            Expanded(
+              child: TextField(
+                controller: widget.form.sku,
+                decoration: const InputDecoration(
+                  border: OutlineInputBorder(),
+                  labelText: 'SKU *',
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: TextField(
+                controller: widget.form.variant,
+                decoration: InputDecoration(
+                  border: const OutlineInputBorder(),
+                  labelText: AppStrings.t('variant'),
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: TextField(
+                controller: widget.form.size,
+                decoration: InputDecoration(
+                  border: const OutlineInputBorder(),
+                  labelText: AppStrings.t('size'),
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            IconButton(
+              onPressed: widget.canRemove ? widget.onRemove : null,
+              tooltip: widget.canRemove
+                  ? _itEn('Rimuovi variante nuova', 'Remove new variant')
+                  : _itEn(
+                      'Le varianti già salvate non vengono eliminate per preservare lo storico',
+                      'Saved variants cannot be deleted to preserve history',
+                    ),
+              icon: const Icon(Icons.delete_outline),
+            ),
+          ]),
+          const SizedBox(height: 12),
+          Row(children: [
+            Expanded(
+              flex: 2,
+              child: TextField(
+                controller: widget.form.barcodes,
+                decoration: InputDecoration(
+                  border: const OutlineInputBorder(),
+                  labelText: _itEn(
+                    'Barcode (uno per riga o separati da virgola)',
+                    'Barcode (one per line or comma-separated)',
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: TextField(
+                controller: widget.form.purchase,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                decoration: InputDecoration(
+                  border: const OutlineInputBorder(),
+                  labelText: _itEn(
+                    'Override acquisto $currency',
+                    'Purchase override $currency',
+                  ),
+                  hintText: _itEn('Eredita prodotto', 'Use product price'),
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: TextField(
+                controller: widget.form.sale,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                decoration: InputDecoration(
+                  border: const OutlineInputBorder(),
+                  labelText: _itEn(
+                    'Override vendita $currency',
+                    'Sale override $currency',
+                  ),
+                  hintText: _itEn('Eredita prodotto', 'Use product price'),
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            StatefulBuilder(
+              builder: (context, setLocal) => Row(children: [
+                Switch(
+                  value: widget.form.active,
+                  onChanged: (value) =>
+                      setLocal(() => widget.form.active = value),
+                ),
+                Text(AppStrings.isEnglish ? 'Active' : 'Attiva'),
+              ]),
+            ),
+            const SizedBox(width: 12),
+            Text('${AppStrings.t('quantity')}: ${widget.form.stock}'),
+          ]),
+        ],
+      ),
+    );
+  }
 }
 
 class _VariantForm {
@@ -478,12 +537,8 @@ class _VariantForm {
         sku: draft.sku,
         variant: draft.variant ?? '',
         size: draft.size ?? '',
-        purchase: draft.purchasePriceCents == null
-            ? ''
-            : (draft.purchasePriceCents! / 100).toStringAsFixed(2).replaceAll('.', ','),
-        sale: draft.salePriceCents == null
-            ? ''
-            : (draft.salePriceCents! / 100).toStringAsFixed(2).replaceAll('.', ','),
+        purchase: _moneyValue(draft.purchasePriceCents),
+        sale: _moneyValue(draft.salePriceCents),
         barcodes: draft.barcodes.join('\n'),
         active: draft.isActive,
         stock: draft.stockQuantity,
@@ -499,6 +554,12 @@ class _VariantForm {
   bool active;
   final int stock;
   bool expanded;
+
+  static String _moneyValue(int? cents) {
+    if (cents == null) return '';
+    final value = (cents / 100).toStringAsFixed(2);
+    return AppStrings.isEnglish ? value : value.replaceAll('.', ',');
+  }
 
   bool containsBarcode(String value) => barcodes.text
       .split(RegExp(r'[,;\n\r]+'))
