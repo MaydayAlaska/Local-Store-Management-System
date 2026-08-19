@@ -312,21 +312,21 @@ class _MenuBrand extends StatelessWidget {
     final showName = settings.showShopNameInMenu;
     if (!showLogo && !showName) return const SizedBox(height: 12);
     return Padding(
-      padding: const EdgeInsets.only(bottom: 12, top: 10),
+      padding: const EdgeInsets.only(bottom: 14, top: 8),
       child: SizedBox(
-        width: 116,
+        width: 128,
         child: Column(
           children: [
             if (showLogo)
               Image.file(
                 File(logo),
                 key: ValueKey(logo),
-                width: 52,
-                height: 52,
+                width: 72,
+                height: 72,
                 fit: BoxFit.contain,
                 gaplessPlayback: false,
               ),
-            if (showLogo && showName) const SizedBox(height: 7),
+            if (showLogo && showName) const SizedBox(height: 9),
             if (showName)
               Text(
                 settings.shopName,
