@@ -248,21 +248,13 @@ class _CustomersPageState extends State<CustomersPage> {
                               separatorBuilder: (_, _) => const Divider(height: 1),
                               itemBuilder: (context, index) {
                                 final customer = customers[index];
-                                final birthPlaceName = BirthPlaceService.resolve(
-                                  customer.birthPlaceCode,
-                                  customer.birthDate,
-                                );
                                 return ListTile(
                                   selected: selected?.id == customer.id,
                                   leading: const CircleAvatar(
                                     child: Icon(Icons.person_outline),
                                   ),
                                   title: Text(customer.displayName),
-                                  subtitle: Text(
-                                    birthPlaceName == null
-                                        ? customer.fiscalCode
-                                        : '${customer.fiscalCode} · $birthPlaceName',
-                                  ),
+                                  subtitle: Text(customer.fiscalCode),
                                   onTap: () =>
                                       setState(() => _selected = customer),
                                 );
