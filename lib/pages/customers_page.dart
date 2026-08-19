@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../core/formatters.dart';
+import '../l10n/app_strings.dart';
 import '../models/customer.dart';
 import '../repositories/customer_repository.dart';
 import '../repositories/sales_order_search.dart';
@@ -23,7 +24,18 @@ class CustomersPage extends StatefulWidget {
 class _CustomersPageState extends State<CustomersPage> {
   final _search = TextEditingController();
   Customer? _selected;
-  String _status = 'Scansiona una Tessera Sanitaria oppure cerca un cliente.';
+  late String _status;
+
+  String _itEn(String it, String en) => AppStrings.isEnglish ? en : it;
+
+  @override
+  void initState() {
+    super.initState();
+    _status = _itEn(
+      'Scansiona una Tessera Sanitaria oppure cerca un cliente.',
+      'Scan a health card / tax code or search for a customer.',
+    );
+  }
 
   @override
   void dispose() {
@@ -31,19 +43,26 @@ class _CustomersPageState extends State<CustomersPage> {
     super.dispose();
   }
 
-  List<Customer> get _customers => widget.services.customers.search(_search.text, 500);
+  List<Customer> get _customers =>
+      widget.services.customers.search(_search.text, 500);
 
   Future<void> _scan(String raw) async {
     final data = FiscalCodeService.tryParse(raw);
     if (data == null) {
-      setState(() => _status = 'La scansione non contiene un codice fiscale valido.');
+      setState(() => _status = _itEn(
+            'La scansione non contiene un codice fiscale valido.',
+            'The scan does not contain a valid tax code.',
+          ));
       return;
     }
     final existing = widget.services.customers.findByFiscalCode(data.fiscalCode);
     if (existing != null) {
       setState(() {
         _selected = existing;
-        _status = 'Cliente trovato: ${existing.displayName}.';
+        _status = _itEn(
+          'Cliente trovato: ${existing.displayName}.',
+          'Customer found: ${existing.displayName}.',
+        );
       });
       return;
     }
@@ -56,7 +75,10 @@ class _CustomersPageState extends State<CustomersPage> {
     if (!mounted || created == null) return;
     setState(() {
       _selected = created;
-      _status = 'Cliente ${created.displayName} registrato.';
+      _status = _itEn(
+        'Cliente ${created.displayName} registrato.',
+        'Customer ${created.displayName} registered.',
+      );
     });
   }
 
@@ -68,7 +90,10 @@ class _CustomersPageState extends State<CustomersPage> {
     if (!mounted || created == null) return;
     setState(() {
       _selected = created;
-      _status = 'Cliente ${created.displayName} registrato.';
+      _status = _itEn(
+        'Cliente ${created.displayName} registrato.',
+        'Customer ${created.displayName} registered.',
+      );
     });
   }
 
@@ -83,7 +108,7 @@ class _CustomersPageState extends State<CustomersPage> {
     if (!mounted || updated == null) return;
     setState(() {
       _selected = updated;
-      _status = 'Dati cliente aggiornati.';
+      _status = _itEn('Dati cliente aggiornati.', 'Customer details updated.');
     });
   }
 
@@ -94,20 +119,32 @@ class _CustomersPageState extends State<CustomersPage> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('Eliminare il cliente?'),
+        title: Text(_itEn('Eliminare il cliente?', 'Delete customer?')),
         content: Text(
           orders.isEmpty
-              ? 'Vuoi eliminare definitivamente ${selected.displayName} (${selected.fiscalCode})?'
-              : 'Vuoi eliminare definitivamente ${selected.displayName} (${selected.fiscalCode})?\n\n'
+              ? _itEn(
+                  'Vuoi eliminare definitivamente ${selected.displayName} (${selected.fiscalCode})?',
+                  'Do you want to permanently delete ${selected.displayName} (${selected.fiscalCode})?',
+                )
+              : _itEn(
+                  'Vuoi eliminare definitivamente ${selected.displayName} (${selected.fiscalCode})?\n\n'
                   'I ${orders.length} ordini associati resteranno nello storico Vendite con nome e codice fiscale memorizzati, ma non saranno più collegati a un cliente attivo.',
+                  'Do you want to permanently delete ${selected.displayName} (${selected.fiscalCode})?\n\n'
+                  'The ${orders.length} linked orders will remain in Sales history with the stored name and tax code, but will no longer be linked to an active customer.',
+                ),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.of(dialogContext).pop(false), child: const Text('Annulla')),
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: Text(AppStrings.t('cancel')),
+          ),
           FilledButton.icon(
-            style: FilledButton.styleFrom(backgroundColor: Theme.of(dialogContext).colorScheme.error),
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(dialogContext).colorScheme.error,
+            ),
             onPressed: () => Navigator.of(dialogContext).pop(true),
             icon: const Icon(Icons.delete_outline),
-            label: const Text('Elimina cliente'),
+            label: Text(_itEn('Elimina cliente', 'Delete customer')),
           ),
         ],
       ),
@@ -120,17 +157,27 @@ class _CustomersPageState extends State<CustomersPage> {
       setState(() {
         _selected = null;
         _status = deleted
-            ? 'Cliente ${selected.displayName} eliminato. Lo storico vendite è stato conservato.'
-            : 'Il cliente non esiste più.';
+            ? _itEn(
+                'Cliente ${selected.displayName} eliminato. Lo storico vendite è stato conservato.',
+                'Customer ${selected.displayName} deleted. Sales history was preserved.',
+              )
+            : _itEn('Il cliente non esiste più.', 'The customer no longer exists.');
       });
     } catch (error) {
       if (!mounted) return;
-      setState(() => _status = 'Impossibile eliminare il cliente: $error');
+      setState(() => _status = _itEn(
+            'Impossibile eliminare il cliente: $error',
+            'Unable to delete customer: $error',
+          ));
     }
   }
 
   Future<void> _openOrder(int orderId) async {
-    await showSalesOrderDialog(context, services: widget.services, orderId: orderId);
+    await showSalesOrderDialog(
+      context,
+      services: widget.services,
+      orderId: orderId,
+    );
     if (mounted) setState(() {});
   }
 
@@ -145,11 +192,16 @@ class _CustomersPageState extends State<CustomersPage> {
         padding: const EdgeInsets.all(24),
         child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           Row(children: [
-            Expanded(child: Text('Clienti', style: Theme.of(context).textTheme.headlineMedium)),
+            Expanded(
+              child: Text(
+                AppStrings.t('customers'),
+                style: Theme.of(context).textTheme.headlineMedium,
+              ),
+            ),
             FilledButton.icon(
               onPressed: _newCustomer,
               icon: const Icon(Icons.person_add_alt_1),
-              label: const Text('Nuovo cliente'),
+              label: Text(_itEn('Nuovo cliente', 'New customer')),
             ),
           ]),
           const SizedBox(height: 12),
@@ -168,18 +220,28 @@ class _CustomersPageState extends State<CustomersPage> {
                         controller: _search,
                         onChanged: (_) => setState(() {}),
                         onSubmitted: _scan,
-                        decoration: const InputDecoration(
-                          border: OutlineInputBorder(),
-                          prefixIcon: Icon(Icons.search),
-                          labelText: 'Cerca cliente',
-                          hintText: 'Nome, cognome o codice fiscale',
+                        decoration: InputDecoration(
+                          border: const OutlineInputBorder(),
+                          prefixIcon: const Icon(Icons.search),
+                          labelText: AppStrings.t('search_customer'),
+                          hintText: _itEn(
+                            'Nome, cognome o codice fiscale',
+                            'First name, last name or tax code',
+                          ),
                         ),
                       ),
                     ),
                     const Divider(height: 1),
                     Expanded(
                       child: customers.isEmpty
-                          ? const Center(child: Text('Nessun cliente trovato.'))
+                          ? Center(
+                              child: Text(
+                                _itEn(
+                                  'Nessun cliente trovato.',
+                                  'No customers found.',
+                                ),
+                              ),
+                            )
                           : ListView.separated(
                               itemCount: customers.length,
                               separatorBuilder: (_, _) => const Divider(height: 1),
@@ -187,10 +249,13 @@ class _CustomersPageState extends State<CustomersPage> {
                                 final customer = customers[index];
                                 return ListTile(
                                   selected: selected?.id == customer.id,
-                                  leading: const CircleAvatar(child: Icon(Icons.person_outline)),
+                                  leading: const CircleAvatar(
+                                    child: Icon(Icons.person_outline),
+                                  ),
                                   title: Text(customer.displayName),
                                   subtitle: Text(customer.fiscalCode),
-                                  onTap: () => setState(() => _selected = customer),
+                                  onTap: () =>
+                                      setState(() => _selected = customer),
                                 );
                               },
                             ),
@@ -201,8 +266,15 @@ class _CustomersPageState extends State<CustomersPage> {
               const SizedBox(width: 14),
               Expanded(
                 child: selected == null
-                    ? const Card(
-                        child: Center(child: Text('Seleziona un cliente oppure scansiona la Tessera Sanitaria.')),
+                    ? Card(
+                        child: Center(
+                          child: Text(
+                            _itEn(
+                              'Seleziona un cliente oppure scansiona la Tessera Sanitaria.',
+                              'Select a customer or scan the health card / tax code.',
+                            ),
+                          ),
+                        ),
                       )
                     : _CustomerDetail(
                         key: ValueKey(selected.id),
@@ -244,6 +316,8 @@ class _CustomerDetail extends StatefulWidget {
 class _CustomerDetailState extends State<_CustomerDetail> {
   final _historySearch = TextEditingController();
 
+  String _itEn(String it, String en) => AppStrings.isEnglish ? en : it;
+
   @override
   void dispose() {
     _historySearch.dispose();
@@ -253,7 +327,10 @@ class _CustomerDetailState extends State<_CustomerDetail> {
   @override
   Widget build(BuildContext context) {
     final orders = widget.repository.ordersForCustomer(widget.customer.id);
-    final visibleOrders = widget.repository.ordersForCustomerMatching(widget.customer.id, _historySearch.text);
+    final visibleOrders = widget.repository.ordersForCustomerMatching(
+      widget.customer.id,
+      _historySearch.text,
+    );
     final spent = orders.fold<int>(0, (sum, order) => sum + order.finalTotalCents);
     final hasFilter = _historySearch.text.trim().isNotEmpty;
     return Card(
@@ -263,31 +340,46 @@ class _CustomerDetailState extends State<_CustomerDetail> {
           padding: const EdgeInsets.all(16),
           child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
             Row(children: [
-              Expanded(child: Text(widget.customer.displayName, style: Theme.of(context).textTheme.headlineSmall)),
-              OutlinedButton.icon(onPressed: widget.onEdit, icon: const Icon(Icons.edit_outlined), label: const Text('Modifica')),
+              Expanded(
+                child: Text(
+                  widget.customer.displayName,
+                  style: Theme.of(context).textTheme.headlineSmall,
+                ),
+              ),
+              OutlinedButton.icon(
+                onPressed: widget.onEdit,
+                icon: const Icon(Icons.edit_outlined),
+                label: Text(_itEn('Modifica', 'Edit')),
+              ),
               const SizedBox(width: 8),
               OutlinedButton.icon(
-                style: OutlinedButton.styleFrom(foregroundColor: Theme.of(context).colorScheme.error),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: Theme.of(context).colorScheme.error,
+                ),
                 onPressed: widget.onDelete,
                 icon: const Icon(Icons.delete_outline),
-                label: const Text('Elimina'),
+                label: Text(_itEn('Elimina', 'Delete')),
               ),
             ]),
             const SizedBox(height: 8),
             Wrap(spacing: 22, runSpacing: 8, children: [
-              Text('CF: ${widget.customer.fiscalCode}'),
-              Text('Nascita: ${widget.customer.birthDateDisplay}'),
-              Text('Sesso: ${widget.customer.sex}'),
-              Text('Codice luogo: ${widget.customer.birthPlaceCode}'),
+              Text('${_itEn('CF', 'Tax code')}: ${widget.customer.fiscalCode}'),
+              Text('${_itEn('Nascita', 'Birth date')}: ${widget.customer.birthDateDisplay}'),
+              Text('${_itEn('Sesso', 'Sex')}: ${widget.customer.sex}'),
+              Text('${_itEn('Codice luogo', 'Place code')}: ${widget.customer.birthPlaceCode}'),
             ]),
             if (widget.customer.notes?.trim().isNotEmpty == true) ...[
               const SizedBox(height: 8),
-              Text('Note: ${widget.customer.notes}'),
+              Text('${AppStrings.t('notes')}: ${widget.customer.notes}'),
             ],
             const SizedBox(height: 12),
             Wrap(spacing: 26, children: [
-              Text('${orders.length} ${orders.length == 1 ? 'acquisto' : 'acquisti'}'),
-              Text('Totale storico: ${formatMoney(spent)}'),
+              Text(
+                '${orders.length} ${_itEn(orders.length == 1 ? 'acquisto' : 'acquisti', orders.length == 1 ? 'purchase' : 'purchases')}',
+              ),
+              Text(
+                '${_itEn('Totale storico', 'History total')}: ${formatMoney(spent)}',
+              ),
             ]),
           ]),
         ),
@@ -295,8 +387,16 @@ class _CustomerDetailState extends State<_CustomerDetail> {
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 14, 16, 8),
           child: Row(children: [
-            Expanded(child: Text('Storico acquisti', style: Theme.of(context).textTheme.titleLarge)),
-            if (hasFilter) Text('${visibleOrders.length} ${visibleOrders.length == 1 ? 'risultato' : 'risultati'}'),
+            Expanded(
+              child: Text(
+                _itEn('Storico acquisti', 'Purchase history'),
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
+            ),
+            if (hasFilter)
+              Text(
+                '${visibleOrders.length} ${_itEn(visibleOrders.length == 1 ? 'risultato' : 'risultati', visibleOrders.length == 1 ? 'result' : 'results')}',
+              ),
           ]),
         ),
         Padding(
@@ -307,11 +407,17 @@ class _CustomerDetailState extends State<_CustomerDetail> {
             decoration: InputDecoration(
               border: const OutlineInputBorder(),
               prefixIcon: const Icon(Icons.search),
-              labelText: 'Cerca prodotto nello storico',
-              hintText: 'Nome e attributi, es. Maglietta Blu M',
+              labelText: _itEn(
+                'Cerca prodotto nello storico',
+                'Search product in history',
+              ),
+              hintText: _itEn(
+                'Nome e attributi, es. Maglietta Blu M',
+                'Name and attributes, e.g. Shirt Blue M',
+              ),
               suffixIcon: hasFilter
                   ? IconButton(
-                      tooltip: 'Azzera ricerca',
+                      tooltip: _itEn('Azzera ricerca', 'Clear search'),
                       onPressed: () {
                         _historySearch.clear();
                         setState(() {});
@@ -327,8 +433,14 @@ class _CustomerDetailState extends State<_CustomerDetail> {
               ? Center(
                   child: Text(
                     hasFilter
-                        ? 'Nessun acquisto contiene un prodotto con questi attributi.'
-                        : 'Nessun acquisto registrato per questo cliente.',
+                        ? _itEn(
+                            'Nessun acquisto contiene un prodotto con questi attributi.',
+                            'No purchase contains a product with these attributes.',
+                          )
+                        : _itEn(
+                            'Nessun acquisto registrato per questo cliente.',
+                            'No purchases recorded for this customer.',
+                          ),
                   ),
                 )
               : ListView.separated(
@@ -336,14 +448,18 @@ class _CustomerDetailState extends State<_CustomerDetail> {
                   separatorBuilder: (_, _) => const Divider(height: 1),
                   itemBuilder: (context, index) {
                     final order = visibleOrders[index];
-                    final local = order.createdAtUtc.toLocal();
-                    final date = '${local.day.toString().padLeft(2, '0')}/${local.month.toString().padLeft(2, '0')}/${local.year} '
-                        '${local.hour.toString().padLeft(2, '0')}:${local.minute.toString().padLeft(2, '0')}';
+                    final date = formatLocalDateTime(order.createdAtUtc);
                     return ListTile(
-                      leading: Icon(order.hasReceipt ? Icons.receipt_long : Icons.shopping_bag_outlined),
+                      leading: Icon(
+                        order.hasReceipt
+                            ? Icons.receipt_long
+                            : Icons.shopping_bag_outlined,
+                      ),
                       title: Text('${order.orderNumber} · ${order.totalDisplay}'),
-                      subtitle: Text('$date · ${order.itemCount} ${order.itemCount == 1 ? 'articolo' : 'articoli'}'
-                          '${order.hasReceipt ? ' · scontrino salvato' : ''}'),
+                      subtitle: Text(
+                        '$date · ${order.itemCount} ${AppStrings.t(order.itemCount == 1 ? 'item' : 'items')}'
+                        '${order.hasReceipt ? _itEn(' · scontrino salvato', ' · receipt saved') : ''}',
+                      ),
                       trailing: const Icon(Icons.chevron_right),
                       onTap: () => widget.onOpenOrder(order.id),
                     );
