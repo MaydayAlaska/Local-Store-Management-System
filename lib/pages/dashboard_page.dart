@@ -24,20 +24,18 @@ class _DashboardPageState extends State<DashboardPage> {
   _ScanMode _mode = _ScanMode.search;
   String _status = 'Scanner HID pronto.';
   String? _scannedCode;
+  ProductVariant? _scannedProduct;
 
   List<ProductVariant> get _results {
     final scanned = _scannedCode;
     if (scanned != null) {
-      final exact = widget.services.products.findByBarcode(scanned);
+      final exact = _scannedProduct;
       return exact == null ? const [] : [exact];
     }
-    return widget.services.products.search(_search.text).take(50).toList();
+    return widget.services.products.search(_search.text, 50);
   }
 
-  bool get _scannedCodeIsMissing {
-    final code = _scannedCode;
-    return code != null && widget.services.products.findByBarcode(code) == null;
-  }
+  bool get _scannedCodeIsMissing => _scannedCode != null && _scannedProduct == null;
 
   @override
   void dispose() {
@@ -56,6 +54,7 @@ class _DashboardPageState extends State<DashboardPage> {
         _search.text = code;
         setState(() {
           _scannedCode = code;
+          _scannedProduct = product;
           _status = product == null
               ? 'Barcode «$code» non presente. Puoi aggiungerlo dall’elenco qui sotto.'
               : 'Trovato: ${product.name} · ${product.variantDisplay}.';
@@ -64,14 +63,27 @@ class _DashboardPageState extends State<DashboardPage> {
         _search.text = code;
         setState(() {
           _scannedCode = code;
+          _scannedProduct = null;
           _status = 'Nessun prodotto trovato per «$code».';
         });
       } else if (_mode == _ScanMode.incoming) {
         widget.services.stock.addMovement(product.id, StockMovementKind.incoming, 1, 'Carico rapido da scanner');
-        setState(() => _status = '${product.name}: caricato +1.');
+        final latest = widget.services.products.getById(product.id) ?? product;
+        _search.text = code;
+        setState(() {
+          _scannedCode = code;
+          _scannedProduct = latest;
+          _status = '${product.name}: caricato +1.';
+        });
       } else {
         widget.services.stock.addMovement(product.id, StockMovementKind.outgoing, 1, 'Scarico rapido da scanner');
-        setState(() => _status = '${product.name}: scaricato -1.');
+        final latest = widget.services.products.getById(product.id) ?? product;
+        _search.text = code;
+        setState(() {
+          _scannedCode = code;
+          _scannedProduct = latest;
+          _status = '${product.name}: scaricato -1.';
+        });
       }
     } catch (error) {
       setState(() => _status = error.toString().replaceFirst('Bad state: ', ''));
@@ -149,7 +161,7 @@ class _DashboardPageState extends State<DashboardPage> {
         context: context,
         builder: (dialogContext) => StatefulBuilder(
           builder: (context, setLocalState) {
-            final products = widget.services.products.searchProducts(controller.text).take(100).toList();
+            final products = widget.services.products.searchProducts(controller.text, 100);
             return AlertDialog(
               title: const Text('Scegli articolo esistente'),
               content: SizedBox(
@@ -199,10 +211,11 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 
   void _refreshAfterBarcodeAssignment(String code) {
+    final product = widget.services.products.findByBarcode(code);
     _search.text = code;
     setState(() {
       _scannedCode = code;
-      final product = widget.services.products.findByBarcode(code);
+      _scannedProduct = product;
       _status = product == null
           ? 'Barcode non ancora assegnato.'
           : 'Barcode assegnato a ${product.name} · ${product.variantDisplay}.';
@@ -210,7 +223,10 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 
   void _manualSearchChanged(String _) {
-    setState(() => _scannedCode = null);
+    setState(() {
+      _scannedCode = null;
+      _scannedProduct = null;
+    });
   }
 
   @override
