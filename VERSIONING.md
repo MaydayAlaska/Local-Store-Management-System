@@ -17,4 +17,4 @@ Le versioni BETA usano sempre il formato `X.Y.Z-bN` (per esempio `0.1.6-b1`). Qu
 
 Versione stabile corrente su `main`: `0.1.5`.
 
-Versione BETA corrente su `Flutter`: `0.1.6-b1`.
+Versione BETA corrente su `Flutter`: `0.1.6-b2`.
