@@ -1,194 +1,234 @@
-name: Build and package desktop app
+name: Build and package Flutter desktop app
 
 on:
   push:
-    branches:
-      - test
-      - main
+    branches: [Flutter, test, main]
   pull_request:
-    branches:
-      - test
-      - main
+    branches: [Flutter, test, main]
 
 concurrency:
-  group: build-package-${{ github.event_name }}-${{ github.ref }}
+  group: flutter-build-package-${{ github.event_name }}-${{ github.ref }}
   cancel-in-progress: true
 
 env:
-  PROJECT: src/LocalStoreManagement.Desktop/LocalStoreManagement.Desktop.csproj
-  ICON_BASE64: src/LocalStoreManagement.Desktop/Assets/app-icon.base64
-  ICON_ICO: src/LocalStoreManagement.Desktop/Assets/app-icon.ico
+  ICON_BASE64: assets/app-icon.base64
 
 jobs:
-  build:
-    strategy:
-      matrix:
-        os: [ubuntu-latest, windows-latest]
-    runs-on: ${{ matrix.os }}
-
+  verify:
+    name: Flutter analyze and tests
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Prepare Windows application icon
-        if: runner.os == 'Windows'
-        shell: pwsh
+      - name: Linux desktop dependencies
         run: |
-          $png = [Convert]::FromBase64String((Get-Content -Raw "${{ env.ICON_BASE64 }}").Trim())
-          $iconPath = "${{ env.ICON_ICO }}"
-          $stream = [IO.File]::Open($iconPath, [IO.FileMode]::Create, [IO.FileAccess]::Write)
-          try {
-            $writer = [IO.BinaryWriter]::new($stream)
-            $writer.Write([UInt16]0)
-            $writer.Write([UInt16]1)
-            $writer.Write([UInt16]1)
-            $writer.Write([Byte]64)
-            $writer.Write([Byte]64)
-            $writer.Write([Byte]0)
-            $writer.Write([Byte]0)
-            $writer.Write([UInt16]1)
-            $writer.Write([UInt16]32)
-            $writer.Write([UInt32]$png.Length)
-            $writer.Write([UInt32]22)
-            $writer.Write($png)
-            $writer.Flush()
-          }
-          finally {
-            $stream.Dispose()
-          }
+          sudo apt-get update
+          sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev libstdc++-12-dev
 
-      - name: Setup .NET 10
-        uses: actions/setup-dotnet@v4
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
         with:
-          dotnet-version: 10.0.x
+          channel: stable
+          cache: true
 
-      - name: Restore
-        run: dotnet restore ${{ env.PROJECT }}
+      - name: Generate Linux runner
+        run: |
+          flutter create --platforms=linux --project-name local_store_management --org com.maydayalaska .
+          rm -f test/widget_test.dart
 
-      - name: Build
-        run: dotnet build ${{ env.PROJECT }} --configuration Release --no-restore
+      - name: Resolve packages
+        run: flutter pub get
 
-      - name: Fresh database smoke test
-        run: dotnet run --project ${{ env.PROJECT }} --configuration Release --no-build -- --database-smoke-test
+      - name: Analyze
+        run: flutter analyze --no-fatal-infos
+
+      - name: SQLite smoke test
+        run: flutter test
 
   package-windows:
-    name: Windows installer
-    needs: build
-    runs-on: windows-latest
-
+    name: Windows installer (${{ matrix.arch }})
+    needs: verify
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: windows-latest
+            arch: x64
+            build_arch: x64
+            allowed_architectures: x64compatible
+          - runner: windows-11-vs2026-arm
+            arch: arm64
+            build_arch: arm64
+            allowed_architectures: arm64
+    runs-on: ${{ matrix.runner }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Setup Flutter x64 host SDK
+        if: matrix.arch == 'x64'
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          architecture: x64
+          cache: true
+
+      - name: Setup Flutter x64 host SDK for Windows ARM64
+        if: matrix.arch == 'arm64'
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          architecture: x64
+          cache: false
+
+      - name: Show Flutter and host architecture
+        shell: pwsh
+        run: |
+          flutter --version
+          Write-Host "PROCESSOR_ARCHITECTURE=$env:PROCESSOR_ARCHITECTURE"
+          Write-Host "PROCESSOR_ARCHITEW6432=$env:PROCESSOR_ARCHITEW6432"
+
+      - name: Force Flutter Windows ARM64 host detection
+        if: matrix.arch == 'arm64'
+        shell: pwsh
+        run: |
+          $source = Join-Path $env:FLUTTER_ROOT 'packages/flutter_tools/lib/src/base/os.dart'
+          $text = Get-Content -Raw $source
+          $pattern = '(?s)HostPlatform get hostPlatform \{\s*return switch \(_currentAbi\) \{.*?\n\s*\};\s*\n\s*\}'
+          $matches = [regex]::Matches($text, $pattern)
+          if ($matches.Count -ne 1) {
+            throw "Impossibile applicare il workaround Windows ARM64: trovati $($matches.Count) getter hostPlatform compatibili."
+          }
+          $replacement = "HostPlatform get hostPlatform {`n    return HostPlatform.windows_arm64;`n  }"
+          $patched = [regex]::Replace($text, $pattern, $replacement, 1)
+          [IO.File]::WriteAllText($source, $patched)
+
+          Remove-Item (Join-Path $env:FLUTTER_ROOT 'bin/cache/flutter_tools.snapshot') -Force -ErrorAction SilentlyContinue
+          Remove-Item (Join-Path $env:FLUTTER_ROOT 'bin/cache/flutter_tools.stamp') -Force -ErrorAction SilentlyContinue
+
+          flutter --version
+          flutter precache --windows --force
+
+      - name: Generate Windows runner
+        run: flutter create --platforms=windows --project-name local_store_management --org com.maydayalaska .
 
       - name: Prepare Windows application icon
         shell: pwsh
         run: |
           $png = [Convert]::FromBase64String((Get-Content -Raw "${{ env.ICON_BASE64 }}").Trim())
-          $iconPath = "${{ env.ICON_ICO }}"
+          $iconPath = "windows/runner/resources/app_icon.ico"
           $stream = [IO.File]::Open($iconPath, [IO.FileMode]::Create, [IO.FileAccess]::Write)
           try {
             $writer = [IO.BinaryWriter]::new($stream)
-            $writer.Write([UInt16]0)
-            $writer.Write([UInt16]1)
-            $writer.Write([UInt16]1)
-            $writer.Write([Byte]64)
-            $writer.Write([Byte]64)
-            $writer.Write([Byte]0)
-            $writer.Write([Byte]0)
-            $writer.Write([UInt16]1)
-            $writer.Write([UInt16]32)
-            $writer.Write([UInt32]$png.Length)
-            $writer.Write([UInt32]22)
-            $writer.Write($png)
-            $writer.Flush()
-          }
-          finally {
-            $stream.Dispose()
-          }
+            $writer.Write([UInt16]0); $writer.Write([UInt16]1); $writer.Write([UInt16]1)
+            $writer.Write([Byte]64); $writer.Write([Byte]64); $writer.Write([Byte]0); $writer.Write([Byte]0)
+            $writer.Write([UInt16]1); $writer.Write([UInt16]32)
+            $writer.Write([UInt32]$png.Length); $writer.Write([UInt32]22); $writer.Write($png); $writer.Flush()
+          } finally { $stream.Dispose() }
 
-      - name: Setup .NET 10
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: 10.0.x
+      - name: Resolve packages
+        run: flutter pub get
 
-      - name: Publish Windows x64
-        run: dotnet publish ${{ env.PROJECT }} --configuration Release --runtime win-x64 --self-contained true --output publish/win-x64
-
-      - name: Write build information
+      - name: Build Windows release
         shell: pwsh
         run: |
-          [xml]$project = Get-Content "${{ env.PROJECT }}"
-          $version = $project.Project.PropertyGroup.Version | Select-Object -First 1
-          $branch = if ("${{ github.head_ref }}") { "${{ github.head_ref }}" } else { "${{ github.ref_name }}" }
           $commit = if ("${{ github.event.pull_request.head.sha }}") { "${{ github.event.pull_request.head.sha }}" } else { "${{ github.sha }}" }
-          $info = [ordered]@{
-            version = "$version"
-            commit = "$commit"
-            branch = "$branch"
-          }
-          $info | ConvertTo-Json | Set-Content -Encoding utf8 "publish/win-x64/build-info.json"
+          $branch = if ("${{ github.head_ref }}") { "${{ github.head_ref }}" } else { "${{ github.ref_name }}" }
+          flutter build windows --release --dart-define="GIT_COMMIT=$commit" --dart-define="BUILD_BRANCH=$branch"
 
       - name: Build installer
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path dist | Out-Null
-          [xml]$project = Get-Content "${{ env.PROJECT }}"
-          $version = $project.Project.PropertyGroup.Version | Select-Object -First 1
-          $publishDir = (Resolve-Path "publish/win-x64").Path
-          $outputDir = (Resolve-Path "dist").Path
-          $iconFile = (Resolve-Path "${{ env.ICON_ICO }}").Path
-
+          $rawVersion = ((Select-String -Path pubspec.yaml -Pattern '^version:\s*(\S+)' | Select-Object -First 1).Matches.Groups[1].Value)
+          $version = $rawVersion -replace '\+', '.'
+          $publishDir = (Resolve-Path 'build/windows/${{ matrix.build_arch }}/runner/Release').Path
+          $outputDir = (Resolve-Path 'dist').Path
+          $iconFile = (Resolve-Path 'windows/runner/resources/app_icon.ico').Path
           $iscc = (Get-Command ISCC.exe -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty Source)
           if (-not $iscc) {
-            $iscc = Get-ChildItem "C:\Program Files*\Inno Setup *\ISCC.exe" -ErrorAction SilentlyContinue |
-              Select-Object -First 1 -ExpandProperty FullName
+            $iscc = Get-ChildItem 'C:\Program Files*\Inno Setup *\ISCC.exe' -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty FullName
           }
-          if (-not $iscc) {
-            throw "ISCC.exe (Inno Setup) non trovato nel runner Windows."
-          }
+          if (-not $iscc) { throw 'ISCC.exe (Inno Setup) non trovato nel runner Windows.' }
+          & $iscc "/DPublishDir=$publishDir" "/DOutputDir=$outputDir" "/DAppVersion=$version" "/DIconFile=$iconFile" "/DAllowedArchitectures=${{ matrix.allowed_architectures }}" "/DOutputBaseFilename=LocalStoreManagement-Setup-win-${{ matrix.arch }}" 'packaging/windows/installer.iss'
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
-          & $iscc "/DPublishDir=$publishDir" "/DOutputDir=$outputDir" "/DAppVersion=$version" "/DIconFile=$iconFile" "packaging/windows/installer.iss"
-          if ($LASTEXITCODE -ne 0) {
-            exit $LASTEXITCODE
-          }
-
-      - name: Upload Windows installer
+      - name: Upload Windows installer for release jobs
         uses: actions/upload-artifact@v4
         with:
-          name: package-win-x64
-          path: dist/LocalStoreManagement-Setup-win-x64.exe
+          name: package-win-${{ matrix.arch }}
+          path: dist/LocalStoreManagement-Setup-win-${{ matrix.arch }}.exe
           if-no-files-found: error
+          retention-days: 1
 
   package-linux:
-    name: Linux AppImage
-    needs: build
-    runs-on: ubuntu-latest
-
+    name: Linux packages (${{ matrix.arch }})
+    needs: verify
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-latest
+            arch: x64
+            build_arch: x64
+            deb_arch: amd64
+            appimage_arch: x86_64
+          - runner: ubuntu-24.04-arm
+            arch: arm64
+            build_arch: arm64
+            deb_arch: arm64
+            appimage_arch: aarch64
+    runs-on: ${{ matrix.runner }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup .NET 10
-        uses: actions/setup-dotnet@v4
+      - name: Linux desktop dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev libstdc++-12-dev squashfs-tools curl git unzip xz-utils
+
+      - name: Setup Flutter x64
+        if: matrix.arch == 'x64'
+        uses: subosito/flutter-action@v2
         with:
-          dotnet-version: 10.0.x
+          channel: stable
+          architecture: x64
+          cache: true
 
-      - name: Publish Linux x64
-        run: dotnet publish ${{ env.PROJECT }} --configuration Release --runtime linux-x64 --self-contained true --output publish/linux-x64
-
-      - name: Write build information
+      - name: Bootstrap Flutter ARM64 from official stable branch
+        if: matrix.arch == 'arm64'
         shell: bash
         run: |
           set -euo pipefail
-          VERSION="$(sed -n 's:.*<Version>\(.*\)</Version>.*:\1:p' "${PROJECT}" | head -n 1)"
+          FLUTTER_ROOT="$RUNNER_TEMP/flutter-arm64"
+          git clone --depth 1 --branch stable https://github.com/flutter/flutter.git "$FLUTTER_ROOT"
+          echo "$FLUTTER_ROOT/bin" >> "$GITHUB_PATH"
+          "$FLUTTER_ROOT/bin/flutter" --version
+          "$FLUTTER_ROOT/bin/flutter" config --enable-linux-desktop
+          "$FLUTTER_ROOT/bin/flutter" precache --linux
+
+      - name: Show Flutter and host architecture
+        shell: bash
+        run: |
+          uname -m
+          flutter --version
+
+      - name: Generate Linux runner
+        run: flutter create --platforms=linux --project-name local_store_management --org com.maydayalaska .
+
+      - name: Resolve packages
+        run: flutter pub get
+
+      - name: Build Linux release
+        shell: bash
+        run: |
+          set -euo pipefail
+          COMMIT='${{ github.event.pull_request.head.sha }}'
+          if [ -z "$COMMIT" ]; then COMMIT='${{ github.sha }}'; fi
           BRANCH="${GITHUB_HEAD_REF:-${GITHUB_REF_NAME}}"
-          COMMIT="${{ github.event.pull_request.head.sha }}"
-          if [ -z "${COMMIT}" ]; then
-            COMMIT="${GITHUB_SHA}"
-          fi
-          printf '{"version":"%s","commit":"%s","branch":"%s"}\n' \
-            "${VERSION}" "${COMMIT}" "${BRANCH}" \
-            > publish/linux-x64/build-info.json
+          flutter build linux --release --dart-define="GIT_COMMIT=$COMMIT" --dart-define="BUILD_BRANCH=$BRANCH"
 
       - name: Build AppDir
         shell: bash
@@ -196,142 +236,178 @@ jobs:
           set -euo pipefail
           rm -rf AppDir dist
           mkdir -p AppDir/usr/bin AppDir/usr/share/icons/hicolor/64x64/apps dist
-          cp -a publish/linux-x64/. AppDir/usr/bin/
+          cp -a build/linux/${{ matrix.build_arch }}/release/bundle/. AppDir/usr/bin/
           cp packaging/linux/AppRun AppDir/AppRun
           cp packaging/linux/local-store-management.desktop AppDir/local-store-management.desktop
           base64 --decode "${ICON_BASE64}" > AppDir/local-store-management.png
           cp AppDir/local-store-management.png AppDir/usr/share/icons/hicolor/64x64/apps/local-store-management.png
           ln -s local-store-management.png AppDir/.DirIcon
-          chmod +x AppDir/AppRun AppDir/usr/bin/LocalStoreManagement.Desktop
-
-      - name: Install AppImage build dependency
-        shell: bash
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y squashfs-tools
+          chmod +x AppDir/AppRun AppDir/usr/bin/local_store_management
 
       - name: Build AppImage
         shell: bash
         run: |
           set -euo pipefail
-          curl --fail --location --retry 3 \
-            --output appimagetool-x86_64.AppImage \
-            https://github.com/AppImage/appimagetool/releases/download/1.9.1/appimagetool-x86_64.AppImage
-          chmod +x appimagetool-x86_64.AppImage
-          APPIMAGE_EXTRACT_AND_RUN=1 ARCH=x86_64 \
-            ./appimagetool-x86_64.AppImage \
-            AppDir \
-            dist/LocalStoreManagement-linux-x64.AppImage
-          chmod +x dist/LocalStoreManagement-linux-x64.AppImage
+          TOOL="appimagetool-${{ matrix.appimage_arch }}.AppImage"
+          curl --fail --location --retry 3 --output "$TOOL" \
+            "https://github.com/AppImage/appimagetool/releases/download/1.9.1/$TOOL"
+          chmod +x "$TOOL"
+          APPIMAGE_EXTRACT_AND_RUN=1 ARCH=${{ matrix.appimage_arch }} ./"$TOOL" AppDir dist/LocalStoreManagement-linux-${{ matrix.arch }}.AppImage
+          chmod +x dist/LocalStoreManagement-linux-${{ matrix.arch }}.AppImage
 
-      - name: Upload Linux AppImage
+      - name: Build Debian package
+        shell: bash
+        run: |
+          set -euo pipefail
+          RAW_VERSION="$(awk '/^version:/{print $2; exit}' pubspec.yaml)"
+          DEB_VERSION="${RAW_VERSION/+/.}"
+          rm -rf DebRoot
+          mkdir -p DebRoot/DEBIAN \
+                   DebRoot/usr/bin \
+                   DebRoot/usr/lib/local-store-management \
+                   DebRoot/usr/share/applications \
+                   DebRoot/usr/share/icons/hicolor/64x64/apps
+          cp -a build/linux/${{ matrix.build_arch }}/release/bundle/. DebRoot/usr/lib/local-store-management/
+          cp packaging/linux/local-store-management.desktop DebRoot/usr/share/applications/local-store-management.desktop
+          base64 --decode "${ICON_BASE64}" > DebRoot/usr/share/icons/hicolor/64x64/apps/local-store-management.png
+          cat > DebRoot/usr/bin/local_store_management <<'EOF'
+          #!/bin/sh
+          exec /usr/lib/local-store-management/local_store_management "$@"
+          EOF
+          chmod +x DebRoot/usr/bin/local_store_management DebRoot/usr/lib/local-store-management/local_store_management
+          INSTALLED_SIZE="$(du -sk DebRoot/usr | cut -f1)"
+          cat > DebRoot/DEBIAN/control <<EOF
+          Package: local-store-management-system
+          Version: ${DEB_VERSION}
+          Section: office
+          Priority: optional
+          Architecture: ${{ matrix.deb_arch }}
+          Maintainer: MaydayAlaska
+          Depends: libgtk-3-0, libblkid1, liblzma5
+          Installed-Size: ${INSTALLED_SIZE}
+          Description: Local Store Management System
+           Gestionale desktop offline per negozio.
+          EOF
+          dpkg-deb --build --root-owner-group DebRoot dist/LocalStoreManagement-linux-${{ matrix.arch }}.deb
+
+      - name: Upload Linux packages for release jobs
         uses: actions/upload-artifact@v4
         with:
-          name: package-linux-x64
-          path: dist/LocalStoreManagement-linux-x64.AppImage
+          name: package-linux-${{ matrix.arch }}
+          path: |
+            dist/LocalStoreManagement-linux-${{ matrix.arch }}.AppImage
+            dist/LocalStoreManagement-linux-${{ matrix.arch }}.deb
           if-no-files-found: error
+          retention-days: 1
+
+  release-flutter:
+    name: Publish Flutter development assets
+    if: github.event_name == 'push' && github.ref == 'refs/heads/Flutter'
+    needs: [package-windows, package-linux]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: package-*
+          path: dist
+          merge-multiple: true
+      - name: Publish direct development downloads
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG='flutter-latest'
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release delete "$TAG" --repo "$GITHUB_REPOSITORY" --cleanup-tag --yes
+          fi
+          gh release create "$TAG" dist/* --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --prerelease --latest=false \
+            --title "Flutter development build (${GITHUB_SHA::7})" \
+            --notes 'Build di sviluppo del branch Flutter. Scarica direttamente il file adatto al sistema: EXE per Windows, AppImage o DEB per Linux. Gli artifact Actions sono solo trasferimenti interni temporanei.'
 
   release-test:
     name: Publish test beta assets
     if: github.event_name == 'push' && github.ref == 'refs/heads/test'
-    needs: [build, package-windows, package-linux]
+    needs: [package-windows, package-linux]
     runs-on: ubuntu-latest
     permissions:
       contents: write
-
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Download packaged applications
-        uses: actions/download-artifact@v4
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
         with:
           pattern: package-*
           path: dist
           merge-multiple: true
-
-      - name: Publish beta prerelease for test
+      - name: Publish beta prerelease
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           set -euo pipefail
-          VERSION="$(sed -n 's:.*<Version>\(.*\)</Version>.*:\1:p' "${PROJECT}" | head -n 1)"
-          TAG="test-latest"
-
-          mv dist/LocalStoreManagement-Setup-win-x64.exe \
-            "dist/LocalStoreManagement-${VERSION}-BETA-Setup-win-x64.exe"
-          mv dist/LocalStoreManagement-linux-x64.AppImage \
-            "dist/LocalStoreManagement-${VERSION}-BETA-linux-x64.AppImage"
-
+          RAW_VERSION="$(awk '/^version:/{print $2; exit}' pubspec.yaml)"
+          VERSION="${RAW_VERSION/+/.}"
+          TAG='test-latest'
+          mv dist/LocalStoreManagement-Setup-win-x64.exe "dist/LocalStoreManagement-${VERSION}-BETA-Setup-win-x64.exe"
+          mv dist/LocalStoreManagement-Setup-win-arm64.exe "dist/LocalStoreManagement-${VERSION}-BETA-Setup-win-arm64.exe"
+          mv dist/LocalStoreManagement-linux-x64.AppImage "dist/LocalStoreManagement-${VERSION}-BETA-linux-x64.AppImage"
+          mv dist/LocalStoreManagement-linux-x64.deb "dist/LocalStoreManagement-${VERSION}-BETA-linux-x64.deb"
+          mv dist/LocalStoreManagement-linux-arm64.AppImage "dist/LocalStoreManagement-${VERSION}-BETA-linux-arm64.AppImage"
+          mv dist/LocalStoreManagement-linux-arm64.deb "dist/LocalStoreManagement-${VERSION}-BETA-linux-arm64.deb"
           if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             gh release delete "$TAG" --repo "$GITHUB_REPOSITORY" --cleanup-tag --yes
           fi
-
-          gh release create "$TAG" dist/* \
-            --repo "$GITHUB_REPOSITORY" \
-            --target "$GITHUB_SHA" \
-            --prerelease \
-            --latest=false \
+          gh release create "$TAG" dist/* --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --prerelease --latest=false \
             --title "Local Store Management v${VERSION} BETA / TEST (${GITHUB_SHA::7})" \
-            --notes "Versione BETA/TEST generata automaticamente dal branch test. Non è una release stabile. Usa questi pacchetti solo per verificare le modifiche prima della promozione su main."
+            --notes 'Versione BETA/TEST generata automaticamente dal branch test. Include Windows x64/ARM64 e Linux x64/ARM64 in formato AppImage e DEB.'
 
   release-main:
     name: Publish main release assets
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    needs: [build, package-windows, package-linux]
+    needs: [package-windows, package-linux]
     runs-on: ubuntu-latest
     permissions:
       contents: write
-
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Download packaged applications
-        uses: actions/download-artifact@v4
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
         with:
           pattern: package-*
           path: dist
           merge-multiple: true
-
-      - name: Publish stable release and OTA compatibility bridge
+      - name: Publish stable release and OTA bridge
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           set -euo pipefail
-          VERSION="$(sed -n 's:.*<Version>\(.*\)</Version>.*:\1:p' "${PROJECT}" | head -n 1)"
+          RAW_VERSION="$(awk '/^version:/{print $2; exit}' pubspec.yaml)"
+          VERSION="${RAW_VERSION/+/.}"
           STABLE_TAG="v${VERSION}"
           LEGACY_TAG="ota-${GITHUB_SHA}"
-
-          # Manteniamo un solo bridge OTA legacy: i client già installati cercano ancora ota-<sha>.
           while IFS= read -r old_tag; do
             [ -z "$old_tag" ] && continue
             gh release delete "$old_tag" --repo "$GITHUB_REPOSITORY" --cleanup-tag --yes
-          done < <(gh release list --repo "$GITHUB_REPOSITORY" --limit 100 --json tagName,name \
-            --jq '.[] | select(.name | startswith("Legacy OTA bridge")) | .tagName')
-
+          done < <(gh release list --repo "$GITHUB_REPOSITORY" --limit 100 --json tagName,name --jq '.[] | select(.name | startswith("Legacy OTA bridge")) | .tagName')
           if gh release view "$STABLE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             gh release delete "$STABLE_TAG" --repo "$GITHUB_REPOSITORY" --cleanup-tag --yes
           fi
           if gh release view "$LEGACY_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             gh release delete "$LEGACY_TAG" --repo "$GITHUB_REPOSITORY" --cleanup-tag --yes
           fi
-
-          # Compatibilità con le versioni già distribuite, senza usare questo tag come release principale.
-          gh release create "$LEGACY_TAG" dist/* \
-            --repo "$GITHUB_REPOSITORY" \
-            --target "$GITHUB_SHA" \
-            --prerelease \
-            --latest=false \
+          gh release create "$LEGACY_TAG" dist/* --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --prerelease --latest=false \
             --title "Legacy OTA bridge v${VERSION}" \
-            --notes "Release tecnica per mantenere compatibili gli aggiornamenti OTA delle versioni precedenti. Per il download manuale usa la release stabile v${VERSION}."
-
-          # Release pubblica principale con tag leggibile.
-          gh release create "$STABLE_TAG" dist/* \
-            --repo "$GITHUB_REPOSITORY" \
-            --target "$GITHUB_SHA" \
-            --latest=true \
+            --notes 'Release tecnica per gli aggiornamenti automatici.'
+          mkdir stable-dist
+          cp dist/LocalStoreManagement-Setup-win-x64.exe "stable-dist/LocalStoreManagement-${VERSION}-Setup-win-x64.exe"
+          cp dist/LocalStoreManagement-Setup-win-arm64.exe "stable-dist/LocalStoreManagement-${VERSION}-Setup-win-arm64.exe"
+          cp dist/LocalStoreManagement-linux-x64.AppImage "stable-dist/LocalStoreManagement-${VERSION}-linux-x64.AppImage"
+          cp dist/LocalStoreManagement-linux-x64.deb "stable-dist/LocalStoreManagement-${VERSION}-linux-x64.deb"
+          cp dist/LocalStoreManagement-linux-arm64.AppImage "stable-dist/LocalStoreManagement-${VERSION}-linux-arm64.AppImage"
+          cp dist/LocalStoreManagement-linux-arm64.deb "stable-dist/LocalStoreManagement-${VERSION}-linux-arm64.deb"
+          gh release create "$STABLE_TAG" stable-dist/* --repo "$GITHUB_REPOSITORY" --latest=true \
             --title "Local Store Management v${VERSION}" \
-            --notes "Release stabile v${VERSION}. Pacchetti Windows e Linux generati automaticamente dal branch main."
+            --notes "Release stabile v${VERSION}. Windows x64/ARM64 e Linux x64/ARM64 (AppImage + DEB)."

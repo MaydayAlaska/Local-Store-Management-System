@@ -1,95 +1,144 @@
-# Local Store Management System
+# Local Store Management System — Flutter
 
-Gestionale desktop multipiattaforma per negozio, pensato per funzionare **offline** su Windows e Linux.
+Gestionale desktop offline per negozio, ora riscritto in **Flutter/Dart**. Il branch `Flutter` sostituisce l'implementazione C#/Avalonia mantenendo compatibilità con il database SQLite e con il flusso operativo già esistente.
 
-## Stack
+## Piattaforme
 
-- .NET 10 LTS
-- Avalonia UI 12.1.1
-- SQLite tramite `Microsoft.Data.Sqlite`
-- esportazione Excel tramite `DocumentFormat.OpenXml`
-- esportazione PDF tramite PDFsharp + MigraDoc
-- Architettura desktop nativa: **nessun browser e nessun server web richiesto**
+- Windows x64
+- Linux x64
+- applicazione desktop nativa, senza browser o server web
+- interfaccia Material 3 con barra titolo personalizzata che segue il tema dell'applicazione
 
-## Funzioni concordate
+## Funzioni migrate
 
-1. **Prodotti**: SKU, barcode/EAN, nome, marca, categoria, variante, taglia, prezzo di acquisto, prezzo di vendita, note e stato attivo/disattivato. Variante e taglia sono attributi distinti; non è prevista una scorta minima.
-2. **Magazzino**: carico, scarico, rettifica e storico completo dei movimenti. La giacenza è sempre derivata dalla somma dei movimenti e non è modificata direttamente nell'anagrafica prodotto.
-3. **Scanner e ricerca Dashboard**: ricerca tramite scanner USB/HID, riconoscimento immediato di SKU/barcode, creazione guidata se il codice non esiste, modalità rapide di carico/scarico da 1 pezzo per scansione e ricerca manuale per nome/SKU/barcode dalla Dashboard.
-4. **Etichette**: selezione prodotto, anteprima, EAN-13 quando il codice è valido (Code 128 negli altri casi), numero copie, dimensioni etichetta e stampa tramite le code di sistema Windows/Linux.
-5. **Backup ed esportazione**: backup locale del database; esportazione completa dell'inventario in Excel o PDF, raggruppata per marca in ordine alfabetico, oppure esportazione parziale filtrando una o più marche e/o una o più categorie. L'Excel completo usa un unico foglio diviso in sezioni per marca.
-6. **Impostazioni**: nome negozio, icona dell'applicazione e logo del negozio da riutilizzare nelle esportazioni Excel/PDF.
-7. **Cassa**: pannello di vendita con ricerca/scansione SKU o barcode, carrello temporaneo, quantità e totale. L'emissione del documento commerciale e lo scarico automatico di magazzino restano disattivati finché non viene integrato un registratore telematico supportato.
+### Catalogo prodotti
 
-Non è previsto un modulo separato di inventario fisico/conteggio sessioni.
+- prodotto con una o più varianti
+- SKU univoco e uno o più barcode per variante
+- nome, marca, categoria, variante, taglia, prezzi di acquisto/vendita, note e stato attivo
+- ricerca per nome, SKU, barcode, marca, categoria, variante e taglia
+- gestione separata di marche e categorie con rinomina, eliminazione e riassegnazione
 
-## Stato attuale sul branch `test`
+### Magazzino
 
-- anagrafica prodotti: implementata;
-- magazzino: carico, scarico, rettifica e storico movimenti implementati;
-- scanner: integrazione HID implementata con ricerca/apertura prodotto, creazione da codice sconosciuto, carico rapido +1 e scarico rapido -1;
-- Dashboard: ricerca manuale prodotti per nome, SKU e barcode implementata;
-- Cassa: pannello base implementato con scanner HID, ricerca prodotti, carrello temporaneo, controllo della disponibilità, modifica quantità e calcolo del totale; pagamento, documento commerciale e scarico magazzino restano volutamente disattivati fino all'integrazione RT;
-- etichette: generazione/anteprima e backend di stampa Windows GDI + Linux CUPS implementati; resta da calibrare e verificare fisicamente la ApiX110 con le etichette reali;
-- impostazioni: nome negozio, icona programma e logo negozio persistenti implementati;
-- backup database: implementato;
-- esportazione inventario Excel: implementata con export completo su un unico foglio e filtri parziali per marca/categoria;
-- esportazione inventario PDF: implementata con lo stesso raggruppamento e gli stessi filtri dell'Excel.
+- carico
+- scarico con controllo disponibilità
+- rettifica a giacenza assoluta
+- storico completo dei movimenti
+- giacenza sempre derivata dalla somma di `stock_movements.quantity_delta`
 
-## Struttura
+### Scanner HID
 
-```text
-src/LocalStoreManagement.Desktop/
-├── Controls/              # controlli Avalonia personalizzati (anteprima barcode)
-├── Data/                  # repository SQLite
-├── Infrastructure/        # database, impostazioni, migrazioni e percorsi locali
-├── Models/                # modelli applicativi
-├── Services/              # barcode, stampa etichette, backup ed esportazioni
-├── App.axaml              # bootstrap Avalonia
-├── MainWindow.axaml       # shell desktop, Dashboard e navigazione principale
-├── CashView.*             # pannello Cassa e carrello di vendita temporaneo
-├── LabelsWindow.*         # anteprima e stampa etichette
-├── ExportWindow.*         # backup ed esportazioni Excel/PDF
-├── SettingsWindow.*       # impostazioni negozio
-├── ProductEditorWindow.*  # editor anagrafica prodotto
-└── StockMovementWindow.*  # carico/scarico/rettifica
-```
+Gli scanner USB che operano come tastiera continuano a funzionare senza driver dedicati. Dalla Dashboard sono disponibili ricerca/apertura prodotto, carico rapido `+1` e scarico rapido `-1`. Un codice sconosciuto in modalità ricerca apre la creazione prodotto con il barcode precompilato.
 
-## Dati locali
+### Cassa
 
-Al primo avvio il programma controlla e, se necessario, crea la cartella **`Documents/Local Store Management System`** dell'utente. Al suo interno vengono salvati:
+- scansione barcode/SKU e ricerca manuale
+- carrello temporaneo
+- quantità limitata alla giacenza disponibile
+- sconto percentuale per singola riga
+- sconto percentuale sul totale
+- più sconti fissi in euro, mostrati come righe negative rimovibili
+- calcolo totale senza modificare il magazzino
 
-- `store.db`: database SQLite;
-- `settings.json`: impostazioni del negozio;
-- `assets/`: icona e logo scelti dall'utente;
-- `Backups/`: copie di backup del database create dall'applicazione.
+L'emissione del documento commerciale resta volutamente disabilitata finché non viene collegato un registratore telematico supportato.
 
-Se esiste un database della precedente versione nella vecchia cartella dati locale e nella nuova cartella non è ancora presente `store.db`, il programma lo copia automaticamente nella nuova posizione.
+### Etichette
 
-Il percorso effettivo del database viene mostrato nella Dashboard.
+- selezione variante
+- anteprima barcode
+- EAN-13 quando il codice è valido, Code 128 negli altri casi
+- numero copie e dimensioni in millimetri
+- generazione PDF e stampa tramite dialogo di sistema Windows/Linux
+
+### Backup ed export
+
+- backup SQLite consistente tramite API di backup del database
+- salvataggio backup in un percorso scelto dall'utente
+- export inventario Excel e PDF
+- filtri per marche/categorie
+- raggruppamento alfabetico per marca
+- nome negozio negli export e logo nel PDF
+
+### Impostazioni e aggiornamenti
+
+- nome negozio
+- icona applicazione personalizzata
+- logo negozio
+- visibilità nome/logo nel menu
+- su Windows l'icona personalizzata viene applicata anche a finestra/taskbar e ai collegamenti dell'app, in modalità best effort
+- controllo aggiornamenti su GitHub
+- installazione OTA delle release Windows e delle AppImage Linux quando l'app è eseguita da un pacchetto pubblicato
+
+### Diagnostica
+
+- `Logs/application.log` registra errori Flutter non gestiti e problemi di avvio
+- se l'inizializzazione del database fallisce viene mostrata una schermata di errore con il percorso del log invece di terminare senza spiegazioni
+
+## Compatibilità dati
+
+La posizione resta la stessa dell'app precedente:
+
+`Documenti/Local Store Management System/`
+
+Contenuto principale:
+
+- `store.db`
+- `settings.json`
+- `assets/`
+- `Backups/`
+- `Logs/`
+
+Lo schema SQLite resta alla versione `2` con le tabelle:
+
+- `products`
+- `product_variants`
+- `product_barcodes`
+- `stock_movements`
+- `brands`
+- `categories`
+
+La migrazione automatica del vecchio schema pre-varianti viene mantenuta e crea una copia di sicurezza prima della conversione.
 
 ## Avvio in sviluppo
 
-Richiede il .NET 10 SDK.
+È richiesto Flutter stable con supporto desktop. I runner nativi sono boilerplate generato da Flutter e vengono creati al primo checkout:
 
-```bash
-dotnet restore src/LocalStoreManagement.Desktop/LocalStoreManagement.Desktop.csproj
-dotnet run --project src/LocalStoreManagement.Desktop/LocalStoreManagement.Desktop.csproj
+### Windows
+
+```powershell
+./tool/bootstrap_desktop.ps1
+flutter run -d windows
 ```
 
-Gli stessi sorgenti vengono compilati su Windows e Linux.
+### Linux
 
-## Hardware previsto
+```bash
+./tool/bootstrap_desktop.sh
+flutter run -d linux
+```
 
-Lo scanner di codici a barre viene trattato come dispositivo HID/tastiera: il codice scansionato termina con `Enter` e viene acquisito dal gestionale. Dalla Dashboard si può scegliere tra ricerca/apertura prodotto, carico rapido e scarico rapido. Nel pannello Cassa ogni scansione di una variante vendibile aggiunge un pezzo al carrello, fino alla giacenza disponibile.
+Per una build release:
 
-Se un codice scansionato non è presente, dalla Dashboard viene aperta la scheda di creazione prodotto con il barcode già compilato; l'utente può completarla oppure annullare. In Cassa il codice sconosciuto viene segnalato senza modificare il carrello.
+```bash
+flutter build linux --release
+```
 
-La stampa delle etichette resta isolata dietro `ILabelPrinter`:
+oppure su Windows:
 
-- su **Windows** il gestionale usa GDI e la coda/driver di stampa installata; la misura fisica dell'etichetta va configurata nel driver;
-- su **Linux** genera una pagina PDF della misura scelta e la invia tramite `lp` alla coda **CUPS**.
+```powershell
+flutter build windows --release
+```
 
-La schermata Etichette rileva le stampanti installate, permette di scegliere il prodotto, il numero di copie e la misura dell'etichetta. La prova fisica con la ApiX110 serve per confermare driver, orientamento, sensore, margini e calibrazione prima di considerare chiusa la parte hardware.
+## CI e pacchetti
 
-L'integrazione con il registratore telematico è prevista dietro un livello dedicato: finché non sono disponibili protocollo/SDK compatibili, il pulsante di emissione scontrino nel pannello Cassa rimane disabilitato e nessun movimento di magazzino viene generato dal carrello.
+GitHub Actions esegue `flutter analyze`, `flutter test`, compila Windows e Linux e produce:
+
+- `LocalStoreManagement-Setup-win-x64.exe`
+- `LocalStoreManagement-linux-x64.AppImage`
+
+I push sul branch `Flutter` producono artefatti di CI senza pubblicare una release. Il branch `test` continua a pubblicare la prerelease `test-latest`; `main` pubblica release stabili con tag leggibile `v<versione>` e un bridge `ota-<commit>` per l'aggiornamento automatico.
+
+## Versione
+
+La versione Flutter corrente è `0.1.3+10`, equivalente alla precedente `0.1.3.10`.
