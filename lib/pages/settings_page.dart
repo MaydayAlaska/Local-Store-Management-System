@@ -267,7 +267,8 @@ class _SettingsPageState extends State<SettingsPage> {
                               : 'Controlla aggiornamenti',
                         ),
                       ),
-                      if (_update?.canInstall == true)
+                      if (_update?.updateAvailable == true &&
+                          _update?.canInstall == true)
                         FilledButton.icon(
                           onPressed: _checking ? null : _installUpdate,
                           icon: const Icon(Icons.download),
