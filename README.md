@@ -2,7 +2,7 @@
 
 Gestionale desktop **offline** per negozi, sviluppato in **Flutter/Dart** con database locale **SQLite**. L'applicazione gestisce catalogo, varianti, barcode, magazzino, cassa, etichette, anagrafiche, export e impostazioni senza richiedere un server o una connessione Internet per il normale utilizzo.
 
-La precedente applicazione C#/Avalonia è stata sostituita dalla versione Flutter, ora presente anche su `main`.
+La precedente applicazione C#/Avalonia è stata sostituita dalla versione Flutter, ora presente su `main`.
 
 ## Download
 
@@ -70,28 +70,9 @@ Il menu laterale è organizzato in questo ordine:
 
 Il catalogo è organizzato in **prodotti** e **varianti**.
 
-Ogni prodotto può contenere:
+Ogni prodotto può contenere nome, marca, categoria, prezzo di acquisto, prezzo di vendita, note, stato attivo/disattivato e una o più varianti. Ogni variante può contenere SKU univoco, descrizione, taglia, uno o più barcode, stato attivo/disattivato ed eventuali override dei prezzi.
 
-- nome
-- marca
-- categoria
-- prezzo di acquisto
-- prezzo di vendita
-- note
-- stato attivo/disattivato
-- una o più varianti
-
-Ogni variante può contenere:
-
-- SKU univoco
-- descrizione variante
-- taglia
-- uno o più barcode
-- stato attivo/disattivato
-- eventuale override del prezzo di acquisto
-- eventuale override del prezzo di vendita
-
-I prezzi appartengono quindi normalmente al prodotto. Una variante usa il prezzo del prodotto salvo quando possiede un override specifico.
+I prezzi appartengono normalmente al prodotto. Una variante usa il prezzo del prodotto salvo quando possiede un override specifico.
 
 La ricerca supporta nome, SKU, barcode, marca, categoria, variante e taglia.
 
@@ -99,66 +80,27 @@ La ricerca supporta nome, SKU, barcode, marca, categoria, variante e taglia.
 
 Gli scanner USB HID che si comportano come una tastiera funzionano senza driver dedicati e **non richiedono di cliccare prima nel campo di ricerca**.
 
-La Dashboard supporta:
+La Dashboard supporta ricerca rapida tramite barcode/SKU, visualizzazione immediata dell'articolo trovato, carico rapido `+1`, scarico rapido `-1` e gestione dei barcode sconosciuti.
 
-- ricerca rapida tramite barcode/SKU
-- visualizzazione immediata dell'articolo trovato
-- carico rapido `+1`
-- scarico rapido `-1`
-- gestione dei barcode sconosciuti
-
-Quando viene scansionato un barcode non presente nel database compare la voce **Aggiungi articolo**. Da lì è possibile:
-
-- creare un nuovo prodotto usando il barcode appena letto
-- aggiungere il barcode come nuova variante di un prodotto esistente
+Quando viene scansionato un barcode non presente nel database compare la voce **Aggiungi articolo**. Da lì è possibile creare un nuovo prodotto usando il barcode appena letto oppure aggiungerlo come nuova variante di un prodotto esistente.
 
 Il percorso scanner → ricerca SQLite → aggiornamento UI è ottimizzato per evitare scansioni complete del catalogo durante l'uso della cassa.
 
 ### Cassa
 
-La pagina Cassa include:
+La pagina Cassa include scansione barcode/SKU senza focus obbligatorio, ricerca manuale, aggiunta rapida al carrello, incremento automatico della quantità, controllo giacenza, sconti percentuali per riga e sul totale, più sconti fissi in euro e ricalcolo automatico del totale.
 
-- scansione barcode/SKU senza focus obbligatorio
-- ricerca manuale
-- aggiunta rapida al carrello
-- incremento automatico della quantità quando lo stesso articolo viene scansionato più volte
-- controllo della giacenza disponibile
-- sconto percentuale per singola riga
-- sconto percentuale sul totale
-- più sconti fissi in euro come righe negative rimovibili
-- ricalcolo automatico del totale
-
-La giacenza non viene modificata finché non viene completato il flusso di vendita fiscale.
-
-L'integrazione con il registratore telematico è ancora separata dal normale carrello; il pulsante di emissione del documento commerciale rimane disabilitato finché non viene implementato il backend RT.
+La giacenza non viene modificata finché non viene completato il flusso di vendita fiscale. L'integrazione con il registratore telematico è ancora separata dal normale carrello; il pulsante di emissione del documento commerciale rimane disabilitato finché non viene implementato il backend RT.
 
 ### Magazzino
 
-Sono disponibili:
-
-- carico
-- scarico con controllo disponibilità
-- rettifica a giacenza assoluta
-- ricerca tramite barcode/SKU
-- storico movimenti
-
-La giacenza viene calcolata dalla somma dei movimenti registrati in `stock_movements`.
+Sono disponibili carico, scarico con controllo disponibilità, rettifica a giacenza assoluta, ricerca tramite barcode/SKU e storico movimenti. La giacenza viene calcolata dalla somma dei movimenti registrati in `stock_movements`.
 
 ### Etichette
 
-La sezione Etichette supporta:
+La sezione Etichette supporta ricerca e scansione barcode/SKU senza focus obbligatorio, selezione della stampante installata, memorizzazione persistente dell'ultima stampante usata, numero copie, dimensioni fisiche in millimetri, anteprima e stampa diretta.
 
-- ricerca e scansione barcode/SKU senza focus obbligatorio
-- selezione della stampante installata
-- memorizzazione persistente dell'ultima stampante usata
-- numero copie
-- larghezza e altezza fisica in millimetri
-- anteprima dell'etichetta
-- stampa diretta sulla stampante selezionata
-- EAN-13 per codici EAN-13 validi
-- Code 128 B per gli altri codici
-
-Il layout è stato riallineato a quello usato dalla precedente versione dell'app: nome e dettagli nella parte superiore, barcode centrale, SKU in basso a sinistra e prezzo in basso a destra.
+Viene usato EAN-13 per codici EAN-13 validi e Code 128 B negli altri casi. Il layout mantiene nome e dettagli nella parte superiore, barcode centrale, SKU in basso a sinistra e prezzo in basso a destra.
 
 Su Windows la versione Flutter usa attualmente il percorso di stampa fornito dal pacchetto `printing` e dal driver installato. Non utilizza ancora lo stesso backend GDI nativo della precedente implementazione C#.
 
@@ -168,24 +110,26 @@ Marche e categorie sono gestite separatamente dal catalogo e possono essere crea
 
 ### Export
 
-Sono disponibili export inventario in:
-
-- Excel `.xlsx`
-- PDF
-
-Gli export supportano filtri per marca e categoria, raggruppamento per marca e dati del negozio. Il PDF usa font Unicode di sistema per visualizzare correttamente anche il simbolo `€`.
+Sono disponibili export inventario in Excel `.xlsx` e PDF. Gli export supportano filtri per marca e categoria, raggruppamento per marca e dati del negozio. Il PDF usa font Unicode di sistema per visualizzare correttamente anche il simbolo `€`.
 
 ### Impostazioni
 
-È possibile configurare:
+È possibile configurare nome negozio, logo, icona applicazione personalizzata, visibilità delle informazioni nel menu e tema dell'applicazione. Logo e icone vengono copiati nell'area dati dell'applicazione per rimanere disponibili anche dopo la chiusura del programma.
 
-- nome negozio
-- logo negozio
-- icona applicazione personalizzata
-- visibilità delle informazioni del negozio nel menu
-- tema dell'applicazione
+## Aggiornamenti OTA
 
-Logo e icone salvati vengono copiati nell'area dati dell'applicazione in modo da rimanere disponibili anche dopo la chiusura del programma.
+Le release stabili di `main` possono essere aggiornate dall'applicazione.
+
+L'updater distingue automaticamente:
+
+- Windows x64
+- Windows ARM64
+- Linux x64 AppImage
+- Linux ARM64 AppImage
+
+La scelta viene effettuata in base al sistema operativo e all'architettura della build in esecuzione. Su Linux l'installazione automatica è disponibile quando l'app viene eseguita come AppImage; i pacchetti `.deb` non vengono sostituiti automaticamente.
+
+Le build BETA provenienti da `Flutter` o `test` non installano il canale OTA stabile.
 
 ## Database e compatibilità dati
 
@@ -216,11 +160,7 @@ Lo schema SQLite corrente usa **`PRAGMA user_version = 3`** e comprende principa
 - `brands`
 - `categories`
 
-La versione 3 introduce i prezzi direttamente sul prodotto mantenendo gli eventuali prezzi di variante come override.
-
-Le migrazioni dai precedenti schemi vengono eseguite automaticamente. Prima delle migrazioni strutturali viene creata una copia di sicurezza del database.
-
-Gli indici SQLite includono SKU, barcode, relazioni prodotto/variante e movimenti di magazzino per mantenere rapide le ricerche operative.
+La versione 3 introduce i prezzi direttamente sul prodotto mantenendo gli eventuali prezzi di variante come override. Le migrazioni dai precedenti schemi vengono eseguite automaticamente e prima delle migrazioni strutturali viene creata una copia di sicurezza del database.
 
 ## Backup e diagnostica
 
@@ -270,7 +210,7 @@ flutter analyze --no-fatal-infos
 flutter test
 ```
 
-I test includono anche controlli sullo schema SQLite e sul percorso rapido di ricerca barcode.
+I test includono controlli sullo schema SQLite, sul percorso rapido di ricerca barcode e sulla selezione dell'asset OTA per sistema operativo e architettura.
 
 ## CI, architetture e release
 
@@ -289,30 +229,20 @@ LocalStoreManagement-linux-arm64.deb
 
 Strategia branch/release:
 
-- `Flutter` → build di sviluppo pubblicata come prerelease `flutter-latest`
-- `test` → prerelease/beta `test-latest`
+- `Flutter` → branch BETA/TEST, prerelease `flutter-latest`
+- `test` → canale BETA legacy compatibile
 - `main` → release stabile con tag `v<versione>`
 
 La pipeline usa runner Linux ARM64 nativi per produrre i pacchetti Linux ARM64 e genera installer distinti per le due architetture Windows.
 
-## Dipendenze principali
+## Versioning
 
-Tra i pacchetti principali usati dall'applicazione:
+La numerazione usa ora il formato semplice `X.Y.Z`, senza suffisso `+build`.
 
-- `sqlite3`
-- `barcode` / `barcode_widget`
-- `pdf`
-- `printing`
-- `excel`
-- `file_selector`
-- `window_manager`
-
-Per le versioni esatte fare riferimento a `pubspec.yaml`.
-
-## Versione
-
-La versione dichiarata attualmente in `pubspec.yaml` è:
+Versione corrente:
 
 ```text
-0.1.3+10
+0.1.4
 ```
+
+Per le regole complete vedere `VERSIONING.md`.
