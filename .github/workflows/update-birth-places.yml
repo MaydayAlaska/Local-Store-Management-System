@@ -1,15 +1,16 @@
 name: Temporary cash keypad layout patch
 
 on:
-  pull_request:
-    branches: [Flutter]
+  push:
+    branches: [chatgpt-keypad-layout-20260819]
+    paths:
+      - .github/workflows/update-birth-places.yml
 
 permissions:
   contents: write
 
 jobs:
   patch:
-    if: github.head_ref == 'chatgpt-keypad-layout-20260819'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout patch branch
@@ -116,8 +117,6 @@ jobs:
           path.write_text(text)
           PY
 
-          # Restore the real ANPR workflow from the current Flutter branch and
-          # remove the temporary workflow so the PR contains only the UI change.
           git checkout origin/Flutter -- .github/workflows/update-birth-places.yml
           rm -f .github/workflows/one-shot-adjust-cash-keypad.yml
 
