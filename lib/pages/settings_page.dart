@@ -34,6 +34,9 @@ class _SettingsPageState extends State<SettingsPage> {
   late String _themeMode;
   late String _languageCode;
   late List<LabelPrinterProfile> _labelPrinters;
+  final Map<String, String> _printerTestMessages = {};
+  final Set<String> _printerTestSuccess = {};
+  final Set<String> _testingPrinterIds = {};
   String? _iconSource;
   String? _logoSource;
   String? _status;
@@ -126,7 +129,20 @@ class _SettingsPageState extends State<SettingsPage> {
     }
   }
 
+  String _systemPrinterLabel(dynamic printer) {
+    final model = printer.model?.toString().trim() ?? '';
+    final location = printer.location?.toString().trim() ?? '';
+    final suffix = <String>[
+      if (model.isNotEmpty) model,
+      if (location.isNotEmpty) location,
+    ].join(' · ');
+    return suffix.isEmpty ? printer.name : '${printer.name} · $suffix';
+  }
+
   Future<void> _editPrinter([LabelPrinterProfile? existing]) async {
+    final systemPrinters = await widget.services.labels.getSystemPrinters();
+    if (!mounted) return;
+
     final name = TextEditingController(text: existing?.name ?? '');
     final host = TextEditingController(text: existing?.host ?? '');
     final port = TextEditingController(
@@ -141,9 +157,35 @@ class _SettingsPageState extends State<SettingsPage> {
     final height = TextEditingController(
       text: _dimensionText(existing?.defaultHeightMm ?? 30),
     );
+    var connectionType = existing?.connectionType ?? 'tcp';
     var protocol = existing?.protocol ?? 'bpl-z';
+    var selectedSystemUrl = existing?.systemPrinterUrl;
     var enabled = existing?.enabled ?? true;
     String? validationError;
+
+    final systemItems = <GlassDropdownItem<String>>[
+      for (final printer in systemPrinters)
+        GlassDropdownItem(
+          value: printer.url,
+          label: _systemPrinterLabel(printer),
+          icon: Icons.usb_rounded,
+        ),
+    ];
+    if (existing?.isSystem == true &&
+        existing?.systemPrinterUrl?.trim().isNotEmpty == true &&
+        !systemItems.any((item) => item.value == existing!.systemPrinterUrl)) {
+      systemItems.insert(
+        0,
+        GlassDropdownItem(
+          value: existing!.systemPrinterUrl,
+          label: _itEn(
+            '${existing.systemPrinterName ?? existing.name} · non rilevata',
+            '${existing.systemPrinterName ?? existing.name} · not detected',
+          ),
+          icon: Icons.usb_off_rounded,
+        ),
+      );
+    }
 
     final result = await showDialog<LabelPrinterProfile>(
       context: context,
@@ -162,7 +204,7 @@ class _SettingsPageState extends State<SettingsPage> {
                     ),
             ),
             content: SizedBox(
-              width: 520,
+              width: 560,
               child: SingleChildScrollView(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
@@ -180,71 +222,139 @@ class _SettingsPageState extends State<SettingsPage> {
                       ),
                     ),
                     const SizedBox(height: 10),
-                    Row(
-                      children: [
-                        Expanded(
-                          flex: 3,
-                          child: TextField(
-                            controller: host,
-                            decoration: InputDecoration(
-                              border: const OutlineInputBorder(),
-                              labelText: _itEn(
-                                'IP / hostname',
-                                'IP / hostname',
-                              ),
-                              hintText: '192.168.1.63',
-                            ),
-                          ),
+                    GlassDropdown<String>(
+                      value: connectionType,
+                      labelText: _itEn('Connessione', 'Connection'),
+                      items: [
+                        GlassDropdownItem(
+                          value: 'tcp',
+                          label: _itEn('TCP/IP diretto', 'Direct TCP/IP'),
+                          icon: Icons.lan_outlined,
                         ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: TextField(
-                            controller: port,
-                            keyboardType: TextInputType.number,
-                            decoration: InputDecoration(
-                              border: const OutlineInputBorder(),
-                              labelText: _itEn('Porta', 'Port'),
-                            ),
+                        GlassDropdownItem(
+                          value: 'system',
+                          label: _itEn(
+                            'USB / stampante di sistema',
+                            'USB / system printer',
                           ),
+                          icon: Icons.usb_rounded,
                         ),
                       ],
+                      onChanged: (value) {
+                        if (value != null) {
+                          setDialogState(() {
+                            connectionType = value;
+                            validationError = null;
+                          });
+                        }
+                      },
                     ),
                     const SizedBox(height: 10),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: DropdownButtonFormField<String>(
-                            initialValue: protocol,
-                            decoration: InputDecoration(
-                              border: const OutlineInputBorder(),
-                              labelText: _itEn('Protocollo', 'Protocol'),
-                            ),
-                            items: const [
-                              DropdownMenuItem(
-                                value: 'bpl-z',
-                                child: Text('BPL-Z / ZPL'),
+                    if (connectionType == 'tcp') ...[
+                      Row(
+                        children: [
+                          Expanded(
+                            flex: 3,
+                            child: TextField(
+                              controller: host,
+                              decoration: InputDecoration(
+                                border: const OutlineInputBorder(),
+                                labelText: _itEn(
+                                  'IP / hostname',
+                                  'IP / hostname',
+                                ),
+                                hintText: '192.168.1.63',
                               ),
-                            ],
-                            onChanged: (value) {
-                              if (value != null) {
-                                setDialogState(() => protocol = value);
-                              }
-                            },
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: TextField(
-                            controller: dpi,
-                            keyboardType: TextInputType.number,
-                            decoration: const InputDecoration(
-                              border: OutlineInputBorder(),
-                              labelText: 'DPI',
                             ),
                           ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: TextField(
+                              controller: port,
+                              keyboardType: TextInputType.number,
+                              decoration: InputDecoration(
+                                border: const OutlineInputBorder(),
+                                labelText: _itEn('Porta', 'Port'),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: GlassDropdown<String>(
+                              value: protocol,
+                              labelText: _itEn('Protocollo', 'Protocol'),
+                              items: const [
+                                GlassDropdownItem(
+                                  value: 'bpl-z',
+                                  label: 'BPL-Z / ZPL',
+                                  icon: Icons.code_rounded,
+                                ),
+                              ],
+                              onChanged: (value) {
+                                if (value != null) {
+                                  setDialogState(() => protocol = value);
+                                }
+                              },
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: TextField(
+                              controller: dpi,
+                              keyboardType: TextInputType.number,
+                              decoration: const InputDecoration(
+                                border: OutlineInputBorder(),
+                                labelText: 'DPI',
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ] else ...[
+                      GlassDropdown<String>(
+                        value: selectedSystemUrl,
+                        labelText: _itEn(
+                          'Stampante USB / sistema',
+                          'USB / system printer',
                         ),
-                      ],
-                    ),
+                        hintText: systemItems.isEmpty
+                            ? _itEn(
+                                'Nessuna stampante rilevata',
+                                'No printer detected',
+                              )
+                            : _itEn(
+                                'Seleziona una stampante',
+                                'Select a printer',
+                              ),
+                        items: systemItems,
+                        onChanged: (value) {
+                          setDialogState(() {
+                            selectedSystemUrl = value;
+                            validationError = null;
+                          });
+                          if (value != null && name.text.trim().isEmpty) {
+                            for (final printer in systemPrinters) {
+                              if (printer.url == value) {
+                                name.text = printer.name;
+                                break;
+                              }
+                            }
+                          }
+                        },
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        _itEn(
+                          'Le stampanti USB vengono gestite tramite il sistema operativo. Devono quindi essere installate e visibili a Windows/macOS/Linux; il gestionale userà il relativo driver di stampa.',
+                          'USB printers are managed through the operating system. They must be installed and visible to Windows/macOS/Linux; the app will use the corresponding printer driver.',
+                        ),
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    ],
                     const SizedBox(height: 10),
                     Row(
                       children: [
@@ -324,25 +434,33 @@ class _SettingsPageState extends State<SettingsPage> {
                       'Inserisci un nome per il profilo.',
                       'Enter a profile name.',
                     );
-                  } else if (normalizedHost.isEmpty ||
-                      normalizedHost.contains(' ')) {
+                  } else if (connectionType == 'tcp' &&
+                      (normalizedHost.isEmpty || normalizedHost.contains(' '))) {
                     error = _itEn(
                       'Inserisci un IP o hostname valido.',
                       'Enter a valid IP or hostname.',
                     );
-                  } else if (parsedPort == null ||
-                      parsedPort < 1 ||
-                      parsedPort > 65535) {
+                  } else if (connectionType == 'tcp' &&
+                      (parsedPort == null ||
+                          parsedPort < 1 ||
+                          parsedPort > 65535)) {
                     error = _itEn(
                       'La porta deve essere compresa tra 1 e 65535.',
                       'Port must be between 1 and 65535.',
                     );
-                  } else if (parsedDpi == null ||
-                      parsedDpi < 100 ||
-                      parsedDpi > 600) {
+                  } else if (connectionType == 'tcp' &&
+                      (parsedDpi == null ||
+                          parsedDpi < 100 ||
+                          parsedDpi > 600)) {
                     error = _itEn(
                       'I DPI devono essere compresi tra 100 e 600.',
                       'DPI must be between 100 and 600.',
+                    );
+                  } else if (connectionType == 'system' &&
+                      selectedSystemUrl?.trim().isNotEmpty != true) {
+                    error = _itEn(
+                      'Seleziona una stampante USB o di sistema.',
+                      'Select a USB or system printer.',
                     );
                   } else if (parsedWidth == null ||
                       parsedWidth < 20 ||
@@ -365,16 +483,31 @@ class _SettingsPageState extends State<SettingsPage> {
                     return;
                   }
 
+                  String? selectedSystemName = existing?.systemPrinterName;
+                  if (connectionType == 'system') {
+                    for (final printer in systemPrinters) {
+                      if (printer.url == selectedSystemUrl) {
+                        selectedSystemName = printer.name;
+                        break;
+                      }
+                    }
+                  }
+
                   Navigator.pop(
                     dialogContext,
                     LabelPrinterProfile(
                       id: existing?.id ??
                           'printer-${DateTime.now().microsecondsSinceEpoch}',
                       name: normalizedName,
-                      host: normalizedHost,
-                      port: parsedPort!,
+                      connectionType: connectionType,
+                      host: connectionType == 'tcp' ? normalizedHost : '',
+                      port: connectionType == 'tcp' ? parsedPort! : 9100,
+                      systemPrinterUrl:
+                          connectionType == 'system' ? selectedSystemUrl : null,
+                      systemPrinterName:
+                          connectionType == 'system' ? selectedSystemName : null,
                       protocol: protocol,
-                      dpi: parsedDpi!,
+                      dpi: connectionType == 'tcp' ? parsedDpi! : 203,
                       defaultWidthMm: parsedWidth!,
                       defaultHeightMm: parsedHeight!,
                       enabled: enabled,
@@ -398,17 +531,27 @@ class _SettingsPageState extends State<SettingsPage> {
 
     if (result == null || !mounted) return;
 
-    final duplicate = _labelPrinters.any(
-      (profile) =>
-          profile.id != result.id &&
-          profile.host.toLowerCase() == result.host.toLowerCase() &&
-          profile.port == result.port,
-    );
+    final duplicate = _labelPrinters.any((profile) {
+      if (profile.id == result.id || profile.connectionType != result.connectionType) {
+        return false;
+      }
+      if (result.isTcp) {
+        return profile.host.toLowerCase() == result.host.toLowerCase() &&
+            profile.port == result.port;
+      }
+      return profile.systemPrinterUrl?.trim().isNotEmpty == true &&
+          profile.systemPrinterUrl == result.systemPrinterUrl;
+    });
     if (duplicate) {
-      setState(() => _status = _itEn(
-            'Esiste già un profilo per ${result.host}:${result.port}.',
-            'A profile for ${result.host}:${result.port} already exists.',
-          ));
+      setState(() => _status = result.isTcp
+          ? _itEn(
+              'Esiste già un profilo per ${result.host}:${result.port}.',
+              'A profile for ${result.host}:${result.port} already exists.',
+            )
+          : _itEn(
+              'Questa stampante USB/sistema è già configurata.',
+              'This USB/system printer is already configured.',
+            ));
       return;
     }
 
@@ -421,6 +564,8 @@ class _SettingsPageState extends State<SettingsPage> {
       } else {
         _labelPrinters.add(result);
       }
+      _printerTestMessages.remove(result.id);
+      _printerTestSuccess.remove(result.id);
       _status = _itEn(
         'Profilo stampante modificato. Premi “Salva impostazioni” per applicare le modifiche.',
         'Printer profile changed. Press “Save settings” to apply the changes.',
@@ -458,6 +603,9 @@ class _SettingsPageState extends State<SettingsPage> {
     if (confirmed != true || !mounted) return;
     setState(() {
       _labelPrinters.removeWhere((item) => item.id == profile.id);
+      _printerTestMessages.remove(profile.id);
+      _printerTestSuccess.remove(profile.id);
+      _testingPrinterIds.remove(profile.id);
       _status = _itEn(
         'Profilo rimosso. Premi “Salva impostazioni” per applicare le modifiche.',
         'Profile removed. Press “Save settings” to apply the changes.',
@@ -466,24 +614,48 @@ class _SettingsPageState extends State<SettingsPage> {
   }
 
   Future<void> _testPrinter(LabelPrinterProfile profile) async {
-    setState(() => _status = _itEn(
-          'Test connessione a ${profile.host}:${profile.port}…',
-          'Testing connection to ${profile.host}:${profile.port}…',
-        ));
+    setState(() {
+      _testingPrinterIds.add(profile.id);
+      _printerTestSuccess.remove(profile.id);
+      _printerTestMessages[profile.id] = profile.isTcp
+          ? _itEn(
+              'Test connessione a ${profile.host}:${profile.port}…',
+              'Testing connection to ${profile.host}:${profile.port}…',
+            )
+          : _itEn(
+              'Verifica stampante USB/sistema…',
+              'Checking USB/system printer…',
+            );
+    });
     try {
       await widget.services.labels.testConnection(profile);
       if (mounted) {
-        setState(() => _status = _itEn(
-              'Connessione riuscita a ${profile.name} (${profile.host}:${profile.port}).',
-              'Connection successful to ${profile.name} (${profile.host}:${profile.port}).',
-            ));
+        setState(() {
+          _printerTestSuccess.add(profile.id);
+          _printerTestMessages[profile.id] = profile.isTcp
+              ? _itEn(
+                  'Connessione riuscita a ${profile.name} (${profile.host}:${profile.port}).',
+                  'Connection successful to ${profile.name} (${profile.host}:${profile.port}).',
+                )
+              : _itEn(
+                  'Stampante ${profile.name} rilevata e disponibile.',
+                  'Printer ${profile.name} detected and available.',
+                );
+        });
       }
     } catch (error) {
       if (mounted) {
-        setState(() => _status = _itEn(
-              'Test connessione fallito: $error',
-              'Connection test failed: $error',
-            ));
+        setState(() {
+          _printerTestSuccess.remove(profile.id);
+          _printerTestMessages[profile.id] = _itEn(
+            'Test connessione fallito: $error',
+            'Connection test failed: $error',
+          );
+        });
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _testingPrinterIds.remove(profile.id));
       }
     }
   }
@@ -714,16 +886,16 @@ class _SettingsPageState extends State<SettingsPage> {
                           children: [
                             Text(
                               _itEn(
-                                'Stampanti etichette di rete',
-                                'Network label printers',
+                                'Stampanti etichette',
+                                'Label printers',
                               ),
                               style: Theme.of(context).textTheme.titleMedium,
                             ),
                             const SizedBox(height: 4),
                             Text(
                               _itEn(
-                                'Configura più profili TCP. Le stampanti di sistema restano disponibili automaticamente nella pagina Etichette.',
-                                'Configure multiple TCP profiles. System printers remain automatically available on the Labels page.',
+                                'Configura profili TCP/IP diretti oppure stampanti USB e di sistema. Le stampanti di sistema non configurate restano comunque disponibili nella pagina Etichette.',
+                                'Configure direct TCP/IP profiles or USB and system printers. Unconfigured system printers remain available on the Labels page.',
                               ),
                               style: Theme.of(context).textTheme.bodySmall,
                             ),
@@ -744,77 +916,131 @@ class _SettingsPageState extends State<SettingsPage> {
                       padding: const EdgeInsets.symmetric(vertical: 8),
                       child: Text(
                         _itEn(
-                          'Nessun profilo TCP configurato.',
-                          'No TCP profiles configured.',
+                          'Nessun profilo stampante configurato.',
+                          'No printer profiles configured.',
                         ),
                       ),
                     )
                   else
-                    ..._labelPrinters.map(
-                      (profile) => Padding(
+                    ..._labelPrinters.map((profile) {
+                      final testMessage = _printerTestMessages[profile.id];
+                      final testing = _testingPrinterIds.contains(profile.id);
+                      final testSuccess = _printerTestSuccess.contains(profile.id);
+                      final subtitle = profile.isTcp
+                          ? '${profile.host}:${profile.port} · ${profile.protocolLabel} · ${profile.dpi} dpi · ${_dimensionText(profile.defaultWidthMm)}×${_dimensionText(profile.defaultHeightMm)} mm'
+                          : '${_itEn('USB / sistema', 'USB / system')} · ${profile.systemPrinterName ?? _itEn('stampante configurata', 'configured printer')} · ${_dimensionText(profile.defaultWidthMm)}×${_dimensionText(profile.defaultHeightMm)} mm';
+                      return Padding(
                         padding: const EdgeInsets.only(bottom: 8),
                         child: Card(
                           margin: EdgeInsets.zero,
-                          child: ListTile(
-                            leading: Icon(
-                              profile.enabled
-                                  ? Icons.print_rounded
-                                  : Icons.print_disabled_outlined,
-                            ),
-                            title: Text(profile.name),
-                            subtitle: Text(
-                              '${profile.host}:${profile.port} · ${profile.protocolLabel} · ${profile.dpi} dpi · ${_dimensionText(profile.defaultWidthMm)}×${_dimensionText(profile.defaultHeightMm)} mm',
-                            ),
-                            trailing: Wrap(
-                              spacing: 2,
-                              crossAxisAlignment: WrapCrossAlignment.center,
-                              children: [
-                                Switch(
-                                  value: profile.enabled,
-                                  onChanged: _saving
-                                      ? null
-                                      : (value) {
-                                          setState(() {
-                                            final index = _labelPrinters.indexWhere(
-                                              (item) => item.id == profile.id,
-                                            );
-                                            if (index >= 0) {
-                                              _labelPrinters[index] =
-                                                  profile.copyWith(enabled: value);
-                                            }
-                                          });
-                                        },
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              ListTile(
+                                leading: Icon(
+                                  profile.enabled
+                                      ? (profile.isTcp
+                                          ? Icons.lan_outlined
+                                          : Icons.usb_rounded)
+                                      : Icons.print_disabled_outlined,
                                 ),
-                                IconButton(
-                                  tooltip: _itEn(
-                                    'Test connessione',
-                                    'Test connection',
+                                title: Text(profile.name),
+                                subtitle: Text(subtitle),
+                                trailing: Wrap(
+                                  spacing: 2,
+                                  crossAxisAlignment: WrapCrossAlignment.center,
+                                  children: [
+                                    Switch(
+                                      value: profile.enabled,
+                                      onChanged: _saving
+                                          ? null
+                                          : (value) {
+                                              setState(() {
+                                                final index = _labelPrinters.indexWhere(
+                                                  (item) => item.id == profile.id,
+                                                );
+                                                if (index >= 0) {
+                                                  _labelPrinters[index] =
+                                                      profile.copyWith(enabled: value);
+                                                }
+                                              });
+                                            },
+                                    ),
+                                    IconButton(
+                                      tooltip: _itEn(
+                                        'Test connessione',
+                                        'Test connection',
+                                      ),
+                                      onPressed: _saving || testing
+                                          ? null
+                                          : () => _testPrinter(profile),
+                                      icon: const Icon(Icons.network_check),
+                                    ),
+                                    IconButton(
+                                      tooltip: _itEn('Modifica', 'Edit'),
+                                      onPressed: _saving
+                                          ? null
+                                          : () => _editPrinter(profile),
+                                      icon: const Icon(Icons.edit_outlined),
+                                    ),
+                                    IconButton(
+                                      tooltip: AppStrings.t('remove'),
+                                      onPressed: _saving
+                                          ? null
+                                          : () => _deletePrinter(profile),
+                                      icon: const Icon(Icons.delete_outline),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              if (testMessage != null)
+                                Padding(
+                                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
+                                  child: Row(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      if (testing)
+                                        const SizedBox(
+                                          width: 16,
+                                          height: 16,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                          ),
+                                        )
+                                      else
+                                        Icon(
+                                          testSuccess
+                                              ? Icons.check_circle_outline
+                                              : Icons.error_outline,
+                                          size: 18,
+                                          color: testSuccess
+                                              ? Theme.of(context).colorScheme.primary
+                                              : Theme.of(context).colorScheme.error,
+                                        ),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: Text(
+                                          testMessage,
+                                          style: Theme.of(context)
+                                              .textTheme
+                                              .bodySmall
+                                              ?.copyWith(
+                                                color: !testing && !testSuccess
+                                                    ? Theme.of(context)
+                                                        .colorScheme
+                                                        .error
+                                                    : null,
+                                              ),
+                                        ),
+                                      ),
+                                    ],
                                   ),
-                                  onPressed: _saving
-                                      ? null
-                                      : () => _testPrinter(profile),
-                                  icon: const Icon(Icons.network_check),
                                 ),
-                                IconButton(
-                                  tooltip: _itEn('Modifica', 'Edit'),
-                                  onPressed: _saving
-                                      ? null
-                                      : () => _editPrinter(profile),
-                                  icon: const Icon(Icons.edit_outlined),
-                                ),
-                                IconButton(
-                                  tooltip: AppStrings.t('remove'),
-                                  onPressed: _saving
-                                      ? null
-                                      : () => _deletePrinter(profile),
-                                  icon: const Icon(Icons.delete_outline),
-                                ),
-                              ],
-                            ),
+                            ],
                           ),
                         ),
-                      ),
-                    ),
+                      );
+                    }),
                 ],
               ),
             ),
