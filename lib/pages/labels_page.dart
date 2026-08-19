@@ -447,13 +447,13 @@ class _LabelsPageState extends State<LabelsPage> {
                         Text(
                           configuredProfile?.isTcp == true
                               ? _itEn(
-                                  'Stampa diretta TCP/${configuredProfile!.protocolLabel}: ${configuredProfile.host}:${configuredProfile.port}, ${configuredProfile.dpi} dpi. La misura impostata qui viene inviata direttamente alla stampante. Non è necessario alcun driver Windows.',
+                                  'Stampa diretta TCP/${configuredProfile.protocolLabel}: ${configuredProfile.host}:${configuredProfile.port}, ${configuredProfile.dpi} dpi. La misura impostata qui viene inviata direttamente alla stampante. Non è necessario alcun driver Windows.',
                                   'Direct TCP/${configuredProfile.protocolLabel} printing: ${configuredProfile.host}:${configuredProfile.port}, ${configuredProfile.dpi} dpi. The size set here is sent directly to the printer. No Windows printer driver is required.',
                                 )
                               : configuredProfile?.isSystem == true
                                   ? _itEn(
-                                      'Stampa USB/sistema tramite driver: il gestionale usa la stampante installata nel sistema operativo e applica ${_dimensionText(configuredProfile!.defaultWidthMm)}×${_dimensionText(configuredProfile.defaultHeightMm)} mm come misura predefinita del profilo.',
-                                      'USB/system printing through the printer driver: the app uses the printer installed in the operating system and applies ${_dimensionText(configuredProfile!.defaultWidthMm)}×${_dimensionText(configuredProfile.defaultHeightMm)} mm as the profile default size.',
+                                      'Stampa USB/sistema tramite driver: il gestionale usa la stampante installata nel sistema operativo e applica ${_dimensionText(configuredProfile.defaultWidthMm)}×${_dimensionText(configuredProfile.defaultHeightMm)} mm come misura predefinita del profilo.',
+                                      'USB/system printing through the printer driver: the app uses the printer installed in the operating system and applies ${_dimensionText(configuredProfile.defaultWidthMm)}×${_dimensionText(configuredProfile.defaultHeightMm)} mm as the profile default size.',
                                     )
                                   : _itEn(
                                       'Stampa tramite sistema: configura nel driver della stampante la stessa misura impostata qui.',
