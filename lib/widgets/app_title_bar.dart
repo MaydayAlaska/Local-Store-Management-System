@@ -12,27 +12,35 @@ class AppTitleBar extends StatelessWidget {
             Expanded(
               child: DragToMoveArea(child: const SizedBox.expand()),
             ),
-            _CaptionButton(
-              tooltip: 'Riduci a icona',
-              icon: Icons.remove,
-              onPressed: () => windowManager.minimize(),
-            ),
-            _CaptionButton(
-              tooltip: 'Massimizza / ripristina',
-              icon: Icons.crop_square_rounded,
-              onPressed: () async {
-                if (await windowManager.isMaximized()) {
-                  await windowManager.unmaximize();
-                } else {
-                  await windowManager.maximize();
-                }
-              },
-            ),
-            _CaptionButton(
-              tooltip: 'Chiudi',
-              icon: Icons.close,
-              danger: true,
-              onPressed: () => windowManager.close(),
+            Transform.translate(
+              offset: const Offset(0, -6),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _CaptionButton(
+                    tooltip: 'Riduci a icona',
+                    icon: Icons.remove,
+                    onPressed: () => windowManager.minimize(),
+                  ),
+                  _CaptionButton(
+                    tooltip: 'Massimizza / ripristina',
+                    icon: Icons.crop_square_rounded,
+                    onPressed: () async {
+                      if (await windowManager.isMaximized()) {
+                        await windowManager.unmaximize();
+                      } else {
+                        await windowManager.maximize();
+                      }
+                    },
+                  ),
+                  _CaptionButton(
+                    tooltip: 'Chiudi',
+                    icon: Icons.close,
+                    danger: true,
+                    onPressed: () => windowManager.close(),
+                  ),
+                ],
+              ),
             ),
           ],
         ),
