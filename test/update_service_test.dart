@@ -5,7 +5,7 @@ import 'package:local_store_management/services/update_service.dart';
 
 void main() {
   test('current beta OTA version is aligned', () {
-    expect(UpdateService.currentVersion, '0.1.6-b3');
+    expect(UpdateService.currentVersion, '0.1.6-b4');
   });
 
   test('OTA selects Windows x64 asset', () {
@@ -108,6 +108,15 @@ void main() {
     expect(isBetaBranch('avalonia'), isFalse);
     expect(isBetaBranch('main'), isFalse);
     expect(betaReleaseTagFor('Flutter'), 'beta-latest');
+  });
+
+  test('beta and stable OTA channels reject each other versions', () {
+    expect(versionBelongsToUpdateChannel('0.1.6-b4', beta: true), isTrue);
+    expect(versionBelongsToUpdateChannel('0.1.6', beta: true), isFalse);
+    expect(versionBelongsToUpdateChannel('0.1.6', beta: false), isTrue);
+    expect(versionBelongsToUpdateChannel('0.1.6-b4', beta: false), isFalse);
+    expect(versionBelongsToUpdateChannel('not-a-version', beta: true), isFalse);
+    expect(versionBelongsToUpdateChannel('not-a-version', beta: false), isFalse);
   });
 
   test('beta version normalization keeps the hyphen format', () {
