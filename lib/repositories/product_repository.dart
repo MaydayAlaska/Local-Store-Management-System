@@ -124,8 +124,15 @@ class ProductRepository {
 
   String generateSku() {
     for (var attempt = 0; attempt < 100; attempt++) {
-      final value = _skuRandom.nextInt(0x100000000);
-      final sku = 'ART-${value.toRadixString(16).toUpperCase().padLeft(8, '0')}';
+      final partA = _skuRandom.nextInt(0x1000000)
+          .toRadixString(16)
+          .toUpperCase()
+          .padLeft(6, '0');
+      final partB = _skuRandom.nextInt(0x100000)
+          .toRadixString(16)
+          .toUpperCase()
+          .padLeft(5, '0');
+      final sku = 'ART-$partA${partB}0';
       final exists = _db.select(
         'SELECT 1 FROM product_variants WHERE sku = ? COLLATE NOCASE LIMIT 1;',
         [sku],
@@ -190,12 +197,13 @@ class ProductRepository {
         now,
         draft.id,
       ]);
+      if (_db.updatedRows == 0) throw StateError('Il prodotto da modificare non esiste più.');
       return draft.id!;
     }
-
     _db.execute('''
-      INSERT INTO products(name, category_id, brand_id, purchase_price_cents, sale_price_cents,
-                           notes, is_active, created_at_utc, updated_at_utc)
+      INSERT INTO products (
+        name, category_id, brand_id, purchase_price_cents, sale_price_cents,
+        notes, is_active, created_at_utc, updated_at_utc)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
     ''', [
       name,
@@ -214,134 +222,102 @@ class ProductRepository {
   int _saveVariantRow(int productId, ProductVariantDraft variant, String now) {
     if (variant.id != null) {
       _db.execute('''
-        UPDATE product_variants
-        SET sku=?, variant=?, size=?, purchase_price_cents=?, sale_price_cents=?, is_active=?, updated_at_utc=?
-        WHERE id=? AND product_id=?;
-      ''', [
-        variant.sku,
-        _optional(variant.variant),
-        _optional(variant.size),
-        variant.purchasePriceCents,
-        variant.salePriceCents,
-        variant.isActive ? 1 : 0,
-        now,
-        variant.id,
-        productId,
-      ]);
+        UPDATE product_variants SET sku=?, variant=?, size=?, purchase_price_cents=?, sale_price_cents=?,
+          is_active=?, updated_at_utc=? WHERE id=? AND product_id=?;
+      ''', [variant.sku, _optional(variant.variant), _optional(variant.size), variant.purchasePriceCents,
+        variant.salePriceCents, variant.isActive ? 1 : 0, now, variant.id, productId]);
+      if (_db.updatedRows == 0) throw StateError('La variante SKU ${variant.sku} non esiste più o non appartiene a questo prodotto.');
       return variant.id!;
     }
-
     _db.execute('''
-      INSERT INTO product_variants(product_id, sku, variant, size, purchase_price_cents,
-                                   sale_price_cents, is_active, created_at_utc, updated_at_utc)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
-    ''', [
-      productId,
-      variant.sku,
-      _optional(variant.variant),
-      _optional(variant.size),
-      variant.purchasePriceCents,
-      variant.salePriceCents,
-      variant.isActive ? 1 : 0,
-      now,
-      now,
-    ]);
+      INSERT INTO product_variants (product_id, sku, variant, size, purchase_price_cents, sale_price_cents,
+        is_active, created_at_utc, updated_at_utc) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
+    ''', [productId, variant.sku, _optional(variant.variant), _optional(variant.size), variant.purchasePriceCents,
+      variant.salePriceCents, variant.isActive ? 1 : 0, now, now]);
     return _db.lastInsertRowId;
   }
 
   void _replaceBarcodes(int variantId, List<String> barcodes) {
     _db.execute('DELETE FROM product_barcodes WHERE variant_id=?;', [variantId]);
-    for (final barcode in barcodes) {
-      _db.execute(
-        'INSERT INTO product_barcodes(variant_id, barcode) VALUES (?, ?);',
-        [variantId, barcode],
-      );
+    for (var i = 0; i < barcodes.length; i++) {
+      _db.execute('INSERT INTO product_barcodes (variant_id, barcode, is_primary) VALUES (?, ?, ?);',
+          [variantId, barcodes[i], i == 0 ? 1 : 0]);
     }
   }
 
   List<String> _getBarcodes(int variantId) => _db
-      .select(
-        'SELECT barcode FROM product_barcodes WHERE variant_id=? ORDER BY id;',
-        [variantId],
-      )
+      .select('SELECT barcode FROM product_barcodes WHERE variant_id=? ORDER BY is_primary DESC, id;', [variantId])
       .map((row) => row['barcode'] as String)
       .toList();
 
-  ProductVariantDraft _normalizeVariant(ProductVariantDraft draft) {
-    final sku = draft.sku.trim();
-    if (sku.isEmpty) throw StateError('Ogni variante deve avere uno SKU.');
-    final barcodes = draft.barcodes
-        .map((e) => e.trim())
-        .where((e) => e.isNotEmpty)
-        .toSet()
-        .toList();
-    return ProductVariantDraft(
-      id: draft.id,
-      sku: sku,
-      variant: _optional(draft.variant),
-      size: _optional(draft.size),
-      purchasePriceCents: draft.purchasePriceCents,
-      salePriceCents: draft.salePriceCents,
-      isActive: draft.isActive,
-      barcodes: barcodes,
-      stockQuantity: draft.stockQuantity,
-    );
+  String? _findSkuOwner(String sku, int? excludeId) {
+    final rows = _db.select('''
+      SELECT p.name, pv.sku, pv.variant, pv.size FROM product_variants pv
+      JOIN products p ON p.id=pv.product_id
+      WHERE pv.sku=? COLLATE NOCASE AND (? IS NULL OR pv.id<>?) LIMIT 1;
+    ''', [sku, excludeId, excludeId]);
+    return rows.isEmpty ? null : _ownerDisplay(rows.first);
+  }
+
+  String? _findBarcodeOwner(String barcode, int? excludeId) {
+    final rows = _db.select('''
+      SELECT p.name, pv.sku, pv.variant, pv.size FROM product_barcodes pb
+      JOIN product_variants pv ON pv.id=pb.variant_id JOIN products p ON p.id=pv.product_id
+      WHERE pb.barcode=? AND (? IS NULL OR pv.id<>?) LIMIT 1;
+    ''', [barcode, excludeId, excludeId]);
+    return rows.isEmpty ? null : _ownerDisplay(rows.first);
+  }
+
+  String _ownerDisplay(Row row) {
+    final parts = <String>[];
+    final variant = row['variant'] as String?;
+    final size = row['size'] as String?;
+    if (variant?.trim().isNotEmpty == true) parts.add(variant!.trim());
+    if (size?.trim().isNotEmpty == true) parts.add('Taglia ${size!.trim()}');
+    final detail = parts.isEmpty ? 'Variante base' : parts.join(' · ');
+    return '${row['name']} — $detail (SKU ${row['sku']})';
   }
 
   void _validateLocalUniqueness(String productName, List<ProductVariantDraft> variants) {
-    final skus = <String>{};
-    final barcodes = <String>{};
+    final skus = <String, ProductVariantDraft>{};
+    final barcodes = <String, ProductVariantDraft>{};
     for (final variant in variants) {
-      final skuKey = variant.sku.toLowerCase();
-      if (!skus.add(skuKey)) {
-        throw StateError('Lo SKU «${variant.sku}» è duplicato nel prodotto $productName.');
+      if (variant.sku.isEmpty) throw StateError('Ogni variante deve avere uno SKU.');
+      final key = variant.sku.toLowerCase();
+      final skuOwner = skus[key];
+      if (skuOwner != null && skuOwner.id != variant.id) {
+        throw StateError('Lo SKU «${variant.sku}» è usato due volte nel prodotto $productName.');
       }
+      skus[key] = variant;
       for (final barcode in variant.barcodes) {
-        if (!barcodes.add(barcode)) {
-          throw StateError('Il barcode «$barcode» è duplicato nel prodotto $productName.');
+        final owner = barcodes[barcode];
+        if (owner != null && owner.id != variant.id) {
+          throw StateError('Il barcode «$barcode» è già assegnato a $productName — ${owner.variantDisplay}.');
         }
+        barcodes[barcode] = variant;
       }
     }
   }
 
-  String? _findSkuOwner(String sku, int? currentVariantId) {
-    final rows = _db.select('''
-      SELECT p.name, pv.variant, pv.size
-      FROM product_variants pv
-      JOIN products p ON p.id = pv.product_id
-      WHERE pv.sku = ? COLLATE NOCASE AND (? IS NULL OR pv.id != ?)
-      LIMIT 1;
-    ''', [sku, currentVariantId, currentVariantId]);
-    if (rows.isEmpty) return null;
-    return _ownerLabel(rows.first);
-  }
+  ProductVariantDraft _normalizeVariant(ProductVariantDraft value) => ProductVariantDraft(
+        id: value.id,
+        sku: value.sku.trim(),
+        variant: _optional(value.variant),
+        size: _optional(value.size),
+        purchasePriceCents: value.purchasePriceCents,
+        salePriceCents: value.salePriceCents,
+        isActive: value.isActive,
+        barcodes: value.barcodes.map((e) => e.trim()).where((e) => e.isNotEmpty).toSet().toList(),
+        stockQuantity: value.stockQuantity,
+      );
 
-  String? _findBarcodeOwner(String barcode, int? currentVariantId) {
-    final rows = _db.select('''
-      SELECT p.name, pv.variant, pv.size
-      FROM product_barcodes pb
-      JOIN product_variants pv ON pv.id = pb.variant_id
-      JOIN products p ON p.id = pv.product_id
-      WHERE pb.barcode = ? AND (? IS NULL OR pv.id != ?)
-      LIMIT 1;
-    ''', [barcode, currentVariantId, currentVariantId]);
-    if (rows.isEmpty) return null;
-    return _ownerLabel(rows.first);
-  }
-
-  String _ownerLabel(Row row) {
-    final parts = <String>[row['name'] as String];
-    final variant = row['variant'] as String?;
-    final size = row['size'] as String?;
-    if (variant?.trim().isNotEmpty == true) parts.add(variant!.trim());
-    if (size?.trim().isNotEmpty == true) parts.add(size!.trim());
-    return parts.join(' · ');
-  }
+  String? _optional(String? value) => value?.trim().isNotEmpty == true ? value!.trim() : null;
 
   ProductVariant _readVariant(Row row) => ProductVariant(
         id: row['id'] as int,
         productId: row['product_id'] as int,
         sku: row['sku'] as String,
+        barcode: row['primary_barcode'] as String?,
         name: row['name'] as String,
         categoryId: row['category_id'] as int?,
         category: row['category_name'] as String?,
@@ -349,11 +325,12 @@ class ProductRepository {
         brand: row['brand_name'] as String?,
         variant: row['variant'] as String?,
         size: row['size'] as String?,
-        purchasePriceCents: row['effective_purchase_price_cents'] as int?,
-        salePriceCents: row['effective_sale_price_cents'] as int?,
-        isActive: (row['product_active'] as int) != 0 && (row['variant_active'] as int) != 0,
-        stockQuantity: row['stock'] as int,
-        barcode: row['primary_barcode'] as String?,
+        purchasePriceCents: row['purchase_price_cents'] as int?,
+        salePriceCents: row['sale_price_cents'] as int?,
+        notes: row['notes'] as String?,
+        isActive: (row['is_active'] as int) != 0,
+        stockQuantity: row['stock_quantity'] as int,
+        barcodesDisplay: row['barcodes_display'] as String?,
       );
 
   ProductSummary _readSummary(Row row) => ProductSummary(
@@ -363,49 +340,47 @@ class ProductRepository {
         category: row['category_name'] as String?,
         brandId: row['brand_id'] as int?,
         brand: row['brand_name'] as String?,
-        purchasePriceCents: row['purchase_price_cents'] as int?,
-        salePriceCents: row['sale_price_cents'] as int?,
+        purchasePriceCents: row['product_purchase_price_cents'] as int?,
+        salePriceCents: row['product_sale_price_cents'] as int?,
         notes: row['notes'] as String?,
         isActive: (row['is_active'] as int) != 0,
         variantCount: row['variant_count'] as int,
-        totalStock: row['total_stock'] as int,
-        minSalePriceCents: row['min_sale_price_cents'] as int?,
-        maxSalePriceCents: row['max_sale_price_cents'] as int?,
+        stockQuantity: row['stock_quantity'] as int,
+        minimumSalePriceCents: row['min_sale_price'] as int?,
+        maximumSalePriceCents: row['max_sale_price'] as int?,
       );
 
-  String? _optional(String? value) {
-    final trimmed = value?.trim();
-    return trimmed == null || trimmed.isEmpty ? null : trimmed;
-  }
-
   static const _variantSelect = '''
-    SELECT pv.id, pv.product_id, pv.sku, p.name,
-           p.category_id, c.name AS category_name,
-           p.brand_id, b.name AS brand_name,
-           pv.variant, pv.size,
-           COALESCE(pv.purchase_price_cents, p.purchase_price_cents) AS effective_purchase_price_cents,
-           COALESCE(pv.sale_price_cents, p.sale_price_cents) AS effective_sale_price_cents,
-           p.is_active AS product_active, pv.is_active AS variant_active,
-           COALESCE((SELECT SUM(sm.quantity_delta) FROM stock_movements sm WHERE sm.variant_id = pv.id), 0) AS stock,
-           (SELECT barcode FROM product_barcodes pb WHERE pb.variant_id = pv.id ORDER BY pb.id LIMIT 1) AS primary_barcode
+    SELECT pv.id, p.id AS product_id, pv.sku,
+      (SELECT pb.barcode FROM product_barcodes pb WHERE pb.variant_id=pv.id ORDER BY pb.is_primary DESC, pb.id LIMIT 1) AS primary_barcode,
+      p.name, p.category_id, c.name AS category_name, p.brand_id, b.name AS brand_name,
+      pv.variant, pv.size,
+      COALESCE(pv.purchase_price_cents, p.purchase_price_cents) AS purchase_price_cents,
+      COALESCE(pv.sale_price_cents, p.sale_price_cents) AS sale_price_cents,
+      p.notes,
+      CASE WHEN p.is_active=1 AND pv.is_active=1 THEN 1 ELSE 0 END AS is_active,
+      COALESCE((SELECT SUM(sm.quantity_delta) FROM stock_movements sm WHERE sm.variant_id=pv.id), 0) AS stock_quantity,
+      (SELECT GROUP_CONCAT(pb2.barcode, ' • ') FROM product_barcodes pb2 WHERE pb2.variant_id=pv.id) AS barcodes_display
     FROM product_variants pv
-    JOIN products p ON p.id = pv.product_id
-    LEFT JOIN brands b ON b.id = p.brand_id
-    LEFT JOIN categories c ON c.id = p.category_id
+    JOIN products p ON p.id=pv.product_id
+    LEFT JOIN categories c ON c.id=p.category_id
+    LEFT JOIN brands b ON b.id=p.brand_id
   ''';
 
   static const _productSummarySelect = '''
-    SELECT p.id, p.name, p.category_id, c.name AS category_name,
-           p.brand_id, b.name AS brand_name,
-           p.purchase_price_cents, p.sale_price_cents, p.notes, p.is_active,
-           COUNT(pv.id) AS variant_count,
-           COALESCE(SUM((SELECT COALESCE(SUM(sm.quantity_delta), 0) FROM stock_movements sm WHERE sm.variant_id = pv.id)), 0) AS total_stock,
-           MIN(COALESCE(pv.sale_price_cents, p.sale_price_cents)) AS min_sale_price_cents,
-           MAX(COALESCE(pv.sale_price_cents, p.sale_price_cents)) AS max_sale_price_cents
+    SELECT p.id, p.name, p.category_id, c.name AS category_name, p.brand_id, b.name AS brand_name,
+      p.purchase_price_cents AS product_purchase_price_cents,
+      p.sale_price_cents AS product_sale_price_cents,
+      p.notes, p.is_active,
+      (SELECT COUNT(*) FROM product_variants pv_count WHERE pv_count.product_id=p.id) AS variant_count,
+      COALESCE((SELECT SUM(sm.quantity_delta) FROM product_variants pv_stock
+        LEFT JOIN stock_movements sm ON sm.variant_id=pv_stock.id WHERE pv_stock.product_id=p.id), 0) AS stock_quantity,
+      (SELECT MIN(COALESCE(pv_min.sale_price_cents, p.sale_price_cents)) FROM product_variants pv_min
+        WHERE pv_min.product_id=p.id) AS min_sale_price,
+      (SELECT MAX(COALESCE(pv_max.sale_price_cents, p.sale_price_cents)) FROM product_variants pv_max
+        WHERE pv_max.product_id=p.id) AS max_sale_price
     FROM products p
-    LEFT JOIN product_variants pv ON pv.product_id = p.id
-    LEFT JOIN brands b ON b.id = p.brand_id
-    LEFT JOIN categories c ON c.id = p.category_id
-    GROUP BY p.id
+    LEFT JOIN categories c ON c.id=p.category_id
+    LEFT JOIN brands b ON b.id=p.brand_id
   ''';
 }
