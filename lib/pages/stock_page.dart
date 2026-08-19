@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../l10n/app_strings.dart';
 import '../models/catalog.dart';
 import '../models/stock.dart';
 import '../services/app_services.dart';
@@ -24,6 +25,8 @@ class _StockPageState extends State<StockPage> {
   StockMovementKind _kind = StockMovementKind.incoming;
   String? _status;
 
+  String _itEn(String it, String en) => AppStrings.isEnglish ? en : it;
+
   @override
   void dispose() {
     _search.dispose();
@@ -41,8 +44,14 @@ class _StockPageState extends State<StockPage> {
     setState(() {
       _selected = product;
       _status = product == null
-          ? 'Nessun prodotto trovato per «$code».'
-          : 'Selezionato ${product.name} · ${product.variantDisplay}.';
+          ? _itEn(
+              'Nessun prodotto trovato per «$code».',
+              'No product found for “$code”.',
+            )
+          : _itEn(
+              'Selezionato ${product.name} · ${product.variantDisplay}.',
+              'Selected ${product.name} · ${product.variantDisplay}.',
+            );
     });
   }
 
@@ -50,7 +59,10 @@ class _StockPageState extends State<StockPage> {
     if (_selected == null) return;
     final quantity = int.tryParse(_quantity.text.trim());
     if (quantity == null) {
-      setState(() => _status = 'Inserisci una quantità intera valida.');
+      setState(() => _status = _itEn(
+            'Inserisci una quantità intera valida.',
+            'Enter a valid whole quantity.',
+          ));
       return;
     }
     try {
@@ -58,7 +70,10 @@ class _StockPageState extends State<StockPage> {
       final latest = widget.services.products.getById(_selected!.id);
       setState(() {
         _selected = latest;
-        _status = 'Movimento registrato. Giacenza: ${latest?.stockQuantity ?? 0}.';
+        _status = _itEn(
+          'Movimento registrato. Giacenza: ${latest?.stockQuantity ?? 0}.',
+          'Movement registered. Stock: ${latest?.stockQuantity ?? 0}.',
+        );
         _note.clear();
       });
     } catch (error) {
@@ -79,7 +94,7 @@ class _StockPageState extends State<StockPage> {
       child: Padding(
         padding: const EdgeInsets.all(24),
         child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-          Text('Magazzino', style: Theme.of(context).textTheme.headlineMedium),
+          Text(AppStrings.t('stock'), style: Theme.of(context).textTheme.headlineMedium),
           const SizedBox(height: 14),
           Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Expanded(
@@ -88,11 +103,17 @@ class _StockPageState extends State<StockPage> {
                   controller: _search,
                   onChanged: (_) => setState(() {}),
                   onSubmitted: _scan,
-                  decoration: const InputDecoration(
-                    border: OutlineInputBorder(),
-                    labelText: 'Cerca variante / SKU / barcode',
-                    prefixIcon: Icon(Icons.qr_code_scanner),
-                    hintText: 'Puoi scansionare anche senza cliccare questo campo',
+                  decoration: InputDecoration(
+                    border: const OutlineInputBorder(),
+                    labelText: _itEn(
+                      'Cerca variante / SKU / barcode',
+                      'Search variant / SKU / barcode',
+                    ),
+                    prefixIcon: const Icon(Icons.qr_code_scanner),
+                    hintText: _itEn(
+                      'Puoi scansionare anche senza cliccare questo campo',
+                      'You can scan without clicking this field',
+                    ),
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -103,14 +124,16 @@ class _StockPageState extends State<StockPage> {
                     child: ListView.builder(
                       itemCount: products.length,
                       itemBuilder: (context, index) {
-                        final p = products[index];
+                        final product = products[index];
                         return ListTile(
                           dense: true,
-                          selected: _selected?.id == p.id,
-                          title: Text(p.name),
-                          subtitle: Text('${p.variantDisplay} · ${p.sku}'),
-                          trailing: Text('Giacenza ${p.stockQuantity}'),
-                          onTap: () => setState(() => _selected = p),
+                          selected: _selected?.id == product.id,
+                          title: Text(product.name),
+                          subtitle: Text('${product.variantDisplay} · ${product.sku}'),
+                          trailing: Text(
+                            '${AppStrings.t('quantity')} ${product.stockQuantity}',
+                          ),
+                          onTap: () => setState(() => _selected = product),
                         );
                       },
                     ),
@@ -127,28 +150,28 @@ class _StockPageState extends State<StockPage> {
                   child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
                     Text(
                       _selected == null
-                          ? 'Seleziona una variante'
+                          ? _itEn('Seleziona una variante', 'Select a variant')
                           : '${_selected!.name} · ${_selected!.variantDisplay}',
                       style: Theme.of(context).textTheme.titleMedium,
                     ),
                     const SizedBox(height: 12),
                     GlassDropdown<StockMovementKind>(
                       value: _kind,
-                      labelText: 'Tipo movimento',
-                      items: const [
+                      labelText: _itEn('Tipo movimento', 'Movement type'),
+                      items: [
                         GlassDropdownItem(
                           value: StockMovementKind.incoming,
-                          label: 'Carico',
+                          label: _itEn('Carico', 'Incoming'),
                           icon: Icons.arrow_downward,
                         ),
                         GlassDropdownItem(
                           value: StockMovementKind.outgoing,
-                          label: 'Scarico',
+                          label: _itEn('Scarico', 'Outgoing'),
                           icon: Icons.arrow_upward,
                         ),
                         GlassDropdownItem(
                           value: StockMovementKind.adjustment,
-                          label: 'Rettifica giacenza',
+                          label: _itEn('Rettifica giacenza', 'Stock adjustment'),
                           icon: Icons.tune,
                         ),
                       ],
@@ -162,22 +185,24 @@ class _StockPageState extends State<StockPage> {
                       keyboardType: TextInputType.number,
                       decoration: InputDecoration(
                         border: const OutlineInputBorder(),
-                        labelText: _kind == StockMovementKind.adjustment ? 'Nuova giacenza' : 'Quantità',
+                        labelText: _kind == StockMovementKind.adjustment
+                            ? _itEn('Nuova giacenza', 'New stock level')
+                            : _itEn('Quantità', 'Quantity'),
                       ),
                     ),
                     const SizedBox(height: 8),
                     TextField(
                       controller: _note,
-                      decoration: const InputDecoration(
-                        border: OutlineInputBorder(),
-                        labelText: 'Nota',
+                      decoration: InputDecoration(
+                        border: const OutlineInputBorder(),
+                        labelText: _itEn('Nota', 'Note'),
                       ),
                     ),
                     const SizedBox(height: 10),
                     FilledButton.icon(
                       onPressed: _selected == null ? null : _register,
                       icon: const Icon(Icons.save),
-                      label: const Text('Registra movimento'),
+                      label: Text(_itEn('Registra movimento', 'Register movement')),
                     ),
                     if (_status != null)
                       Padding(
@@ -193,10 +218,10 @@ class _StockPageState extends State<StockPage> {
           TextField(
             controller: _historySearch,
             onChanged: (_) => setState(() {}),
-            decoration: const InputDecoration(
-              border: OutlineInputBorder(),
-              labelText: 'Cerca nello storico',
-              prefixIcon: Icon(Icons.history),
+            decoration: InputDecoration(
+              border: const OutlineInputBorder(),
+              labelText: _itEn('Cerca nello storico', 'Search history'),
+              prefixIcon: const Icon(Icons.history),
             ),
           ),
           const SizedBox(height: 8),
@@ -207,19 +232,23 @@ class _StockPageState extends State<StockPage> {
                 itemCount: history.length,
                 separatorBuilder: (_, _) => const Divider(height: 1),
                 itemBuilder: (context, index) {
-                  final m = history[index];
+                  final movement = history[index];
                   return ListTile(
                     dense: true,
                     leading: Icon(
-                      m.kind == StockMovementKind.incoming
+                      movement.kind == StockMovementKind.incoming
                           ? Icons.arrow_downward
-                          : m.kind == StockMovementKind.outgoing
+                          : movement.kind == StockMovementKind.outgoing
                               ? Icons.arrow_upward
                               : Icons.tune,
                     ),
-                    title: Text('${m.productName} · SKU ${m.sku}'),
-                    subtitle: Text('${m.createdAtDisplay}${m.note == null ? '' : ' · ${m.note}'}'),
-                    trailing: Text('${m.typeDisplay} ${m.quantityDisplay}  →  ${m.stockAfter}'),
+                    title: Text('${movement.productName} · SKU ${movement.sku}'),
+                    subtitle: Text(
+                      '${movement.createdAtDisplay}${movement.note == null ? '' : ' · ${movement.note}'}',
+                    ),
+                    trailing: Text(
+                      '${movement.typeDisplay} ${movement.quantityDisplay}  →  ${movement.stockAfter}',
+                    ),
                   );
                 },
               ),
