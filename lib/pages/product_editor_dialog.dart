@@ -89,18 +89,15 @@ class _ProductEditorDialogState extends State<ProductEditorDialog> {
   }
 
   String _nextSku() {
-    final base = widget.services.products.generateSku();
-    final match = RegExp(r'^(.*?)(\d+)$').firstMatch(base);
-    if (match == null) return '$base-${_variants.length + 1}';
-    final prefix = match.group(1)!;
-    var number = int.parse(match.group(2)!);
-    var result = base;
-    final used = _variants.map((e) => e.sku.text.toLowerCase()).toSet();
-    while (used.contains(result.toLowerCase())) {
-      number++;
-      result = '$prefix${number.toString().padLeft(match.group(2)!.length, '0')}';
+    final used = _variants.map((e) => e.sku.text.trim().toLowerCase()).toSet();
+    for (var attempt = 0; attempt < 100; attempt++) {
+      final candidate = widget.services.products.generateSku();
+      if (!used.contains(candidate.toLowerCase())) return candidate;
     }
-    return result;
+    throw StateError(_itEn(
+      'Impossibile generare uno SKU univoco. Riprova.',
+      'Unable to generate a unique SKU. Try again.',
+    ));
   }
 
   void _addVariant() => setState(() => _variants.add(_VariantForm(
@@ -311,6 +308,7 @@ class _ProductEditorDialogState extends State<ProductEditorDialog> {
                     form: _variants[index],
                     index: index,
                     canRemove: _variants[index].id == null && _variants.length > 1,
+                    onGenerateSku: _nextSku,
                     onRemove: () => _removeVariant(index),
                   ),
                 ),
@@ -359,12 +357,14 @@ class _VariantEditor extends StatefulWidget {
     required this.form,
     required this.index,
     required this.canRemove,
+    required this.onGenerateSku,
     required this.onRemove,
   });
 
   final _VariantForm form;
   final int index;
   final bool canRemove;
+  final String Function() onGenerateSku;
   final VoidCallback onRemove;
 
   @override
@@ -373,6 +373,14 @@ class _VariantEditor extends StatefulWidget {
 
 class _VariantEditorState extends State<_VariantEditor> {
   String _itEn(String it, String en) => AppStrings.isEnglish ? en : it;
+
+  void _generateSku() {
+    final sku = widget.onGenerateSku();
+    widget.form.sku.value = TextEditingValue(
+      text: sku,
+      selection: TextSelection.collapsed(offset: sku.length),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -410,9 +418,17 @@ class _VariantEditorState extends State<_VariantEditor> {
             Expanded(
               child: TextField(
                 controller: widget.form.sku,
-                decoration: const InputDecoration(
-                  border: OutlineInputBorder(),
+                decoration: InputDecoration(
+                  border: const OutlineInputBorder(),
                   labelText: 'SKU *',
+                  suffixIcon: IconButton(
+                    tooltip: _itEn(
+                      'Genera SKU univoco',
+                      'Generate unique SKU',
+                    ),
+                    onPressed: _generateSku,
+                    icon: const Icon(Icons.autorenew_rounded),
+                  ),
                 ),
               ),
             ),
