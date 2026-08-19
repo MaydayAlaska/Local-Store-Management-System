@@ -79,7 +79,7 @@ class SalesOrderDraftLine {
     required this.finalTotalCents,
   });
 
-  final int variantId;
+  final int? variantId;
   final String sku;
   final String? barcode;
   final String productName;

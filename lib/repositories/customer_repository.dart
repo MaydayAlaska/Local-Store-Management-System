@@ -291,9 +291,11 @@ class CustomerRepository {
 
       for (final line in draft.lines) {
         if (line.quantity <= 0) throw ArgumentError('Quantità di vendita non valida.');
+        final variantId = line.variantId;
+        if (variantId == null) continue;
         final available = db.select(
           'SELECT COALESCE(SUM(quantity_delta), 0) AS stock FROM stock_movements WHERE variant_id=?;',
-          [line.variantId],
+          [variantId],
         ).first['stock'] as int;
         if (available < line.quantity) {
           throw StateError('${line.productName}: giacenza insufficiente. Disponibili: $available.');
@@ -343,10 +345,14 @@ class CustomerRepository {
           line.grossTotalCents,
           line.finalTotalCents,
         ]);
-        db.execute('''
-          INSERT INTO stock_movements (variant_id, movement_type, quantity_delta, note, created_at_utc)
-          VALUES (?, 'OUT', ?, ?, ?);
-        ''', [line.variantId, -line.quantity, 'Vendita $orderNumber', now.toIso8601String()]);
+
+        final variantId = line.variantId;
+        if (variantId != null) {
+          db.execute('''
+            INSERT INTO stock_movements (variant_id, movement_type, quantity_delta, note, created_at_utc)
+            VALUES (?, 'OUT', ?, ?, ?);
+          ''', [variantId, -line.quantity, 'Vendita $orderNumber', now.toIso8601String()]);
+        }
       }
 
       db.execute('COMMIT;');

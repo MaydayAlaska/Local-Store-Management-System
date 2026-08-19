@@ -20,20 +20,18 @@ class CashPage extends StatefulWidget {
   State<CashPage> createState() => _CashPageState();
 }
 
-enum _KeypadTarget { search, totalPercent, fixedDiscount }
-
 class _CashPageState extends State<CashPage> {
+  static const _maxGenericPriceCents = 99999999;
+
   final _search = TextEditingController();
-  final _searchFocus = FocusNode();
   final _totalPercent = TextEditingController();
-  final _totalPercentFocus = FocusNode();
   final _fixedDiscount = TextEditingController();
-  final _fixedDiscountFocus = FocusNode();
   final List<_CashLine> _cart = [];
   final List<_FixedDiscountLine> _fixedDiscounts = [];
   Customer? _customer;
   int _nextDiscountId = 1;
-  _KeypadTarget _keypadTarget = _KeypadTarget.search;
+  int _nextGenericLineId = 1;
+  int _keypadPriceCents = 0;
   late String _searchStatus;
   late String _cartStatus;
 
@@ -47,112 +45,69 @@ class _CashPageState extends State<CashPage> {
   @override
   void dispose() {
     _search.dispose();
-    _searchFocus.dispose();
     _totalPercent.dispose();
-    _totalPercentFocus.dispose();
     _fixedDiscount.dispose();
-    _fixedDiscountFocus.dispose();
     super.dispose();
   }
 
-  List<ProductVariant> get _results => widget.services.products.search(_search.text, 50);
+  List<ProductVariant> get _results =>
+      widget.services.products.search(_search.text, 50);
 
   String _itEn(String it, String en) => AppStrings.isEnglish ? en : it;
 
-  TextEditingController get _keypadController => switch (_keypadTarget) {
-        _KeypadTarget.search => _search,
-        _KeypadTarget.totalPercent => _totalPercent,
-        _KeypadTarget.fixedDiscount => _fixedDiscount,
-      };
-
-  FocusNode get _keypadFocus => switch (_keypadTarget) {
-        _KeypadTarget.search => _searchFocus,
-        _KeypadTarget.totalPercent => _totalPercentFocus,
-        _KeypadTarget.fixedDiscount => _fixedDiscountFocus,
-      };
-
-  void _selectKeypadTarget(
-    _KeypadTarget target, {
-    bool requestFocus = true,
-  }) {
-    if (target != _KeypadTarget.search && _cart.isEmpty) return;
-    setState(() => _keypadTarget = target);
-    if (requestFocus) _keypadFocus.requestFocus();
-  }
-
   void _keypadInsert(String value) {
-    if (_keypadTarget == _KeypadTarget.search &&
-        (value == ',' || value == '.')) {
-      return;
+    var next = _keypadPriceCents;
+    for (final digit in value.split('')) {
+      final parsed = int.tryParse(digit);
+      if (parsed == null) continue;
+      next = next * 10 + parsed;
+      if (next > _maxGenericPriceCents) {
+        setState(() {
+          _cartStatus = _itEn(
+            'Importo troppo alto per un articolo generico.',
+            'The generic item amount is too high.',
+          );
+        });
+        return;
+      }
     }
-    final controller = _keypadController;
-    if ((value == ',' || value == '.') &&
-        (controller.text.contains(',') || controller.text.contains('.'))) {
-      return;
-    }
-
-    final text = controller.text;
-    final selection = controller.selection;
-    final start = !selection.isValid || selection.start < 0
-        ? text.length
-        : selection.start > text.length
-            ? text.length
-            : selection.start;
-    final end = !selection.isValid || selection.end < start
-        ? start
-        : selection.end > text.length
-            ? text.length
-            : selection.end;
-    final next = text.replaceRange(start, end, value);
-    controller.value = TextEditingValue(
-      text: next,
-      selection: TextSelection.collapsed(offset: start + value.length),
-    );
-    _keypadFocus.requestFocus();
-    setState(() {});
+    setState(() => _keypadPriceCents = next);
   }
 
   void _keypadBackspace() {
-    final controller = _keypadController;
-    final text = controller.text;
-    if (text.isEmpty) return;
-    final selection = controller.selection;
-    var start = !selection.isValid || selection.start < 0
-        ? text.length
-        : selection.start > text.length
-            ? text.length
-            : selection.start;
-    var end = !selection.isValid || selection.end < start
-        ? start
-        : selection.end > text.length
-            ? text.length
-            : selection.end;
-    if (start == end && start > 0) start--;
-    if (start == end) return;
-    final next = text.replaceRange(start, end, '');
-    controller.value = TextEditingValue(
-      text: next,
-      selection: TextSelection.collapsed(offset: start),
-    );
-    _keypadFocus.requestFocus();
-    setState(() {});
+    if (_keypadPriceCents == 0) return;
+    setState(() => _keypadPriceCents ~/= 10);
   }
 
   void _keypadClear() {
-    _keypadController.clear();
-    _keypadFocus.requestFocus();
-    setState(() {});
+    if (_keypadPriceCents == 0) return;
+    setState(() => _keypadPriceCents = 0);
   }
 
   void _keypadSubmit() {
-    switch (_keypadTarget) {
-      case _KeypadTarget.search:
-        _submitSearch(_search.text);
-      case _KeypadTarget.totalPercent:
-        _addPercentDiscount();
-      case _KeypadTarget.fixedDiscount:
-        _addFixedDiscount();
+    final cents = _keypadPriceCents;
+    if (cents <= 0) {
+      return _cartMessage(_itEn(
+        'Inserisci un prezzo maggiore di zero e conferma.',
+        'Enter a price greater than zero and confirm.',
+      ));
     }
+
+    final line = _CashLine.generic(
+      genericId: _nextGenericLineId++,
+      genericName: _itEn('Articolo generico', 'Generic item'),
+      unitPriceCents: cents,
+      quantity: 1,
+      discountPercent: 0,
+    );
+    setState(() {
+      _cart.add(line);
+      _keypadPriceCents = 0;
+      _cartStatus = _itEn(
+        'Articolo generico da ${formatMoney(cents)} aggiunto al carrello.',
+        'Generic item for ${formatMoney(cents)} added to the cart.',
+      );
+    });
   }
 
   void _submitSearch(String value) {
@@ -256,7 +211,9 @@ class _CashPageState extends State<CashPage> {
       ));
     }
 
-    final index = _cart.indexWhere((line) => line.variantId == latest.id);
+    final index = _cart.indexWhere(
+      (line) => !line.isGeneric && line.variantId == latest.id,
+    );
     final current = index < 0 ? null : _cart[index];
     final quantity = current?.quantity ?? 0;
     if (quantity >= latest.stockQuantity) {
@@ -266,7 +223,7 @@ class _CashPageState extends State<CashPage> {
       ));
     }
 
-    final line = _CashLine(
+    final line = _CashLine.product(
       product: latest,
       quantity: quantity + 1,
       discountPercent: current?.discountPercent ?? 0,
@@ -288,9 +245,33 @@ class _CashPageState extends State<CashPage> {
   void _message(String value) => setState(() => _searchStatus = value);
 
   void _changeQuantity(_CashLine line, int delta) {
-    final index = _cart.indexWhere((item) => item.variantId == line.variantId);
+    final index = _cart.indexWhere((item) => item.key == line.key);
     if (index < 0) return;
-    final latest = widget.services.products.getById(line.variantId);
+    final next = line.quantity + delta;
+    if (next < 1) {
+      return _cartMessage(_itEn(
+        'Usa «Rimuovi» per eliminare completamente la riga.',
+        'Use “Remove” to delete the line completely.',
+      ));
+    }
+
+    if (line.isGeneric) {
+      if (next > 999) {
+        return _cartMessage(_itEn(
+          'Quantità massima raggiunta per l’articolo generico.',
+          'Maximum quantity reached for the generic item.',
+        ));
+      }
+      _cart[index] = line.copyWith(quantity: next);
+      return setState(() => _cartStatus = _itEn(
+            '${line.productName}: quantità aggiornata a $next.',
+            '${line.productName}: quantity updated to $next.',
+          ));
+    }
+
+    final variantId = line.variantId;
+    if (variantId == null) return;
+    final latest = widget.services.products.getById(variantId);
     if (latest == null ||
         !latest.isActive ||
         latest.salePriceCents == null ||
@@ -303,24 +284,13 @@ class _CashPageState extends State<CashPage> {
           ));
       return;
     }
-    final next = _cart[index].quantity + delta;
-    if (next < 1) {
-      return _cartMessage(_itEn(
-        'Usa «Rimuovi» per eliminare completamente la riga.',
-        'Use “Remove” to delete the line completely.',
-      ));
-    }
     if (next > latest.stockQuantity) {
       return _cartMessage(_itEn(
         'Quantità massima raggiunta: ${latest.stockQuantity} pezzi disponibili.',
         'Maximum quantity reached: ${latest.stockQuantity} items available.',
       ));
     }
-    _cart[index] = _CashLine(
-      product: latest,
-      quantity: next,
-      discountPercent: line.discountPercent,
-    );
+    _cart[index] = line.copyWith(product: latest, quantity: next);
     setState(() => _cartStatus = _itEn(
           '${latest.name}: quantità aggiornata a $next.',
           '${latest.name}: quantity updated to $next.',
@@ -332,17 +302,17 @@ class _CashPageState extends State<CashPage> {
   void _setLineDiscount(_CashLine line, String value) {
     final percent =
         _clampPercent(double.tryParse(value.replaceAll(',', '.')) ?? 0);
-    final index = _cart.indexWhere((e) => e.variantId == line.variantId);
+    final index = _cart.indexWhere((item) => item.key == line.key);
     if (index < 0) return;
     _cart[index] = line.copyWith(discountPercent: percent);
     setState(() => _cartStatus = percent == 0
         ? _itEn(
-            'Sconto rimosso da ${line.product.name}.',
-            'Discount removed from ${line.product.name}.',
+            'Sconto rimosso da ${line.productName}.',
+            'Discount removed from ${line.productName}.',
           )
         : _itEn(
-            'Sconto del ${_percentText(percent)}% applicato a ${line.product.name}.',
-            '${_percentText(percent)}% discount applied to ${line.product.name}.',
+            'Sconto del ${_percentText(percent)}% applicato a ${line.productName}.',
+            '${_percentText(percent)}% discount applied to ${line.productName}.',
           ));
   }
 
@@ -437,16 +407,16 @@ class _CashPageState extends State<CashPage> {
   }
 
   void _removeLine(_CashLine line) {
-    _cart.removeWhere((e) => e.variantId == line.variantId);
+    _cart.removeWhere((item) => item.key == line.key);
     _normalizeDiscounts();
     setState(() => _cartStatus = _itEn(
-          '${line.product.name} rimosso dal carrello.',
-          '${line.product.name} removed from the cart.',
+          '${line.productName} rimosso dal carrello.',
+          '${line.productName} removed from the cart.',
         ));
   }
 
   void _removeFixed(_FixedDiscountLine line) {
-    _fixedDiscounts.removeWhere((e) => e.id == line.id);
+    _fixedDiscounts.removeWhere((item) => item.id == line.id);
     setState(() => _cartStatus = _itEn(
           'Sconto di ${formatMoney(line.amountCents)} rimosso dal carrello.',
           'Discount of ${formatMoney(line.amountCents)} removed from the cart.',
@@ -459,7 +429,7 @@ class _CashPageState extends State<CashPage> {
     _customer = null;
     _totalPercent.clear();
     _fixedDiscount.clear();
-    _keypadTarget = _KeypadTarget.search;
+    _keypadPriceCents = 0;
     if (!keepStatus) {
       setState(() => _cartStatus = _itEn(
             'Carrello svuotato. Nessun movimento di magazzino è stato registrato.',
@@ -473,7 +443,6 @@ class _CashPageState extends State<CashPage> {
       _fixedDiscounts.clear();
       _totalPercent.clear();
       _fixedDiscount.clear();
-      _keypadTarget = _KeypadTarget.search;
     }
   }
 
@@ -517,12 +486,12 @@ class _CashPageState extends State<CashPage> {
       lines: _cart
           .map((line) => SalesOrderDraftLine(
                 variantId: line.variantId,
-                sku: line.product.sku,
-                barcode: line.product.barcode,
-                productName: line.product.name,
-                variantDisplay: line.product.variantDisplay,
+                sku: line.sku,
+                barcode: line.barcode,
+                productName: line.productName,
+                variantDisplay: line.variantDisplay,
                 quantity: line.quantity,
-                unitPriceCents: line.product.salePriceCents ?? 0,
+                unitPriceCents: line.unitPriceCents,
                 discountBasisPoints: (line.discountPercent * 100).round(),
                 grossTotalCents: line.grossLineTotalCents,
                 finalTotalCents: line.lineTotalCents,
@@ -541,8 +510,8 @@ class _CashPageState extends State<CashPage> {
       _clear(keepStatus: true);
       setState(() {
         _cartStatus = _itEn(
-          'Vendita ${order.orderNumber} registrata. Magazzino aggiornato.',
-          'Sale ${order.orderNumber} registered. Stock updated.',
+          'Vendita ${order.orderNumber} registrata. Magazzino aggiornato dove previsto.',
+          'Sale ${order.orderNumber} registered. Stock updated where applicable.',
         );
         _searchStatus = _itEn(
           'Vendita completata. Scanner pronto per il prossimo cliente o prodotto.',
@@ -573,66 +542,64 @@ class _CashPageState extends State<CashPage> {
       child: Padding(
         padding: const EdgeInsets.all(24),
         child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-          Text(AppStrings.t('cash'),
-              style: Theme.of(context).textTheme.headlineMedium),
+          Text(
+            AppStrings.t('cash'),
+            style: Theme.of(context).textTheme.headlineMedium,
+          ),
           const SizedBox(height: 14),
           Expanded(
             child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
               Expanded(
-                child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-                  TextField(
-                    controller: _search,
-                    focusNode: _searchFocus,
-                    onTap: () => _selectKeypadTarget(
-                      _KeypadTarget.search,
-                      requestFocus: false,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    TextField(
+                      controller: _search,
+                      onChanged: (_) => setState(() {}),
+                      onSubmitted: _submitSearch,
+                      decoration: InputDecoration(
+                        border: const OutlineInputBorder(),
+                        prefixIcon: const Icon(Icons.qr_code_scanner),
+                        labelText: AppStrings.t('scan_search'),
+                        hintText: AppStrings.t('scanner_hint'),
+                      ),
                     ),
-                    onChanged: (_) => setState(() {}),
-                    onSubmitted: _submitSearch,
-                    decoration: InputDecoration(
-                      border: const OutlineInputBorder(),
-                      prefixIcon: const Icon(Icons.qr_code_scanner),
-                      labelText: AppStrings.t('scan_search'),
-                      hintText: AppStrings.t('scanner_hint'),
+                    const SizedBox(height: 8),
+                    Text(_searchStatus),
+                    const SizedBox(height: 8),
+                    Expanded(
+                      child: Card(
+                        clipBehavior: Clip.antiAlias,
+                        child: results.isEmpty
+                            ? Center(child: Text(AppStrings.t('no_product_found')))
+                            : ListView.separated(
+                                itemCount: results.length,
+                                separatorBuilder: (_, _) =>
+                                    const Divider(height: 1),
+                                itemBuilder: (context, index) {
+                                  final product = results[index];
+                                  return ListTile(
+                                    title: Text(product.name),
+                                    subtitle: Text(
+                                      '${product.variantDisplay} · SKU ${product.sku} · ${AppStrings.t('quantity').toLowerCase()} ${product.stockQuantity}',
+                                    ),
+                                    trailing: Text(product.salePriceDisplay),
+                                    onTap: () => _add(product),
+                                  );
+                                },
+                              ),
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(_searchStatus),
-                  const SizedBox(height: 8),
-                  Expanded(
-                    child: Card(
-                      clipBehavior: Clip.antiAlias,
-                      child: results.isEmpty
-                          ? Center(child: Text(AppStrings.t('no_product_found')))
-                          : ListView.separated(
-                              itemCount: results.length,
-                              separatorBuilder: (_, _) => const Divider(height: 1),
-                              itemBuilder: (context, index) {
-                                final product = results[index];
-                                return ListTile(
-                                  title: Text(product.name),
-                                  subtitle: Text(
-                                    '${product.variantDisplay} · SKU ${product.sku} · ${AppStrings.t('quantity').toLowerCase()} ${product.stockQuantity}',
-                                  ),
-                                  trailing: Text(product.salePriceDisplay),
-                                  onTap: () => _add(product),
-                                );
-                              },
-                            ),
+                    const SizedBox(height: 8),
+                    _CashKeypad(
+                      priceText: formatMoney(_keypadPriceCents),
+                      onKey: _keypadInsert,
+                      onBackspace: _keypadBackspace,
+                      onClear: _keypadClear,
+                      onSubmit: _keypadSubmit,
                     ),
-                  ),
-                  const SizedBox(height: 8),
-                  _CashKeypad(
-                    target: _keypadTarget,
-                    currencySymbol: AppRuntime.currencySymbol,
-                    discountsEnabled: _cart.isNotEmpty,
-                    onTargetChanged: _selectKeypadTarget,
-                    onKey: _keypadInsert,
-                    onBackspace: _keypadBackspace,
-                    onClear: _keypadClear,
-                    onSubmit: _keypadSubmit,
-                  ),
-                ]),
+                  ],
+                ),
               ),
               const SizedBox(width: 16),
               Expanded(
@@ -651,7 +618,8 @@ class _CashPageState extends State<CashPage> {
                         TextButton.icon(
                           onPressed: _cart.isEmpty &&
                                   _fixedDiscounts.isEmpty &&
-                                  _customer == null
+                                  _customer == null &&
+                                  _keypadPriceCents == 0
                               ? null
                               : _clear,
                           icon: const Icon(Icons.delete_sweep),
@@ -710,19 +678,23 @@ class _CashPageState extends State<CashPage> {
                           : ListView(children: [
                               ..._cart.map((line) => _CartTile(
                                     line: line,
-                                    onDecrease: () => _changeQuantity(line, -1),
+                                    onDecrease: () =>
+                                        _changeQuantity(line, -1),
                                     onIncrease: () => _changeQuantity(line, 1),
                                     onDiscount: (value) =>
                                         _setLineDiscount(line, value),
                                     onRemove: () => _removeLine(line),
                                   )),
                               ..._fixedDiscounts.map((line) => ListTile(
-                                    leading: const Icon(Icons.discount_outlined),
+                                    leading:
+                                        const Icon(Icons.discount_outlined),
                                     title: Text(line.label),
                                     trailing: Row(
                                       mainAxisSize: MainAxisSize.min,
                                       children: [
-                                        Text('−${formatMoney(line.amountCents)}'),
+                                        Text(
+                                          '−${formatMoney(line.amountCents)}',
+                                        ),
                                         IconButton(
                                           onPressed: () => _removeFixed(line),
                                           icon: const Icon(Icons.close),
@@ -742,14 +714,10 @@ class _CashPageState extends State<CashPage> {
                             Expanded(
                               child: TextField(
                                 controller: _totalPercent,
-                                focusNode: _totalPercentFocus,
                                 enabled: _cart.isNotEmpty,
-                                keyboardType: const TextInputType.numberWithOptions(
+                                keyboardType:
+                                    const TextInputType.numberWithOptions(
                                   decimal: true,
-                                ),
-                                onTap: () => _selectKeypadTarget(
-                                  _KeypadTarget.totalPercent,
-                                  requestFocus: false,
                                 ),
                                 onChanged: (_) => setState(() {}),
                                 onSubmitted: (_) => _addPercentDiscount(),
@@ -764,14 +732,10 @@ class _CashPageState extends State<CashPage> {
                             Expanded(
                               child: TextField(
                                 controller: _fixedDiscount,
-                                focusNode: _fixedDiscountFocus,
                                 enabled: _cart.isNotEmpty,
-                                keyboardType: const TextInputType.numberWithOptions(
+                                keyboardType:
+                                    const TextInputType.numberWithOptions(
                                   decimal: true,
-                                ),
-                                onTap: () => _selectKeypadTarget(
-                                  _KeypadTarget.fixedDiscount,
-                                  requestFocus: false,
                                 ),
                                 onSubmitted: (_) => _addFixedDiscount(),
                                 decoration: InputDecoration(
@@ -846,47 +810,21 @@ class _CashPageState extends State<CashPage> {
 
 class _CashKeypad extends StatelessWidget {
   const _CashKeypad({
-    required this.target,
-    required this.currencySymbol,
-    required this.discountsEnabled,
-    required this.onTargetChanged,
+    required this.priceText,
     required this.onKey,
     required this.onBackspace,
     required this.onClear,
     required this.onSubmit,
   });
 
-  final _KeypadTarget target;
-  final String currencySymbol;
-  final bool discountsEnabled;
-  final ValueChanged<_KeypadTarget> onTargetChanged;
+  final String priceText;
   final ValueChanged<String> onKey;
   final VoidCallback onBackspace;
   final VoidCallback onClear;
   final VoidCallback onSubmit;
 
-  Widget _targetButton(
-    BuildContext context,
-    _KeypadTarget value,
-    String label, {
-    bool enabled = true,
-  }) {
-    final selected = target == value;
-    final child = Text(label, maxLines: 1, overflow: TextOverflow.ellipsis);
-    return Expanded(
-      child: selected
-          ? FilledButton.tonal(
-              onPressed: enabled ? () => onTargetChanged(value) : null,
-              child: child,
-            )
-          : OutlinedButton(
-              onPressed: enabled ? () => onTargetChanged(value) : null,
-              child: child,
-            ),
-    );
-  }
-
-  Widget _numberButton(String value) => Expanded(
+  Widget _numberButton(String value, {int flex = 1}) => Expanded(
+        flex: flex,
         child: SizedBox(
           height: 38,
           child: OutlinedButton(
@@ -897,140 +835,139 @@ class _CashKeypad extends StatelessWidget {
       );
 
   @override
-  Widget build(BuildContext context) {
-    final decimal = AppStrings.isEnglish ? '.' : ',';
-    return Card(
-      margin: EdgeInsets.zero,
-      child: Padding(
-        padding: const EdgeInsets.all(10),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Row(
-              children: [
-                const Icon(Icons.dialpad_rounded, size: 18),
-                const SizedBox(width: 6),
-                Text(
-                  AppStrings.isEnglish ? 'Keypad' : 'Tastierino',
-                  style: Theme.of(context).textTheme.titleSmall,
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                _targetButton(
-                  context,
-                  _KeypadTarget.search,
-                  AppStrings.isEnglish ? 'Search' : 'Ricerca',
-                ),
-                const SizedBox(width: 6),
-                _targetButton(
-                  context,
-                  _KeypadTarget.totalPercent,
-                  AppStrings.isEnglish ? 'Discount %' : 'Sconto %',
-                  enabled: discountsEnabled,
-                ),
-                const SizedBox(width: 6),
-                _targetButton(
-                  context,
-                  _KeypadTarget.fixedDiscount,
-                  '${AppStrings.isEnglish ? 'Discount' : 'Sconto'} $currencySymbol',
-                  enabled: discountsEnabled,
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            SizedBox(
-              height: 170,
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
+  Widget build(BuildContext context) => Card(
+        margin: EdgeInsets.zero,
+        child: Padding(
+          padding: const EdgeInsets.all(10),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
                 children: [
+                  const Icon(Icons.dialpad_rounded, size: 18),
+                  const SizedBox(width: 6),
                   Expanded(
-                    child: Column(
-                      children: [
-                        Row(children: [
-                          _numberButton('7'),
-                          const SizedBox(width: 6),
-                          _numberButton('8'),
-                          const SizedBox(width: 6),
-                          _numberButton('9'),
-                        ]),
-                        const SizedBox(height: 6),
-                        Row(children: [
-                          _numberButton('4'),
-                          const SizedBox(width: 6),
-                          _numberButton('5'),
-                          const SizedBox(width: 6),
-                          _numberButton('6'),
-                        ]),
-                        const SizedBox(height: 6),
-                        Row(children: [
-                          _numberButton('1'),
-                          const SizedBox(width: 6),
-                          _numberButton('2'),
-                          const SizedBox(width: 6),
-                          _numberButton('3'),
-                        ]),
-                        const SizedBox(height: 6),
-                        Row(children: [
-                          _numberButton('0'),
-                          const SizedBox(width: 6),
-                          _numberButton('00'),
-                          const SizedBox(width: 6),
-                          Expanded(
-                            child: SizedBox(
-                              height: 38,
-                              child: OutlinedButton(
-                                onPressed: target == _KeypadTarget.search
-                                    ? null
-                                    : () => onKey(decimal),
-                                child: Text(decimal),
-                              ),
-                            ),
-                          ),
-                        ]),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  SizedBox(
-                    width: 54,
-                    child: Column(
-                      children: [
-                        Expanded(
-                          child: IconButton.outlined(
-                            tooltip: AppStrings.isEnglish ? 'Backspace' : 'Cancella cifra',
-                            onPressed: onBackspace,
-                            icon: const Icon(Icons.backspace_outlined),
-                          ),
-                        ),
-                        const SizedBox(height: 6),
-                        Expanded(
-                          child: OutlinedButton(
-                            onPressed: onClear,
-                            child: const Text('C'),
-                          ),
-                        ),
-                        const SizedBox(height: 6),
-                        Expanded(
-                          child: FilledButton(
-                            onPressed: onSubmit,
-                            child: const Icon(Icons.keyboard_return_rounded),
-                          ),
-                        ),
-                      ],
+                    child: Text(
+                      AppStrings.isEnglish
+                          ? 'Generic item price'
+                          : 'Prezzo articolo generico',
+                      style: Theme.of(context).textTheme.titleSmall,
                     ),
                   ),
                 ],
               ),
-            ),
-          ],
+              const SizedBox(height: 4),
+              Text(
+                AppStrings.isEnglish
+                    ? 'Enter the amount, then confirm to add it to the cart.'
+                    : 'Inserisci l’importo e conferma per aggiungerlo al carrello.',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+              const SizedBox(height: 8),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(12),
+                  color: Theme.of(context)
+                      .colorScheme
+                      .surfaceContainerHighest
+                      .withValues(alpha: 0.55),
+                ),
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerRight,
+                  child: Text(
+                    priceText,
+                    textAlign: TextAlign.right,
+                    style: Theme.of(context).textTheme.headlineLarge?.copyWith(
+                          fontWeight: FontWeight.w800,
+                          fontSize: 40,
+                        ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+              SizedBox(
+                height: 170,
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Expanded(
+                      child: Column(
+                        children: [
+                          Row(children: [
+                            _numberButton('7'),
+                            const SizedBox(width: 6),
+                            _numberButton('8'),
+                            const SizedBox(width: 6),
+                            _numberButton('9'),
+                          ]),
+                          const SizedBox(height: 6),
+                          Row(children: [
+                            _numberButton('4'),
+                            const SizedBox(width: 6),
+                            _numberButton('5'),
+                            const SizedBox(width: 6),
+                            _numberButton('6'),
+                          ]),
+                          const SizedBox(height: 6),
+                          Row(children: [
+                            _numberButton('1'),
+                            const SizedBox(width: 6),
+                            _numberButton('2'),
+                            const SizedBox(width: 6),
+                            _numberButton('3'),
+                          ]),
+                          const SizedBox(height: 6),
+                          Row(children: [
+                            _numberButton('0'),
+                            const SizedBox(width: 6),
+                            _numberButton('00', flex: 2),
+                          ]),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    SizedBox(
+                      width: 54,
+                      child: Column(
+                        children: [
+                          Expanded(
+                            child: IconButton.outlined(
+                              tooltip: AppStrings.isEnglish
+                                  ? 'Backspace'
+                                  : 'Cancella cifra',
+                              onPressed: onBackspace,
+                              icon: const Icon(Icons.backspace_outlined),
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Expanded(
+                            child: OutlinedButton(
+                              onPressed: onClear,
+                              child: const Text('C'),
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Expanded(
+                            child: FilledButton(
+                              onPressed: onSubmit,
+                              child:
+                                  const Icon(Icons.keyboard_return_rounded),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
-      ),
-    );
-  }
+      );
 }
 
 class _CartTile extends StatelessWidget {
@@ -1041,6 +978,7 @@ class _CartTile extends StatelessWidget {
     required this.onDiscount,
     required this.onRemove,
   });
+
   final _CashLine line;
   final VoidCallback onDecrease;
   final VoidCallback onIncrease;
@@ -1056,11 +994,13 @@ class _CartTile extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  line.product.name,
+                  line.productName,
                   style: Theme.of(context).textTheme.titleSmall,
                 ),
                 Text(
-                  '${line.product.variantDisplay} · ${line.product.sku} · ${formatMoney(line.product.salePriceCents)} ${AppStrings.t('each')}',
+                  line.isGeneric
+                      ? '${AppStrings.isEnglish ? 'Generic item' : 'Articolo generico'} · ${formatMoney(line.unitPriceCents)} ${AppStrings.t('each')}'
+                      : '${line.variantDisplay} · ${line.sku} · ${formatMoney(line.unitPriceCents)} ${AppStrings.t('each')}',
                 ),
               ],
             ),
@@ -1077,7 +1017,7 @@ class _CartTile extends StatelessWidget {
           SizedBox(
             width: 84,
             child: TextFormField(
-              key: ValueKey('${line.variantId}-${line.discountPercent}'),
+              key: ValueKey('${line.key}-${line.discountPercent}'),
               initialValue: line.discountPercent == 0
                   ? ''
                   : line.discountPercent.toString().replaceAll('.', ','),
@@ -1110,23 +1050,66 @@ class _CartTile extends StatelessWidget {
 }
 
 class _CashLine {
-  const _CashLine({
-    required this.product,
+  const _CashLine.product({
+    required ProductVariant product,
     required this.quantity,
     required this.discountPercent,
-  });
-  final ProductVariant product;
+  })  : product = product,
+        genericId = null,
+        genericName = null,
+        genericUnitPriceCents = null;
+
+  const _CashLine.generic({
+    required int genericId,
+    required String genericName,
+    required int unitPriceCents,
+    required this.quantity,
+    required this.discountPercent,
+  })  : product = null,
+        genericId = genericId,
+        genericName = genericName,
+        genericUnitPriceCents = unitPriceCents;
+
+  final ProductVariant? product;
+  final int? genericId;
+  final String? genericName;
+  final int? genericUnitPriceCents;
   final int quantity;
   final double discountPercent;
-  int get variantId => product.id;
-  int get grossLineTotalCents => (product.salePriceCents ?? 0) * quantity;
+
+  bool get isGeneric => product == null;
+  String get key => isGeneric ? 'generic-$genericId' : 'variant-${product!.id}';
+  int? get variantId => product?.id;
+  String get sku => product?.sku ?? 'GENERIC';
+  String? get barcode => product?.barcode;
+  String get productName => product?.name ?? genericName ?? 'Articolo generico';
+  String get variantDisplay => product?.variantDisplay ?? '';
+  int get unitPriceCents => product?.salePriceCents ?? genericUnitPriceCents ?? 0;
+  int get grossLineTotalCents => unitPriceCents * quantity;
   int get lineTotalCents =>
-      (grossLineTotalCents * (1 - discountPercent.clamp(0, 100) / 100)).round();
-  _CashLine copyWith({double? discountPercent}) => _CashLine(
-        product: product,
-        quantity: quantity,
+      (grossLineTotalCents * (1 - discountPercent.clamp(0, 100) / 100))
+          .round();
+
+  _CashLine copyWith({
+    ProductVariant? product,
+    int? quantity,
+    double? discountPercent,
+  }) {
+    if (isGeneric) {
+      return _CashLine.generic(
+        genericId: genericId!,
+        genericName: genericName!,
+        unitPriceCents: genericUnitPriceCents!,
+        quantity: quantity ?? this.quantity,
         discountPercent: discountPercent ?? this.discountPercent,
       );
+    }
+    return _CashLine.product(
+      product: product ?? this.product!,
+      quantity: quantity ?? this.quantity,
+      discountPercent: discountPercent ?? this.discountPercent,
+    );
+  }
 }
 
 class _FixedDiscountLine {
@@ -1135,6 +1118,7 @@ class _FixedDiscountLine {
     required this.amountCents,
     required this.label,
   });
+
   final int id;
   final int amountCents;
   final String label;

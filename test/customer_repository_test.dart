@@ -18,6 +18,53 @@ void main() {
     expect(FiscalCodeService.tryParse('RSSMRA85T10A562X'), isNull);
   });
 
+  test('generic sale item is stored without changing stock', () async {
+    final temp = await Directory.systemTemp.createTemp('lsms-flutter-generic-sale-');
+    final path = '${temp.path}${Platform.pathSeparator}store.db';
+    final service = DatabaseService(path);
+    try {
+      await service.initialize();
+      final repository = CustomerRepository(service);
+
+      final order = repository.recordSale(const SalesOrderDraft(
+        lines: [
+          SalesOrderDraftLine(
+            variantId: null,
+            sku: 'GENERIC',
+            productName: 'Articolo generico',
+            variantDisplay: '',
+            quantity: 1,
+            unitPriceCents: 1234,
+            discountBasisPoints: 0,
+            grossTotalCents: 1234,
+            finalTotalCents: 1234,
+          ),
+        ],
+        grossTotalCents: 1234,
+        itemDiscountCents: 0,
+        orderDiscountBasisPoints: 0,
+        orderPercentDiscountCents: 0,
+        fixedDiscountCents: 0,
+        finalTotalCents: 1234,
+      ));
+
+      final detail = repository.getOrder(order.id)!;
+      expect(detail.items, hasLength(1));
+      expect(detail.items.single.variantId, isNull);
+      expect(detail.items.single.productName, 'Articolo generico');
+      expect(detail.items.single.unitPriceCents, 1234);
+      expect(detail.summary.finalTotalCents, 1234);
+
+      final movements = service.db
+          .select("SELECT COUNT(*) AS count FROM stock_movements WHERE movement_type='OUT';")
+          .first['count'] as int;
+      expect(movements, 0);
+    } finally {
+      service.dispose();
+      await temp.delete(recursive: true);
+    }
+  });
+
   test('customer order stores immutable sale snapshot, is globally searchable and survives customer deletion', () async {
     final temp = await Directory.systemTemp.createTemp('lsms-flutter-customers-');
     final path = '${temp.path}${Platform.pathSeparator}store.db';
