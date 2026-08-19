@@ -31,4 +31,13 @@ void main() {
       'LocalStoreManagement-linux-arm64.AppImage',
     );
   });
+
+  test('only Flutter is the beta branch', () {
+    expect(isBetaBranch('Flutter'), isTrue);
+    expect(isBetaBranch('flutter'), isTrue);
+    expect(isBetaBranch('test'), isFalse);
+    expect(isBetaBranch('avalonia'), isFalse);
+    expect(isBetaBranch('main'), isFalse);
+    expect(betaReleaseTagFor('Flutter'), 'beta-latest');
+  });
 }

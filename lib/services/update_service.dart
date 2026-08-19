@@ -19,6 +19,10 @@ String updateAssetNameFor({required String operatingSystem, required Abi abi}) {
   };
 }
 
+bool isBetaBranch(String branch) => branch.trim().toLowerCase() == 'flutter';
+
+String betaReleaseTagFor(String branch) => isBetaBranch(branch) ? 'beta-latest' : '';
+
 class UpdateCheckResult {
   const UpdateCheckResult({
     required this.updateAvailable,
@@ -43,13 +47,9 @@ class UpdateService {
   static const currentBranch = String.fromEnvironment('BUILD_BRANCH');
   static const tokenEnvironmentVariable = 'LOCAL_STORE_GITHUB_TOKEN';
 
-  static bool get isBetaBuild {
-    final branch = currentBranch.toLowerCase();
-    return branch == 'flutter' || branch == 'test';
-  }
+  static bool get isBetaBuild => isBetaBranch(currentBranch);
 
-  static String get betaReleaseTag =>
-      currentBranch.toLowerCase() == 'flutter' ? 'flutter-latest' : 'test-latest';
+  static String get betaReleaseTag => betaReleaseTagFor(currentBranch);
 
   static bool get isInstalledBuild => currentCommit.isNotEmpty;
 

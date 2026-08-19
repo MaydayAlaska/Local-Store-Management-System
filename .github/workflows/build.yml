@@ -2,9 +2,9 @@ name: Build and package Flutter desktop app
 
 on:
   push:
-    branches: [Flutter, test, main]
+    branches: [Flutter, main]
   pull_request:
-    branches: [Flutter, test, main]
+    branches: [Flutter, main]
 
 concurrency:
   group: flutter-build-package-${{ github.event_name }}-${{ github.ref }}
@@ -332,37 +332,9 @@ jobs:
           if-no-files-found: error
           retention-days: 1
 
-  release-flutter:
-    name: Publish Flutter development assets
+  release-beta:
+    name: Publish Flutter beta assets
     if: github.event_name == 'push' && github.ref == 'refs/heads/Flutter'
-    needs: [package-windows, package-linux]
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
-        with:
-          pattern: package-*
-          path: dist
-          merge-multiple: true
-      - name: Publish direct development downloads
-        env:
-          GH_TOKEN: ${{ github.token }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          TAG='flutter-latest'
-          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            gh release delete "$TAG" --repo "$GITHUB_REPOSITORY" --cleanup-tag --yes
-          fi
-          gh release create "$TAG" dist/* --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --prerelease --latest=false \
-            --title "Flutter development build (${GITHUB_SHA::7})" \
-            --notes 'Build di sviluppo del branch Flutter. Scarica direttamente il file adatto al sistema: EXE per Windows, AppImage o DEB per Linux. Gli artifact Actions sono solo trasferimenti interni temporanei.'
-
-  release-test:
-    name: Publish test beta assets
-    if: github.event_name == 'push' && github.ref == 'refs/heads/test'
     needs: [package-windows, package-linux]
     runs-on: ubuntu-latest
     permissions:
@@ -382,7 +354,8 @@ jobs:
           set -euo pipefail
           RAW_VERSION="$(awk '/^version:/{print $2; exit}' pubspec.yaml)"
           VERSION="${RAW_VERSION/+/.}"
-          TAG='test-latest'
+          VERSION="${VERSION/-b/.b}"
+          TAG='beta-latest'
           mv dist/LocalStoreManagement-Setup-win-x64.exe "dist/LocalStoreManagement-${VERSION}-BETA-Setup-win-x64.exe"
           mv dist/LocalStoreManagement-Setup-win-arm64.exe "dist/LocalStoreManagement-${VERSION}-BETA-Setup-win-arm64.exe"
           mv dist/LocalStoreManagement-linux-x64.AppImage "dist/LocalStoreManagement-${VERSION}-BETA-linux-x64.AppImage"
@@ -393,8 +366,8 @@ jobs:
             gh release delete "$TAG" --repo "$GITHUB_REPOSITORY" --cleanup-tag --yes
           fi
           gh release create "$TAG" dist/* --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --prerelease --latest=false \
-            --title "Local Store Management v${VERSION} BETA / TEST (${GITHUB_SHA::7})" \
-            --notes 'Versione BETA/TEST generata automaticamente dal branch test. Include Windows x64/ARM64 e Linux x64/ARM64 in formato AppImage e DEB.'
+            --title "Local Store Management v${VERSION} BETA (${GITHUB_SHA::7})" \
+            --notes 'Versione BETA generata automaticamente dal branch Flutter. Include Windows x64/ARM64 e Linux x64/ARM64 in formato AppImage e DEB. Le versioni validate vengono poi promosse su main.'
 
   release-main:
     name: Publish main release assets
