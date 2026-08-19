@@ -147,9 +147,21 @@ class _SettingsPageState extends State<SettingsPage> {
   Widget build(BuildContext context) => ListView(
         padding: const EdgeInsets.all(24),
         children: [
-          Text(
-            AppStrings.t('settings'),
-            style: Theme.of(context).textTheme.headlineMedium,
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Expanded(
+                child: Text(
+                  AppStrings.t('settings'),
+                  style: Theme.of(context).textTheme.headlineMedium,
+                ),
+              ),
+              FilledButton.icon(
+                onPressed: _saving ? null : _save,
+                icon: const Icon(Icons.save_outlined),
+                label: Text(AppStrings.t(_saving ? 'saving' : 'save_settings')),
+              ),
+            ],
           ),
           const SizedBox(height: 14),
           Card(
@@ -284,15 +296,6 @@ class _SettingsPageState extends State<SettingsPage> {
                         ),
                       ),
                     ],
-                  ),
-                  const SizedBox(height: 12),
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: FilledButton.icon(
-                      onPressed: _saving ? null : _save,
-                      icon: const Icon(Icons.save),
-                      label: Text(AppStrings.t(_saving ? 'saving' : 'save_settings')),
-                    ),
                   ),
                 ],
               ),
