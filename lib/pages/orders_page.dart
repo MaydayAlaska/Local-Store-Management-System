@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../core/formatters.dart';
 import '../models/customer.dart';
+import '../repositories/sales_order_search.dart';
 import '../services/app_services.dart';
 import 'order_dialog.dart';
 
@@ -23,7 +24,7 @@ class _OrdersPageState extends State<OrdersPage> {
     super.dispose();
   }
 
-  List<SalesOrderSummary> get _orders => widget.services.customers.searchOrders(_search.text, 1000);
+  List<SalesOrderSummary> get _orders => widget.services.customers.searchOrdersMatching(_search.text, 1000);
 
   Future<void> _openOrder(int orderId) async {
     await showSalesOrderDialog(context, services: widget.services, orderId: orderId);
@@ -49,7 +50,7 @@ class _OrdersPageState extends State<OrdersPage> {
             border: OutlineInputBorder(),
             prefixIcon: Icon(Icons.search),
             labelText: 'Cerca ordine o vendita',
-            hintText: 'Numero ordine, cliente, CF, prodotto, SKU o barcode',
+            hintText: 'Numero ordine, cliente, CF oppure prodotto + attributi (es. Maglietta Blu M)',
           ),
         ),
         const SizedBox(height: 10),

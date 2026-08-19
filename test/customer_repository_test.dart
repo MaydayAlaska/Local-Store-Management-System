@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:local_store_management/core/database_service.dart';
 import 'package:local_store_management/models/customer.dart';
 import 'package:local_store_management/repositories/customer_repository.dart';
+import 'package:local_store_management/repositories/sales_order_search.dart';
 import 'package:local_store_management/services/fiscal_code_service.dart';
 
 void main() {
@@ -96,6 +97,13 @@ void main() {
       expect(repository.searchOrders('MAG-001').single.id, order.id);
       expect(repository.searchOrders('8000000000001').single.id, order.id);
 
+      expect(repository.searchOrdersMatching('Maglietta Blu M').single.id, order.id);
+      expect(repository.searchOrdersMatching('Maglietta Taglia M').single.id, order.id);
+      expect(repository.searchOrdersMatching('Maglietta Rosso M'), isEmpty);
+      expect(repository.ordersForCustomerMatching(customer.id, 'Maglietta Blu M').single.id, order.id);
+      expect(repository.ordersForCustomerMatching(customer.id, 'MAG-001 Blu').single.id, order.id);
+      expect(repository.ordersForCustomerMatching(customer.id, 'Maglietta Rosso'), isEmpty);
+
       service.db.execute('UPDATE products SET name=?, sale_price_cents=? WHERE id=?;', ['Nome nuovo', 9999, productId]);
       final unchanged = repository.getOrder(order.id)!;
       expect(unchanged.items.single.productName, 'Maglietta');
@@ -118,6 +126,7 @@ void main() {
       expect(preserved.summary.customerFiscalCode, 'RSSMRA85T10A562S');
       expect(preserved.items.single.productName, 'Maglietta');
       expect(repository.searchOrders('Rossi').single.id, order.id);
+      expect(repository.searchOrdersMatching('Maglietta Blu M').single.id, order.id);
     } finally {
       service.dispose();
       await temp.delete(recursive: true);

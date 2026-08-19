@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../core/formatters.dart';
 import '../models/customer.dart';
+import '../repositories/customer_repository.dart';
+import '../repositories/sales_order_search.dart';
 import '../services/app_services.dart';
 import '../services/fiscal_code_service.dart';
 import '../widgets/hid_barcode_listener.dart';
@@ -203,8 +205,9 @@ class _CustomersPageState extends State<CustomersPage> {
                         child: Center(child: Text('Seleziona un cliente oppure scansiona la Tessera Sanitaria.')),
                       )
                     : _CustomerDetail(
+                        key: ValueKey(selected.id),
                         customer: selected,
-                        orders: widget.services.customers.ordersForCustomer(selected.id),
+                        repository: widget.services.customers,
                         onEdit: _editCustomer,
                         onDelete: _deleteCustomer,
                         onOpenOrder: _openOrder,
@@ -218,24 +221,41 @@ class _CustomersPageState extends State<CustomersPage> {
   }
 }
 
-class _CustomerDetail extends StatelessWidget {
+class _CustomerDetail extends StatefulWidget {
   const _CustomerDetail({
+    super.key,
     required this.customer,
-    required this.orders,
+    required this.repository,
     required this.onEdit,
     required this.onDelete,
     required this.onOpenOrder,
   });
 
   final Customer customer;
-  final List<SalesOrderSummary> orders;
+  final CustomerRepository repository;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
   final ValueChanged<int> onOpenOrder;
 
   @override
+  State<_CustomerDetail> createState() => _CustomerDetailState();
+}
+
+class _CustomerDetailState extends State<_CustomerDetail> {
+  final _historySearch = TextEditingController();
+
+  @override
+  void dispose() {
+    _historySearch.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final orders = widget.repository.ordersForCustomer(widget.customer.id);
+    final visibleOrders = widget.repository.ordersForCustomerMatching(widget.customer.id, _historySearch.text);
     final spent = orders.fold<int>(0, (sum, order) => sum + order.finalTotalCents);
+    final hasFilter = _historySearch.text.trim().isNotEmpty;
     return Card(
       clipBehavior: Clip.antiAlias,
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
@@ -243,26 +263,26 @@ class _CustomerDetail extends StatelessWidget {
           padding: const EdgeInsets.all(16),
           child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
             Row(children: [
-              Expanded(child: Text(customer.displayName, style: Theme.of(context).textTheme.headlineSmall)),
-              OutlinedButton.icon(onPressed: onEdit, icon: const Icon(Icons.edit_outlined), label: const Text('Modifica')),
+              Expanded(child: Text(widget.customer.displayName, style: Theme.of(context).textTheme.headlineSmall)),
+              OutlinedButton.icon(onPressed: widget.onEdit, icon: const Icon(Icons.edit_outlined), label: const Text('Modifica')),
               const SizedBox(width: 8),
               OutlinedButton.icon(
                 style: OutlinedButton.styleFrom(foregroundColor: Theme.of(context).colorScheme.error),
-                onPressed: onDelete,
+                onPressed: widget.onDelete,
                 icon: const Icon(Icons.delete_outline),
                 label: const Text('Elimina'),
               ),
             ]),
             const SizedBox(height: 8),
             Wrap(spacing: 22, runSpacing: 8, children: [
-              Text('CF: ${customer.fiscalCode}'),
-              Text('Nascita: ${customer.birthDateDisplay}'),
-              Text('Sesso: ${customer.sex}'),
-              Text('Codice luogo: ${customer.birthPlaceCode}'),
+              Text('CF: ${widget.customer.fiscalCode}'),
+              Text('Nascita: ${widget.customer.birthDateDisplay}'),
+              Text('Sesso: ${widget.customer.sex}'),
+              Text('Codice luogo: ${widget.customer.birthPlaceCode}'),
             ]),
-            if (customer.notes?.trim().isNotEmpty == true) ...[
+            if (widget.customer.notes?.trim().isNotEmpty == true) ...[
               const SizedBox(height: 8),
-              Text('Note: ${customer.notes}'),
+              Text('Note: ${widget.customer.notes}'),
             ],
             const SizedBox(height: 12),
             Wrap(spacing: 26, children: [
@@ -274,16 +294,48 @@ class _CustomerDetail extends StatelessWidget {
         const Divider(height: 1),
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 14, 16, 8),
-          child: Text('Storico acquisti', style: Theme.of(context).textTheme.titleLarge),
+          child: Row(children: [
+            Expanded(child: Text('Storico acquisti', style: Theme.of(context).textTheme.titleLarge)),
+            if (hasFilter) Text('${visibleOrders.length} ${visibleOrders.length == 1 ? 'risultato' : 'risultati'}'),
+          ]),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+          child: TextField(
+            controller: _historySearch,
+            onChanged: (_) => setState(() {}),
+            decoration: InputDecoration(
+              border: const OutlineInputBorder(),
+              prefixIcon: const Icon(Icons.search),
+              labelText: 'Cerca prodotto nello storico',
+              hintText: 'Nome e attributi, es. Maglietta Blu M',
+              suffixIcon: hasFilter
+                  ? IconButton(
+                      tooltip: 'Azzera ricerca',
+                      onPressed: () {
+                        _historySearch.clear();
+                        setState(() {});
+                      },
+                      icon: const Icon(Icons.close),
+                    )
+                  : null,
+            ),
+          ),
         ),
         Expanded(
-          child: orders.isEmpty
-              ? const Center(child: Text('Nessun acquisto registrato per questo cliente.'))
+          child: visibleOrders.isEmpty
+              ? Center(
+                  child: Text(
+                    hasFilter
+                        ? 'Nessun acquisto contiene un prodotto con questi attributi.'
+                        : 'Nessun acquisto registrato per questo cliente.',
+                  ),
+                )
               : ListView.separated(
-                  itemCount: orders.length,
+                  itemCount: visibleOrders.length,
                   separatorBuilder: (_, _) => const Divider(height: 1),
                   itemBuilder: (context, index) {
-                    final order = orders[index];
+                    final order = visibleOrders[index];
                     final local = order.createdAtUtc.toLocal();
                     final date = '${local.day.toString().padLeft(2, '0')}/${local.month.toString().padLeft(2, '0')}/${local.year} '
                         '${local.hour.toString().padLeft(2, '0')}:${local.minute.toString().padLeft(2, '0')}';
@@ -293,7 +345,7 @@ class _CustomerDetail extends StatelessWidget {
                       subtitle: Text('$date · ${order.itemCount} ${order.itemCount == 1 ? 'articolo' : 'articoli'}'
                           '${order.hasReceipt ? ' · scontrino salvato' : ''}'),
                       trailing: const Icon(Icons.chevron_right),
-                      onTap: () => onOpenOrder(order.id),
+                      onTap: () => widget.onOpenOrder(order.id),
                     );
                   },
                 ),
