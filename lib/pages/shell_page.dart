@@ -319,15 +319,15 @@ class _MenuBrand extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(bottom: 14, top: 8),
       child: SizedBox(
-        width: 128,
+        width: 136,
         child: Column(
           children: [
             if (showLogo)
               Image.file(
                 File(logo),
                 key: ValueKey(logo),
-                width: 72,
-                height: 72,
+                width: 84,
+                height: 84,
                 fit: BoxFit.contain,
                 gaplessPlayback: false,
               ),
