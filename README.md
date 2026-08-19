@@ -1,12 +1,12 @@
-# Local Store Management System — Flutter BETA
+# Local Store Management System
 
 Gestionale desktop **offline** per negozi, sviluppato in **Flutter/Dart** con database locale **SQLite**.
 
-Il branch `Flutter` è il canale **BETA/TEST** del progetto. Le build di questo branch vengono pubblicate come prerelease `beta-latest`, mostrano `BETA` nell'applicazione e ricevono aggiornamenti esclusivamente dal canale OTA BETA. Le release stabili di `main` restano separate.
+Il branch `main` contiene il canale **STABILE**. La versione stabile corrente è **0.1.5**. Il branch `Flutter` resta il canale **BETA/TEST** per lo sviluppo delle versioni successive.
 
-## Download BETA
+## Download
 
-Le build BETA sono disponibili nella prerelease `beta-latest` come file diretti per:
+Le release stabili vengono pubblicate con tag `vX.Y.Z` e includono:
 
 | Sistema | Architettura | Formati |
 | --- | --- | --- |
@@ -15,11 +15,11 @@ Le build BETA sono disponibili nella prerelease `beta-latest` come file diretti 
 | Linux | x86_64 | `.AppImage`, `.deb` |
 | Linux | ARM64 | `.AppImage`, `.deb` |
 
-Gli artifact della pagina Actions sono trasferimenti interni della CI; per provare la Beta è preferibile usare gli asset della prerelease.
+Gli artifact della pagina Actions sono output temporanei della CI; per l'uso normale è preferibile scaricare i file dalla release stabile.
 
 ## Funzioni principali
 
-La versione Flutter gestisce catalogo prodotti e varianti, SKU e barcode multipli, prezzi a livello prodotto con eventuali override per variante, magazzino, cassa, etichette, anagrafiche, export, backup e impostazioni.
+L'applicazione gestisce catalogo prodotti e varianti, SKU e barcode multipli, prezzi a livello prodotto con eventuali override per variante, magazzino, cassa, vendite, clienti, etichette, anagrafiche, export, backup e impostazioni.
 
 Gli scanner USB HID funzionano senza focus obbligatorio. Dashboard, Cassa, Magazzino ed Etichette possono ricevere direttamente i barcode dallo scanner.
 
@@ -29,27 +29,25 @@ La sezione Etichette supporta stampante persistente, dimensioni fisiche, antepri
 
 ## Aggiornamenti OTA
 
-L'updater distingue automaticamente sistema operativo e architettura:
+Sono presenti due canali OTA indipendenti:
+
+- `main` → canale **STABILE**
+- `Flutter` → canale **BETA**, pubblicato come `beta-latest`
+
+Una build stabile non installa Beta e una build Beta non installa release stabili.
+
+All'avvio viene eseguito automaticamente un controllo aggiornamenti. Se è disponibile una versione realmente più recente, compare una notifica discreta in basso a destra; cliccandola si apre direttamente la sezione **Impostazioni**.
+
+Il confronto OTA è basato sulla versione, non sul semplice fatto che il commit online sia diverso. Un aggiornamento viene proposto solo se `versione_online > versione_installata`. Una release con versione uguale o precedente non genera notifiche, anche se il commit è differente.
+
+L'updater seleziona automaticamente il pacchetto corretto per:
 
 - Windows x64
 - Windows ARM64
 - Linux x64 AppImage
 - Linux ARM64 AppImage
 
-Sono presenti due canali OTA indipendenti:
-
-- `main` → canale **STABILE**
-- `Flutter` → canale **BETA**, pubblicato come `beta-latest`
-
-Una build BETA non installa release stabili e una build stabile non installa Beta.
-
-All'avvio dell'app viene eseguito automaticamente un controllo aggiornamenti. Se è disponibile una versione realmente più recente, compare una notifica discreta in basso a destra; cliccandola si apre direttamente la sezione **Impostazioni**, dove è già disponibile il risultato del controllo.
-
-Il confronto OTA è basato sulla versione, non sul semplice fatto che il commit online sia diverso. Un aggiornamento viene proposto solo se `versione_online > versione_installata`. Di conseguenza una release uguale o precedente non genera notifiche, anche se ha un commit differente.
-
-Per le Beta il formato leggibile è `X.Y.Z.bN`: ad esempio `0.1.5.b2` è più recente di `0.1.5.b1`. La release stabile `0.1.5` è considerata successiva a tutte le Beta `0.1.5.bN`.
-
-Su Linux l'installazione automatica è disponibile per AppImage; i pacchetti `.deb` possono essere pubblicati e scaricati ma non vengono sostituiti automaticamente dal processo in esecuzione.
+Su Linux l'installazione automatica è disponibile quando l'app viene avviata da AppImage. I pacchetti `.deb` vengono pubblicati ma non vengono sostituiti automaticamente dal processo in esecuzione.
 
 ## Database
 
@@ -59,9 +57,9 @@ I dati restano in:
 Documenti/Local Store Management System/
 ```
 
-Lo schema SQLite corrente usa `PRAGMA user_version = 3` e comprende `products`, `product_variants`, `product_barcodes`, `stock_movements`, `brands` e `categories`.
+Lo schema SQLite corrente usa `PRAGMA user_version = 3` e comprende prodotti, varianti, barcode, movimenti di magazzino, clienti, vendite e anagrafiche.
 
-Le migrazioni dai vecchi schemi vengono eseguite automaticamente con backup preventivo quando necessario.
+Le migrazioni vengono eseguite automaticamente con backup preventivo quando necessario.
 
 ## Sviluppo
 
@@ -87,7 +85,7 @@ flutter analyze --no-fatal-infos
 flutter test
 ```
 
-I test dell'updater coprono selezione dell'asset per sistema/architettura, riconoscimento del canale Beta, normalizzazione delle versioni e confronto monotono fra Beta e release stabili.
+I test dell'updater coprono la selezione dell'asset per sistema/architettura, il riconoscimento del canale Beta, la normalizzazione delle versioni e il confronto monotono fra Beta e release stabili.
 
 ## CI e release
 
@@ -102,27 +100,22 @@ LocalStoreManagement-linux-arm64.AppImage
 LocalStoreManagement-linux-arm64.deb
 ```
 
-Gli asset della prerelease Beta vengono rinominati includendo la versione, per esempio:
-
-```text
-LocalStoreManagement-0.1.5.b1-BETA-Setup-win-x64.exe
-LocalStoreManagement-0.1.5.b1-BETA-linux-x64.AppImage
-```
-
 Strategia branch:
 
-- `Flutter` → BETA/TEST, prerelease `beta-latest`, OTA BETA
-- `main` → stabile, tag `v<versione>` e OTA stabile
+- `main` → STABILE, tag `v<versione>` e OTA stabile
+- `Flutter` → BETA/TEST, prerelease `beta-latest` e OTA Beta
 - `avalonia` → implementazione storica/alternativa
 
 ## Versioning
 
-Le versioni stabili usano il formato `X.Y.Z`. Le Beta usano la forma leggibile `X.Y.Z.bN`; nel `pubspec.yaml` la stessa versione viene codificata in SemVer come `X.Y.Z-bN`.
+Le versioni stabili usano il formato `X.Y.Z`. Le Beta usano la forma leggibile `X.Y.Z.bN`; nel `pubspec.yaml` la stessa Beta viene codificata come `X.Y.Z-bN`.
 
-Versione BETA corrente:
+Versione stabile corrente:
 
 ```text
-0.1.5.b1
+0.1.5
 ```
+
+Il ciclo di sviluppo successivo parte dal branch `Flutter` con `0.1.6.b1`.
 
 Per le regole complete vedere `VERSIONING.md`.
