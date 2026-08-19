@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../l10n/app_strings.dart';
 import '../models/customer.dart';
 import '../repositories/customer_repository.dart';
 import '../services/fiscal_code_service.dart';
@@ -42,6 +43,8 @@ class _CustomerEditorDialogState extends State<_CustomerEditorDialog> {
   late final TextEditingController _notes;
   String? _error;
 
+  String _itEn(String it, String en) => AppStrings.isEnglish ? en : it;
+
   @override
   void initState() {
     super.initState();
@@ -80,13 +83,19 @@ class _CustomerEditorDialogState extends State<_CustomerEditorDialog> {
     final firstName = _firstName.text.trim();
     final lastName = _lastName.text.trim();
     if (firstName.isEmpty || lastName.isEmpty) {
-      setState(() => _error = 'Nome e cognome sono obbligatori.');
+      setState(() => _error = _itEn(
+            'Nome e cognome sono obbligatori.',
+            'First name and last name are required.',
+          ));
       return;
     }
 
     final data = _preview;
     if (data == null) {
-      setState(() => _error = 'Il codice fiscale non è valido. Controlla la scansione o il valore inserito.');
+      setState(() => _error = _itEn(
+            'Il codice fiscale non è valido. Controlla la scansione o il valore inserito.',
+            'The tax code is invalid. Check the scan or the entered value.',
+          ));
       return;
     }
 
@@ -100,7 +109,10 @@ class _CustomerEditorDialogState extends State<_CustomerEditorDialog> {
       ));
       Navigator.of(context).pop(saved);
     } catch (error) {
-      setState(() => _error = 'Impossibile salvare il cliente: $error');
+      setState(() => _error = _itEn(
+            'Impossibile salvare il cliente: $error',
+            'Unable to save customer: $error',
+          ));
     }
   }
 
@@ -109,7 +121,11 @@ class _CustomerEditorDialogState extends State<_CustomerEditorDialog> {
     final preview = _preview;
     final lockedFiscalCode = widget.customer != null || widget.scanned != null;
     return AlertDialog(
-      title: Text(widget.customer == null ? 'Nuovo cliente' : 'Modifica cliente'),
+      title: Text(
+        widget.customer == null
+            ? _itEn('Nuovo cliente', 'New customer')
+            : _itEn('Modifica cliente', 'Edit customer'),
+      ),
       content: SizedBox(
         width: 520,
         child: SingleChildScrollView(
@@ -122,10 +138,10 @@ class _CustomerEditorDialogState extends State<_CustomerEditorDialog> {
                 readOnly: lockedFiscalCode,
                 textCapitalization: TextCapitalization.characters,
                 onChanged: (_) => setState(() => _error = null),
-                decoration: const InputDecoration(
-                  border: OutlineInputBorder(),
-                  labelText: 'Codice fiscale',
-                  prefixIcon: Icon(Icons.badge_outlined),
+                decoration: InputDecoration(
+                  border: const OutlineInputBorder(),
+                  labelText: _itEn('Codice fiscale', 'Tax code'),
+                  prefixIcon: const Icon(Icons.badge_outlined),
                 ),
               ),
               const SizedBox(height: 12),
@@ -134,14 +150,20 @@ class _CustomerEditorDialogState extends State<_CustomerEditorDialog> {
                   child: TextField(
                     controller: _lastName,
                     autofocus: widget.scanned != null,
-                    decoration: const InputDecoration(border: OutlineInputBorder(), labelText: 'Cognome *'),
+                    decoration: InputDecoration(
+                      border: const OutlineInputBorder(),
+                      labelText: _itEn('Cognome *', 'Last name *'),
+                    ),
                   ),
                 ),
                 const SizedBox(width: 10),
                 Expanded(
                   child: TextField(
                     controller: _firstName,
-                    decoration: const InputDecoration(border: OutlineInputBorder(), labelText: 'Nome *'),
+                    decoration: InputDecoration(
+                      border: const OutlineInputBorder(),
+                      labelText: _itEn('Nome *', 'First name *'),
+                    ),
                   ),
                 ),
               ]),
@@ -154,33 +176,51 @@ class _CustomerEditorDialogState extends State<_CustomerEditorDialog> {
                       spacing: 22,
                       runSpacing: 8,
                       children: [
-                        Text('Nascita: ${preview.birthDateDisplay}'),
-                        Text('Sesso: ${preview.sex}'),
-                        Text('Codice luogo: ${preview.birthPlaceCode}'),
+                        Text('${_itEn('Nascita', 'Birth date')}: ${preview.birthDateDisplay}'),
+                        Text('${_itEn('Sesso', 'Sex')}: ${preview.sex}'),
+                        Text('${_itEn('Codice luogo', 'Place code')}: ${preview.birthPlaceCode}'),
                       ],
                     ),
                   ),
                 )
               else
-                const Text('Inserisci un codice fiscale valido per ricavare automaticamente i dati disponibili.'),
+                Text(
+                  _itEn(
+                    'Inserisci un codice fiscale valido per ricavare automaticamente i dati disponibili.',
+                    'Enter a valid tax code to automatically extract the available data.',
+                  ),
+                ),
               const SizedBox(height: 12),
               TextField(
                 controller: _notes,
                 minLines: 2,
                 maxLines: 4,
-                decoration: const InputDecoration(border: OutlineInputBorder(), labelText: 'Note'),
+                decoration: InputDecoration(
+                  border: const OutlineInputBorder(),
+                  labelText: AppStrings.t('notes'),
+                ),
               ),
               if (_error != null) ...[
                 const SizedBox(height: 10),
-                Text(_error!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
+                Text(
+                  _error!,
+                  style: TextStyle(color: Theme.of(context).colorScheme.error),
+                ),
               ],
             ],
           ),
         ),
       ),
       actions: [
-        TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Annulla')),
-        FilledButton.icon(onPressed: _save, icon: const Icon(Icons.save_outlined), label: const Text('Salva cliente')),
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: Text(AppStrings.t('cancel')),
+        ),
+        FilledButton.icon(
+          onPressed: _save,
+          icon: const Icon(Icons.save_outlined),
+          label: Text(_itEn('Salva cliente', 'Save customer')),
+        ),
       ],
     );
   }
