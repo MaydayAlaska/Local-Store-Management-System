@@ -567,7 +567,8 @@ class _CashPageState extends State<CashPage> {
                     const SizedBox(height: 8),
                     Text(_searchStatus),
                     const SizedBox(height: 8),
-                    Expanded(
+                    SizedBox(
+                      height: 188,
                       child: Card(
                         clipBehavior: Clip.antiAlias,
                         child: results.isEmpty
@@ -591,12 +592,14 @@ class _CashPageState extends State<CashPage> {
                       ),
                     ),
                     const SizedBox(height: 8),
-                    _CashKeypad(
-                      priceText: formatMoney(_keypadPriceCents),
-                      onKey: _keypadInsert,
-                      onBackspace: _keypadBackspace,
-                      onClear: _keypadClear,
-                      onSubmit: _keypadSubmit,
+                    Expanded(
+                      child: _CashKeypad(
+                        priceText: formatMoney(_keypadPriceCents),
+                        onKey: _keypadInsert,
+                        onBackspace: _keypadBackspace,
+                        onClear: _keypadClear,
+                        onSubmit: _keypadSubmit,
+                      ),
                     ),
                   ],
                 ),
@@ -825,8 +828,7 @@ class _CashKeypad extends StatelessWidget {
 
   Widget _numberButton(String value, {int flex = 1}) => Expanded(
         flex: flex,
-        child: SizedBox(
-          height: 38,
+        child: SizedBox.expand(
           child: OutlinedButton(
             onPressed: () => onKey(value),
             child: Text(value),
@@ -840,7 +842,6 @@ class _CashKeypad extends StatelessWidget {
         child: Padding(
           padding: const EdgeInsets.all(10),
           child: Column(
-            mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Row(
@@ -889,43 +890,50 @@ class _CashKeypad extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 8),
-              SizedBox(
-                height: 170,
+              Expanded(
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     Expanded(
                       child: Column(
                         children: [
-                          Row(children: [
-                            _numberButton('7'),
-                            const SizedBox(width: 6),
-                            _numberButton('8'),
-                            const SizedBox(width: 6),
-                            _numberButton('9'),
-                          ]),
+                          Expanded(
+                            child: Row(children: [
+                              _numberButton('7'),
+                              const SizedBox(width: 6),
+                              _numberButton('8'),
+                              const SizedBox(width: 6),
+                              _numberButton('9'),
+                            ]),
+                          ),
                           const SizedBox(height: 6),
-                          Row(children: [
-                            _numberButton('4'),
-                            const SizedBox(width: 6),
-                            _numberButton('5'),
-                            const SizedBox(width: 6),
-                            _numberButton('6'),
-                          ]),
+                          Expanded(
+                            child: Row(children: [
+                              _numberButton('4'),
+                              const SizedBox(width: 6),
+                              _numberButton('5'),
+                              const SizedBox(width: 6),
+                              _numberButton('6'),
+                            ]),
+                          ),
                           const SizedBox(height: 6),
-                          Row(children: [
-                            _numberButton('1'),
-                            const SizedBox(width: 6),
-                            _numberButton('2'),
-                            const SizedBox(width: 6),
-                            _numberButton('3'),
-                          ]),
+                          Expanded(
+                            child: Row(children: [
+                              _numberButton('1'),
+                              const SizedBox(width: 6),
+                              _numberButton('2'),
+                              const SizedBox(width: 6),
+                              _numberButton('3'),
+                            ]),
+                          ),
                           const SizedBox(height: 6),
-                          Row(children: [
-                            _numberButton('0'),
-                            const SizedBox(width: 6),
-                            _numberButton('00', flex: 2),
-                          ]),
+                          Expanded(
+                            child: Row(children: [
+                              _numberButton('0'),
+                              const SizedBox(width: 6),
+                              _numberButton('00', flex: 2),
+                            ]),
+                          ),
                         ],
                       ),
                     ),
