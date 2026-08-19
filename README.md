@@ -1,108 +1,56 @@
-# Local Store Management System — Flutter
+# Local Store Management System — Flutter BETA
 
-Gestionale desktop offline per negozio, ora riscritto in **Flutter/Dart**. Il branch `Flutter` sostituisce l'implementazione C#/Avalonia mantenendo compatibilità con il database SQLite e con il flusso operativo già esistente.
+Gestionale desktop **offline** per negozi, sviluppato in **Flutter/Dart** con database locale **SQLite**.
 
-## Piattaforme
+Il branch `Flutter` è il canale **BETA/TEST** del progetto. Le build di questo branch vengono pubblicate come prerelease `flutter-latest`, mostrano `BETA` nell'applicazione e non installano automaticamente gli aggiornamenti stabili di `main`.
+
+## Download BETA
+
+Le build BETA sono disponibili nella prerelease `flutter-latest` come file diretti per:
+
+| Sistema | Architettura | Formati |
+| --- | --- | --- |
+| Windows | x86_64 | `.exe` installer |
+| Windows | ARM64 | `.exe` installer |
+| Linux | x86_64 | `.AppImage`, `.deb` |
+| Linux | ARM64 | `.AppImage`, `.deb` |
+
+Gli artifact della pagina Actions sono trasferimenti interni della CI; per provare la Beta è preferibile usare gli asset della prerelease.
+
+## Funzioni principali
+
+La versione Flutter gestisce catalogo prodotti e varianti, SKU e barcode multipli, prezzi a livello prodotto con eventuali override per variante, magazzino, cassa, etichette, anagrafiche, export, backup e impostazioni.
+
+Gli scanner USB HID funzionano senza focus obbligatorio. Dashboard, Cassa, Magazzino ed Etichette possono ricevere direttamente i barcode dallo scanner.
+
+La Cassa supporta carrello, quantità, giacenza disponibile, sconti per riga, sconto percentuale totale e sconti fissi in euro. L'emissione del documento commerciale tramite registratore telematico non è ancora integrata.
+
+La sezione Etichette supporta stampante persistente, dimensioni fisiche, anteprima, EAN-13, Code 128 B e stampa diretta.
+
+## Aggiornamenti OTA
+
+L'updater stabile distingue automaticamente sistema operativo e architettura:
 
 - Windows x64
-- Linux x64
-- applicazione desktop nativa, senza browser o server web
-- interfaccia Material 3 con barra titolo personalizzata che segue il tema dell'applicazione
+- Windows ARM64
+- Linux x64 AppImage
+- Linux ARM64 AppImage
 
-## Funzioni migrate
+Le build del branch `Flutter` sono però considerate **BETA** e non possono installare il canale OTA stabile. Le release stabili vengono pubblicate da `main`.
 
-### Catalogo prodotti
+## Database
 
-- prodotto con una o più varianti
-- SKU univoco e uno o più barcode per variante
-- nome, marca, categoria, variante, taglia, prezzi di acquisto/vendita, note e stato attivo
-- ricerca per nome, SKU, barcode, marca, categoria, variante e taglia
-- gestione separata di marche e categorie con rinomina, eliminazione e riassegnazione
+I dati restano in:
 
-### Magazzino
+```text
+Documenti/Local Store Management System/
+```
 
-- carico
-- scarico con controllo disponibilità
-- rettifica a giacenza assoluta
-- storico completo dei movimenti
-- giacenza sempre derivata dalla somma di `stock_movements.quantity_delta`
+Lo schema SQLite corrente usa `PRAGMA user_version = 3` e comprende `products`, `product_variants`, `product_barcodes`, `stock_movements`, `brands` e `categories`.
 
-### Scanner HID
+Le migrazioni dai vecchi schemi vengono eseguite automaticamente con backup preventivo quando necessario.
 
-Gli scanner USB che operano come tastiera continuano a funzionare senza driver dedicati. Dalla Dashboard sono disponibili ricerca/apertura prodotto, carico rapido `+1` e scarico rapido `-1`. Un codice sconosciuto in modalità ricerca apre la creazione prodotto con il barcode precompilato.
-
-### Cassa
-
-- scansione barcode/SKU e ricerca manuale
-- carrello temporaneo
-- quantità limitata alla giacenza disponibile
-- sconto percentuale per singola riga
-- sconto percentuale sul totale
-- più sconti fissi in euro, mostrati come righe negative rimovibili
-- calcolo totale senza modificare il magazzino
-
-L'emissione del documento commerciale resta volutamente disabilitata finché non viene collegato un registratore telematico supportato.
-
-### Etichette
-
-- selezione variante
-- anteprima barcode
-- EAN-13 quando il codice è valido, Code 128 negli altri casi
-- numero copie e dimensioni in millimetri
-- generazione PDF e stampa tramite dialogo di sistema Windows/Linux
-
-### Backup ed export
-
-- backup SQLite consistente tramite API di backup del database
-- salvataggio backup in un percorso scelto dall'utente
-- export inventario Excel e PDF
-- filtri per marche/categorie
-- raggruppamento alfabetico per marca
-- nome negozio negli export e logo nel PDF
-
-### Impostazioni e aggiornamenti
-
-- nome negozio
-- icona applicazione personalizzata
-- logo negozio
-- visibilità nome/logo nel menu
-- su Windows l'icona personalizzata viene applicata anche a finestra/taskbar e ai collegamenti dell'app, in modalità best effort
-- controllo aggiornamenti su GitHub
-- installazione OTA delle release Windows e delle AppImage Linux quando l'app è eseguita da un pacchetto pubblicato
-
-### Diagnostica
-
-- `Logs/application.log` registra errori Flutter non gestiti e problemi di avvio
-- se l'inizializzazione del database fallisce viene mostrata una schermata di errore con il percorso del log invece di terminare senza spiegazioni
-
-## Compatibilità dati
-
-La posizione resta la stessa dell'app precedente:
-
-`Documenti/Local Store Management System/`
-
-Contenuto principale:
-
-- `store.db`
-- `settings.json`
-- `assets/`
-- `Backups/`
-- `Logs/`
-
-Lo schema SQLite resta alla versione `2` con le tabelle:
-
-- `products`
-- `product_variants`
-- `product_barcodes`
-- `stock_movements`
-- `brands`
-- `categories`
-
-La migrazione automatica del vecchio schema pre-varianti viene mantenuta e crea una copia di sicurezza prima della conversione.
-
-## Avvio in sviluppo
-
-È richiesto Flutter stable con supporto desktop. I runner nativi sono boilerplate generato da Flutter e vengono creati al primo checkout:
+## Sviluppo
 
 ### Windows
 
@@ -118,27 +66,41 @@ flutter run -d windows
 flutter run -d linux
 ```
 
-Per una build release:
+## Test
 
 ```bash
-flutter build linux --release
+flutter pub get
+flutter analyze --no-fatal-infos
+flutter test
 ```
 
-oppure su Windows:
+## CI e release
 
-```powershell
-flutter build windows --release
+La pipeline produce:
+
+```text
+LocalStoreManagement-Setup-win-x64.exe
+LocalStoreManagement-Setup-win-arm64.exe
+LocalStoreManagement-linux-x64.AppImage
+LocalStoreManagement-linux-x64.deb
+LocalStoreManagement-linux-arm64.AppImage
+LocalStoreManagement-linux-arm64.deb
 ```
 
-## CI e pacchetti
+Strategia branch:
 
-GitHub Actions esegue `flutter analyze`, `flutter test`, compila Windows e Linux e produce:
+- `Flutter` → BETA/TEST, prerelease `flutter-latest`
+- `main` → stabile, tag `v<versione>` e OTA stabile
+- `test` → canale BETA legacy compatibile
 
-- `LocalStoreManagement-Setup-win-x64.exe`
-- `LocalStoreManagement-linux-x64.AppImage`
+## Versioning
 
-I push sul branch `Flutter` producono artefatti di CI senza pubblicare una release. Il branch `test` continua a pubblicare la prerelease `test-latest`; `main` pubblica release stabili con tag leggibile `v<versione>` e un bridge `ota-<commit>` per l'aggiornamento automatico.
+Le versioni usano il formato `X.Y.Z`, senza suffisso `+build`.
 
-## Versione
+Versione BETA corrente:
 
-La versione Flutter corrente è `0.1.3+10`, equivalente alla precedente `0.1.3.10`.
+```text
+0.1.4
+```
+
+Per le regole complete vedere `VERSIONING.md`.
