@@ -1,4 +1,5 @@
 import '../core/formatters.dart';
+import '../l10n/app_strings.dart';
 
 enum StockMovementKind { incoming, outgoing, adjustment }
 
@@ -32,9 +33,12 @@ class StockMovement {
   final int stockAfter;
 
   String get typeDisplay => switch (kind) {
-        StockMovementKind.incoming => 'Carico',
-        StockMovementKind.outgoing => 'Scarico',
-        StockMovementKind.adjustment => 'Rettifica',
+        StockMovementKind.incoming =>
+          AppStrings.isEnglish ? 'Incoming' : 'Carico',
+        StockMovementKind.outgoing =>
+          AppStrings.isEnglish ? 'Outgoing' : 'Scarico',
+        StockMovementKind.adjustment =>
+          AppStrings.isEnglish ? 'Adjustment' : 'Rettifica',
       };
   String get quantityDisplay => quantityDelta > 0 ? '+$quantityDelta' : '$quantityDelta';
   String get createdAtDisplay => formatLocalDateTime(createdAtUtc);
