@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:window_manager/window_manager.dart';
 
+import '../l10n/app_strings.dart';
+
 class AppTitleBar extends StatelessWidget {
   const AppTitleBar({super.key});
 
@@ -18,12 +20,12 @@ class AppTitleBar extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   _CaptionButton(
-                    tooltip: 'Riduci a icona',
+                    tooltip: AppStrings.t('minimize'),
                     icon: Icons.remove,
                     onPressed: () => windowManager.minimize(),
                   ),
                   _CaptionButton(
-                    tooltip: 'Massimizza / ripristina',
+                    tooltip: AppStrings.t('maximize_restore'),
                     icon: Icons.crop_square_rounded,
                     onPressed: () async {
                       if (await windowManager.isMaximized()) {
@@ -34,7 +36,7 @@ class AppTitleBar extends StatelessWidget {
                     },
                   ),
                   _CaptionButton(
-                    tooltip: 'Chiudi',
+                    tooltip: AppStrings.t('close'),
                     icon: Icons.close,
                     danger: true,
                     onPressed: () => windowManager.close(),
