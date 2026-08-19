@@ -173,7 +173,7 @@ class UpdateService {
         canInstall: false,
         latestCommit: latestCommit,
         message:
-            'Nessun aggiornamento stabile pubblicato più recente. Una revisione di main potrebbe essere ancora in compilazione.',
+            'Nessun aggiornamento disponibile.',
       );
     }
 
@@ -184,7 +184,7 @@ class UpdateService {
         canInstall: false,
         latestCommit: latestCommit,
         message:
-            'Impossibile determinare la versione della release stabile pubblicata: aggiornamento automatico non proposto.',
+            'Impossibile determinare la versione della release stabile pubblicata.',
       );
     }
 
