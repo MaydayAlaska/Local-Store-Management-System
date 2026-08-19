@@ -19,6 +19,7 @@ SOURCE_URL = (
 OUTPUT = Path("assets/data/birth_places.json")
 MANIFEST = Path("assets/data/birth_places_manifest.json")
 
+# ANPR pubblica le date storiche come GG/MM/AAAA; nel dataset runtime usiamo ISO.
 REQUIRED_COLUMNS = {
     "DATAISTITUZIONE",
     "DATACESSAZIONE",
