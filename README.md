@@ -2,7 +2,7 @@
 
 Gestionale desktop **offline** per negozi, sviluppato in **Flutter/Dart** con database locale **SQLite**.
 
-Il branch `Flutter` è il canale **BETA/TEST** del progetto. La versione BETA corrente è **0.1.6.b1** (`0.1.6-b1` nel `pubspec.yaml`). Le build di questo branch vengono pubblicate come prerelease `beta-latest`, mostrano `BETA` nell'applicazione e ricevono aggiornamenti esclusivamente dal canale OTA BETA.
+Il branch `Flutter` è il canale **BETA/TEST** del progetto. La versione BETA corrente è **0.1.6-b1**. Le build di questo branch vengono pubblicate come prerelease `beta-latest`, mostrano `BETA` nell'applicazione e ricevono aggiornamenti esclusivamente dal canale OTA BETA.
 
 La versione stabile corrente su `main` è **0.1.5**.
 
@@ -14,6 +14,8 @@ Le build BETA sono disponibili nella prerelease `beta-latest` per:
 | --- | --- | --- |
 | Windows | x86_64 | `.exe` installer |
 | Windows | ARM64 | `.exe` installer |
+| macOS | Intel x86_64 | `.dmg` con `.app` |
+| macOS | Apple Silicon ARM64 | `.dmg` con `.app` |
 | Linux | x86_64 | `.AppImage`, `.deb` |
 | Linux | ARM64 | `.AppImage`, `.deb` |
 
@@ -30,13 +32,13 @@ All'avvio viene eseguito automaticamente un controllo aggiornamenti. Se è dispo
 
 Il confronto OTA è monotono per versione: un aggiornamento viene proposto solo quando `versione_online > versione_installata`. Un commit differente, da solo, non è sufficiente. Per esempio:
 
-- `0.1.6.b2 > 0.1.6.b1`
-- `0.1.6.b1 > 0.1.5`
-- `0.1.5 > 0.1.5.b99`
+- `0.1.6-b2 > 0.1.6-b1`
+- `0.1.6-b1 > 0.1.5`
+- `0.1.5 > 0.1.5-b99`
 
 Il pulsante **Installa aggiornamento** compare solo quando esiste davvero un aggiornamento e il pacchetto è installabile sulla piattaforma corrente.
 
-L'updater seleziona automaticamente Windows/Linux e x64/ARM64. Su Linux l'installazione automatica è disponibile quando l'app viene avviata da AppImage; i pacchetti `.deb` vengono pubblicati ma non sostituiti automaticamente.
+L'updater seleziona automaticamente Windows, macOS o Linux e x64/ARM64. Su Linux l'installazione automatica è disponibile quando l'app viene avviata da AppImage; i pacchetti `.deb` vengono pubblicati ma non sostituiti automaticamente. Su macOS l'updater scarica e apre il nuovo `.dmg`, dal quale l'utente può sostituire l'applicazione nella cartella Applicazioni.
 
 ## Funzioni principali
 
@@ -63,6 +65,13 @@ Lo schema SQLite corrente usa `PRAGMA user_version = 3`. Le migrazioni vengono e
 ```powershell
 ./tool/bootstrap_desktop.ps1
 flutter run -d windows
+```
+
+### macOS
+
+```bash
+flutter create --platforms=macos --project-name local_store_management --org com.maydayalaska .
+flutter run -d macos
 ```
 
 ### Linux

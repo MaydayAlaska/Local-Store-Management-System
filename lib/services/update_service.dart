@@ -5,8 +5,8 @@ import 'dart:io';
 import 'package:path/path.dart' as p;
 
 String updateArchitectureForAbi(Abi abi) => switch (abi) {
-      Abi.windowsX64 || Abi.linuxX64 => 'x64',
-      Abi.windowsArm64 || Abi.linuxArm64 => 'arm64',
+      Abi.windowsX64 || Abi.macosX64 || Abi.linuxX64 => 'x64',
+      Abi.windowsArm64 || Abi.macosArm64 || Abi.linuxArm64 => 'arm64',
       _ => throw UnsupportedError(
           'Architettura non supportata per gli aggiornamenti OTA: $abi'),
     };
@@ -18,9 +18,10 @@ String updateAssetNameFor({
   final arch = updateArchitectureForAbi(abi);
   return switch (operatingSystem) {
     'windows' => 'LocalStoreManagement-Setup-win-$arch.exe',
+    'macos' => 'LocalStoreManagement-macos-$arch.dmg',
     'linux' => 'LocalStoreManagement-linux-$arch.AppImage',
     _ => throw UnsupportedError(
-        'Aggiornamento automatico disponibile solo su Windows e Linux.'),
+        'Aggiornamento automatico disponibile solo su Windows, macOS e Linux.'),
   };
 }
 
@@ -31,9 +32,10 @@ String betaUpdateAssetSuffixFor({
   final arch = updateArchitectureForAbi(abi);
   return switch (operatingSystem) {
     'windows' => '-BETA-Setup-win-$arch.exe',
+    'macos' => '-BETA-macos-$arch.dmg',
     'linux' => '-BETA-linux-$arch.AppImage',
     _ => throw UnsupportedError(
-        'Aggiornamento automatico disponibile solo su Windows e Linux.'),
+        'Aggiornamento automatico disponibile solo su Windows, macOS e Linux.'),
   };
 }
 
@@ -45,9 +47,8 @@ String betaReleaseTagFor(String branch) =>
 String normalizeAppVersion(String value) {
   var normalized = value.trim().toLowerCase();
   if (normalized.startsWith('v')) normalized = normalized.substring(1);
-  normalized = normalized.replaceFirst('-b', '.b');
 
-  final match = RegExp(r'^(\d+)\.(\d+)\.(\d+)(?:\.b(\d+))?$')
+  final match = RegExp(r'^(\d+)\.(\d+)\.(\d+)(?:-b(\d+))?$')
       .firstMatch(normalized);
   if (match == null) {
     throw FormatException('Versione applicazione non valida: $value');
@@ -59,7 +60,7 @@ String normalizeAppVersion(String value) {
   final beta = match.group(4);
   return beta == null
       ? '$major.$minor.$patch'
-      : '$major.$minor.$patch.b${int.parse(beta)}';
+      : '$major.$minor.$patch-b${int.parse(beta)}';
 }
 
 int compareAppVersions(String left, String right) {
@@ -89,7 +90,7 @@ String? releaseVersionFromMetadata(Map<String, dynamic> release) {
   ];
 
   final pattern = RegExp(
-    r'(\d+\.\d+\.\d+(?:[.-]b\d+)?)',
+    r'(\d+\.\d+\.\d+(?:-b\d+)?)',
     caseSensitive: false,
   );
   for (final candidate in candidates) {
@@ -114,7 +115,7 @@ class _ParsedAppVersion {
 
   factory _ParsedAppVersion.parse(String value) {
     final normalized = normalizeAppVersion(value);
-    final match = RegExp(r'^(\d+)\.(\d+)\.(\d+)(?:\.b(\d+))?$')
+    final match = RegExp(r'^(\d+)\.(\d+)\.(\d+)(?:-b(\d+))?$')
         .firstMatch(normalized)!;
     return _ParsedAppVersion(
       major: int.parse(match.group(1)!),
@@ -150,7 +151,7 @@ class UpdateService {
   static const owner = 'MaydayAlaska';
   static const repository = 'Local-Store-Management-System';
   static const stableBranch = 'main';
-  static const currentVersion = '0.1.6.b1';
+  static const currentVersion = '0.1.6-b1';
   static const currentCommit = String.fromEnvironment('GIT_COMMIT');
   static const currentBranch = String.fromEnvironment('BUILD_BRANCH');
   static const tokenEnvironmentVariable = 'LOCAL_STORE_GITHUB_TOKEN';
@@ -172,8 +173,7 @@ class UpdateService {
         updateAvailable: false,
         canInstall: false,
         latestCommit: latestCommit,
-        message:
-            'Nessun aggiornamento disponibile.',
+        message: 'Nessun aggiornamento disponibile.',
       );
     }
 
@@ -301,8 +301,9 @@ class UpdateService {
       canInstall: true,
       latestCommit: latest,
       assetUrl: asset,
-      message:
-          'Aggiornamento $channelName $latestVersion disponibile. Puoi scaricarlo e riavviare l’applicazione.',
+      message: Platform.isMacOS
+          ? 'Aggiornamento $channelName $latestVersion disponibile. Puoi scaricare e aprire il nuovo DMG.'
+          : 'Aggiornamento $channelName $latestVersion disponibile. Puoi scaricarlo e riavviare l’applicazione.',
     );
   }
 
@@ -334,6 +335,18 @@ class UpdateService {
       exit(0);
     }
 
+    if (Platform.isMacOS) {
+      final destination = p.join(root.path, assetName);
+      await _download(update.assetUrl!, destination);
+      final result = await Process.run('open', [destination]);
+      if (result.exitCode != 0) {
+        throw StateError(
+          'Impossibile aprire il DMG scaricato: ${result.stderr}',
+        );
+      }
+      exit(0);
+    }
+
     if (Platform.isLinux) {
       final current = Platform.environment['APPIMAGE'];
       if (current == null || current.trim().isEmpty) {
@@ -360,11 +373,12 @@ exec ${_shell(current)}
     }
 
     throw UnsupportedError(
-        'Aggiornamento automatico disponibile solo su Windows e Linux.');
+        'Aggiornamento automatico disponibile solo su Windows, macOS e Linux.');
   }
 
   bool _canInstall() =>
       Platform.isWindows ||
+      Platform.isMacOS ||
       (Platform.isLinux &&
           (Platform.environment['APPIMAGE']?.isNotEmpty ?? false));
 

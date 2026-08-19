@@ -209,6 +209,186 @@ jobs:
           if-no-files-found: error
           retention-days: 1
 
+  package-macos:
+    name: macOS DMG (${{ matrix.arch }})
+    needs: package-windows-x64
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-15
+            arch: arm64
+            flutter_arch: arm64
+            macho_arch: arm64
+            excluded_arch: x86_64
+          - runner: macos-15-intel
+            arch: x64
+            flutter_arch: x64
+            macho_arch: x86_64
+            excluded_arch: arm64
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          architecture: ${{ matrix.flutter_arch }}
+          cache: true
+
+      - name: Show Flutter, macOS and host architecture
+        shell: bash
+        run: |
+          set -euo pipefail
+          sw_vers
+          uname -m
+          flutter --version
+          xcodebuild -version
+
+      - name: Generate macOS runner
+        shell: bash
+        run: |
+          set -euo pipefail
+          flutter config --enable-macos-desktop
+          flutter create --platforms=macos --project-name local_store_management --org com.maydayalaska .
+
+      - name: Configure macOS bundle, privacy, entitlements and architecture
+        shell: bash
+        env:
+          TARGET_ARCH: ${{ matrix.macho_arch }}
+          EXCLUDED_ARCH: ${{ matrix.excluded_arch }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import os
+          import plistlib
+          import re
+          from pathlib import Path
+
+          app_info = Path('macos/Runner/Configs/AppInfo.xcconfig')
+          text = app_info.read_text()
+          text = re.sub(
+              r'^PRODUCT_NAME\s*=.*$',
+              'PRODUCT_NAME = Local Store Management System',
+              text,
+              flags=re.MULTILINE,
+          )
+          app_info.write_text(text)
+
+          release_config = Path('macos/Runner/Configs/Release.xcconfig')
+          with release_config.open('a') as handle:
+              handle.write(f"\nARCHS = {os.environ['TARGET_ARCH']}\n")
+              handle.write(f"EXCLUDED_ARCHS = {os.environ['EXCLUDED_ARCH']}\n")
+
+          info_path = Path('macos/Runner/Info.plist')
+          with info_path.open('rb') as handle:
+              info = plistlib.load(handle)
+          info['NSLocalNetworkUsageDescription'] = (
+              'Local Store Management System usa la rete locale per comunicare '
+              'con stampanti e dispositivi del negozio.'
+          )
+          with info_path.open('wb') as handle:
+              plistlib.dump(info, handle, sort_keys=False)
+
+          entitlement_keys = {
+              'com.apple.security.app-sandbox': True,
+              'com.apple.security.network.client': True,
+              'com.apple.security.files.user-selected.read-write': True,
+              'com.apple.security.print': True,
+          }
+          for relative in (
+              'macos/Runner/Release.entitlements',
+              'macos/Runner/DebugProfile.entitlements',
+          ):
+              path = Path(relative)
+              with path.open('rb') as handle:
+                  data = plistlib.load(handle)
+              data.update(entitlement_keys)
+              with path.open('wb') as handle:
+                  plistlib.dump(data, handle, sort_keys=False)
+          PY
+
+      - name: Prepare macOS application icon
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import base64
+          import os
+          from pathlib import Path
+
+          encoded = Path('assets/app-icon.base64').read_text().strip()
+          Path(os.environ['RUNNER_TEMP'], 'lsms-app-icon.png').write_bytes(
+              base64.b64decode(encoded)
+          )
+          PY
+          SOURCE="$RUNNER_TEMP/lsms-app-icon.png"
+          ICONSET="macos/Runner/Assets.xcassets/AppIcon.appiconset"
+          for size in 16 32 64 128 256 512 1024; do
+            sips -z "$size" "$size" "$SOURCE" --out "$ICONSET/app_icon_${size}.png" >/dev/null
+          done
+
+      - name: Resolve packages
+        run: flutter pub get
+
+      - name: Build macOS release
+        shell: bash
+        run: |
+          set -euo pipefail
+          COMMIT='${{ github.event.pull_request.head.sha }}'
+          if [ -z "$COMMIT" ]; then COMMIT='${{ github.sha }}'; fi
+          BRANCH="${GITHUB_HEAD_REF:-${GITHUB_REF_NAME}}"
+          flutter build macos --release --dart-define="GIT_COMMIT=$COMMIT" --dart-define="BUILD_BRANCH=$BRANCH"
+
+      - name: Verify macOS application architecture
+        shell: bash
+        run: |
+          set -euo pipefail
+          APP="$(find build/macos/Build/Products/Release -maxdepth 1 -type d -name '*.app' -print -quit)"
+          if [ -z "$APP" ]; then
+            echo 'Bundle .app non trovato.' >&2
+            exit 1
+          fi
+          EXECUTABLE="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "$APP/Contents/Info.plist")"
+          ARCHES="$(lipo -archs "$APP/Contents/MacOS/$EXECUTABLE")"
+          echo "Bundle: $APP"
+          echo "Executable architectures: $ARCHES"
+          case " $ARCHES " in
+            *" ${{ matrix.macho_arch }} "*) ;;
+            *) echo 'Architettura richiesta assente dal bundle.' >&2; exit 1 ;;
+          esac
+          case " $ARCHES " in
+            *" ${{ matrix.excluded_arch }} "*) echo 'Il bundle contiene anche l’architettura che doveva essere esclusa.' >&2; exit 1 ;;
+            *) ;;
+          esac
+
+      - name: Build DMG with Applications shortcut
+        shell: bash
+        run: |
+          set -euo pipefail
+          APP="$(find build/macos/Build/Products/Release -maxdepth 1 -type d -name '*.app' -print -quit)"
+          rm -rf dmg-root dist
+          mkdir -p dmg-root dist
+          ditto "$APP" "dmg-root/Local Store Management System.app"
+          ln -s /Applications "dmg-root/Applications"
+          hdiutil create \
+            -volname 'Local Store Management System' \
+            -srcfolder dmg-root \
+            -ov \
+            -format UDZO \
+            "dist/LocalStoreManagement-macos-${{ matrix.arch }}.dmg"
+          hdiutil imageinfo "dist/LocalStoreManagement-macos-${{ matrix.arch }}.dmg" >/dev/null
+
+      - name: Upload macOS DMG for release jobs
+        uses: actions/upload-artifact@v4
+        with:
+          name: package-macos-${{ matrix.arch }}
+          path: dist/LocalStoreManagement-macos-${{ matrix.arch }}.dmg
+          if-no-files-found: error
+          retention-days: 1
+
   package-linux:
     name: Linux packages (${{ matrix.arch }})
     needs: package-windows-x64
@@ -366,7 +546,7 @@ jobs:
   release-beta:
     name: Publish Flutter beta assets
     if: github.event_name == 'push' && github.ref == 'refs/heads/Flutter'
-    needs: [package-windows-x64, package-windows-arm64, package-linux]
+    needs: [package-windows-x64, package-windows-arm64, package-macos, package-linux]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -384,11 +564,12 @@ jobs:
         run: |
           set -euo pipefail
           RAW_VERSION="$(awk '/^version:/{print $2; exit}' pubspec.yaml)"
-          VERSION="${RAW_VERSION/+/.}"
-          VERSION="${VERSION/-b/.b}"
+          VERSION="$RAW_VERSION"
           TAG='beta-latest'
           mv dist/LocalStoreManagement-Setup-win-x64.exe "dist/LocalStoreManagement-${VERSION}-BETA-Setup-win-x64.exe"
           mv dist/LocalStoreManagement-Setup-win-arm64.exe "dist/LocalStoreManagement-${VERSION}-BETA-Setup-win-arm64.exe"
+          mv dist/LocalStoreManagement-macos-x64.dmg "dist/LocalStoreManagement-${VERSION}-BETA-macos-x64.dmg"
+          mv dist/LocalStoreManagement-macos-arm64.dmg "dist/LocalStoreManagement-${VERSION}-BETA-macos-arm64.dmg"
           mv dist/LocalStoreManagement-linux-x64.AppImage "dist/LocalStoreManagement-${VERSION}-BETA-linux-x64.AppImage"
           mv dist/LocalStoreManagement-linux-x64.deb "dist/LocalStoreManagement-${VERSION}-BETA-linux-x64.deb"
           mv dist/LocalStoreManagement-linux-arm64.AppImage "dist/LocalStoreManagement-${VERSION}-BETA-linux-arm64.AppImage"
@@ -398,12 +579,12 @@ jobs:
           fi
           gh release create "$TAG" dist/* --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --prerelease --latest=false \
             --title "Local Store Management v${VERSION} BETA (${GITHUB_SHA::7})" \
-            --notes 'Versione BETA generata automaticamente dal branch Flutter. Include Windows x64/ARM64 e Linux x64/ARM64 in formato AppImage e DEB. Le versioni validate vengono poi promosse su main.'
+            --notes 'Versione BETA generata automaticamente dal branch Flutter. Include Windows x64/ARM64, macOS Intel/Apple Silicon in formato DMG e Linux x64/ARM64 in formato AppImage e DEB. Le versioni validate vengono poi promosse su main.'
 
   release-main:
     name: Publish main release assets
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    needs: [package-windows-x64, package-windows-arm64, package-linux]
+    needs: [package-windows-x64, package-windows-arm64, package-macos, package-linux]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -421,7 +602,7 @@ jobs:
         run: |
           set -euo pipefail
           RAW_VERSION="$(awk '/^version:/{print $2; exit}' pubspec.yaml)"
-          VERSION="${RAW_VERSION/+/.}"
+          VERSION="$RAW_VERSION"
           STABLE_TAG="v${VERSION}"
           LEGACY_TAG="ota-${GITHUB_SHA}"
           while IFS= read -r old_tag; do
@@ -440,10 +621,12 @@ jobs:
           mkdir stable-dist
           cp dist/LocalStoreManagement-Setup-win-x64.exe "stable-dist/LocalStoreManagement-${VERSION}-Setup-win-x64.exe"
           cp dist/LocalStoreManagement-Setup-win-arm64.exe "stable-dist/LocalStoreManagement-${VERSION}-Setup-win-arm64.exe"
+          cp dist/LocalStoreManagement-macos-x64.dmg "stable-dist/LocalStoreManagement-${VERSION}-macos-x64.dmg"
+          cp dist/LocalStoreManagement-macos-arm64.dmg "stable-dist/LocalStoreManagement-${VERSION}-macos-arm64.dmg"
           cp dist/LocalStoreManagement-linux-x64.AppImage "stable-dist/LocalStoreManagement-${VERSION}-linux-x64.AppImage"
           cp dist/LocalStoreManagement-linux-x64.deb "stable-dist/LocalStoreManagement-${VERSION}-linux-x64.deb"
           cp dist/LocalStoreManagement-linux-arm64.AppImage "stable-dist/LocalStoreManagement-${VERSION}-linux-arm64.AppImage"
           cp dist/LocalStoreManagement-linux-arm64.deb "stable-dist/LocalStoreManagement-${VERSION}-linux-arm64.deb"
           gh release create "$STABLE_TAG" stable-dist/* --repo "$GITHUB_REPOSITORY" --latest=true \
             --title "Local Store Management v${VERSION}" \
-            --notes "Release stabile v${VERSION}. Windows x64/ARM64 e Linux x64/ARM64 (AppImage + DEB)."
+            --notes "Release stabile v${VERSION}. Windows x64/ARM64, macOS Intel/Apple Silicon (DMG) e Linux x64/ARM64 (AppImage + DEB)."
