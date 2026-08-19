@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../l10n/app_strings.dart';
 import '../models/catalog.dart';
 import '../repositories/lookup_repository.dart';
 import '../services/app_services.dart';
@@ -14,22 +15,38 @@ class LookupsPage extends StatefulWidget {
 }
 
 class _LookupsPageState extends State<LookupsPage> {
+  String _kindLabel(LookupKind kind) => kind == LookupKind.brand
+      ? (AppStrings.isEnglish ? 'brand' : 'marca')
+      : (AppStrings.isEnglish ? 'category' : 'categoria');
+
   Future<void> _edit(LookupKind kind, [LookupItem? item]) async {
     final controller = TextEditingController(text: item?.name ?? '');
-    final label = kind == LookupKind.brand ? 'marca' : 'categoria';
+    final label = _kindLabel(kind);
     final value = await showDialog<String>(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text(item == null ? 'Nuova $label' : 'Rinomina $label'),
+        title: Text(
+          item == null
+              ? (AppStrings.isEnglish ? 'New $label' : 'Nuova $label')
+              : (AppStrings.isEnglish ? 'Rename $label' : 'Rinomina $label'),
+        ),
         content: TextField(
           controller: controller,
           autofocus: true,
-          onSubmitted: (v) => Navigator.pop(context, v),
-          decoration: InputDecoration(labelText: 'Nome $label'),
+          onSubmitted: (value) => Navigator.pop(context, value),
+          decoration: InputDecoration(
+            labelText: AppStrings.isEnglish ? '$label name' : 'Nome $label',
+          ),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Annulla')),
-          FilledButton(onPressed: () => Navigator.pop(context, controller.text), child: const Text('Salva')),
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(AppStrings.t('cancel')),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, controller.text),
+            child: Text(AppStrings.t('save')),
+          ),
         ],
       ),
     );
@@ -48,14 +65,21 @@ class _LookupsPageState extends State<LookupsPage> {
   }
 
   Future<void> _delete(LookupKind kind, LookupItem item) async {
-    final all = widget.services.lookups.getAll(kind).where((e) => e.id != item.id).toList();
+    final all = widget.services.lookups
+        .getAll(kind)
+        .where((entry) => entry.id != item.id)
+        .toList();
     int? target;
     var assignNone = true;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setLocal) => AlertDialog(
-          title: Text('Elimina «${item.name}»'),
+          title: Text(
+            AppStrings.isEnglish
+                ? 'Delete “${item.name}”'
+                : 'Elimina «${item.name}»',
+          ),
           content: SizedBox(
             width: 420,
             child: Column(
@@ -63,26 +87,49 @@ class _LookupsPageState extends State<LookupsPage> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Text(
-                  '${item.productCount} prodotti usano questa voce. Puoi lasciarli senza assegnazione oppure riassegnarli.',
+                  AppStrings.isEnglish
+                      ? '${item.productCount} products use this entry. You can leave them unassigned or reassign them.'
+                      : '${item.productCount} prodotti usano questa voce. Puoi lasciarli senza assegnazione oppure riassegnarli.',
                 ),
                 const SizedBox(height: 12),
                 RadioGroup<bool>(
                   groupValue: assignNone,
-                  onChanged: (v) => setLocal(() => assignNone = v ?? true),
-                  child: const Column(
+                  onChanged: (value) =>
+                      setLocal(() => assignNone = value ?? true),
+                  child: Column(
                     children: [
-                      RadioListTile<bool>(value: true, title: Text('Lascia senza assegnazione')),
-                      RadioListTile<bool>(value: false, title: Text('Riassegna a:')),
+                      RadioListTile<bool>(
+                        value: true,
+                        title: Text(
+                          AppStrings.isEnglish
+                              ? 'Leave unassigned'
+                              : 'Lascia senza assegnazione',
+                        ),
+                      ),
+                      RadioListTile<bool>(
+                        value: false,
+                        title: Text(
+                          AppStrings.isEnglish ? 'Reassign to:' : 'Riassegna a:',
+                        ),
+                      ),
                     ],
                   ),
                 ),
                 if (!assignNone)
                   GlassDropdown<int>(
                     value: target,
-                    labelText: 'Destinazione',
-                    hintText: 'Seleziona destinazione',
+                    labelText:
+                        AppStrings.isEnglish ? 'Destination' : 'Destinazione',
+                    hintText: AppStrings.isEnglish
+                        ? 'Select destination'
+                        : 'Seleziona destinazione',
                     items: all
-                        .map((e) => GlassDropdownItem<int>(value: e.id, label: e.name))
+                        .map(
+                          (entry) => GlassDropdownItem<int>(
+                            value: entry.id,
+                            label: entry.name,
+                          ),
+                        )
                         .toList(),
                     onChanged: (value) => setLocal(() => target = value),
                   ),
@@ -92,11 +139,13 @@ class _LookupsPageState extends State<LookupsPage> {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context, false),
-              child: const Text('Annulla'),
+              child: Text(AppStrings.t('cancel')),
             ),
             FilledButton(
-              onPressed: !assignNone && target == null ? null : () => Navigator.pop(context, true),
-              child: const Text('Elimina'),
+              onPressed: !assignNone && target == null
+                  ? null
+                  : () => Navigator.pop(context, true),
+              child: Text(AppStrings.isEnglish ? 'Delete' : 'Elimina'),
             ),
           ],
         ),
@@ -104,7 +153,11 @@ class _LookupsPageState extends State<LookupsPage> {
     );
     if (confirmed != true) return;
     try {
-      widget.services.lookups.deleteAndReassign(kind, item.id, assignNone ? null : target);
+      widget.services.lookups.deleteAndReassign(
+        kind,
+        item.id,
+        assignNone ? null : target,
+      );
       setState(() {});
     } catch (error) {
       if (mounted) _showError(error);
@@ -112,7 +165,9 @@ class _LookupsPageState extends State<LookupsPage> {
   }
 
   void _showError(Object error) => ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(error.toString().replaceFirst('Bad state: ', ''))),
+        SnackBar(
+          content: Text(error.toString().replaceFirst('Bad state: ', '')),
+        ),
       );
 
   @override
@@ -121,12 +176,21 @@ class _LookupsPageState extends State<LookupsPage> {
         child: Padding(
           padding: const EdgeInsets.all(24),
           child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-            Text('Marche e categorie', style: Theme.of(context).textTheme.headlineMedium),
+            Text(
+              AppStrings.isEnglish ? 'Brands and categories' : 'Marche e categorie',
+              style: Theme.of(context).textTheme.headlineMedium,
+            ),
             const SizedBox(height: 12),
-            const TabBar(
+            TabBar(
               tabs: [
-                Tab(text: 'Marche', icon: Icon(Icons.sell_outlined)),
-                Tab(text: 'Categorie', icon: Icon(Icons.category_outlined)),
+                Tab(
+                  text: AppStrings.t('brands'),
+                  icon: const Icon(Icons.sell_outlined),
+                ),
+                Tab(
+                  text: AppStrings.t('categories'),
+                  icon: const Icon(Icons.category_outlined),
+                ),
               ],
             ),
             const SizedBox(height: 8),
@@ -166,9 +230,13 @@ class _LookupList extends StatelessWidget {
   final Future<void> Function(LookupKind, [LookupItem?]) onEdit;
   final Future<void> Function(LookupKind, LookupItem) onDelete;
 
+  String get _label => kind == LookupKind.brand
+      ? (AppStrings.isEnglish ? 'brand' : 'marca')
+      : (AppStrings.isEnglish ? 'category' : 'categoria');
+
   @override
   Widget build(BuildContext context) {
-    final label = kind == LookupKind.brand ? 'marca' : 'categoria';
+    final label = _label;
     return Card(
       clipBehavior: Clip.antiAlias,
       child: Column(children: [
@@ -179,14 +247,20 @@ class _LookupList extends StatelessWidget {
             child: FilledButton.icon(
               onPressed: () => onEdit(kind),
               icon: const Icon(Icons.add),
-              label: Text('Nuova $label'),
+              label: Text(
+                AppStrings.isEnglish ? 'New $label' : 'Nuova $label',
+              ),
             ),
           ),
         ),
         const Divider(height: 1),
         Expanded(
           child: items.isEmpty
-              ? Center(child: Text('Nessuna $label.'))
+              ? Center(
+                  child: Text(
+                    AppStrings.isEnglish ? 'No $label entries.' : 'Nessuna $label.',
+                  ),
+                )
               : ListView.separated(
                   itemCount: items.length,
                   separatorBuilder: (_, __) => const Divider(height: 1),
@@ -195,19 +269,23 @@ class _LookupList extends StatelessWidget {
                     return ListTile(
                       title: Text(item.name),
                       subtitle: Text(
-                        '${item.productCount} ${item.productCount == 1 ? 'prodotto' : 'prodotti'}',
+                        AppStrings.isEnglish
+                            ? '${item.productCount} ${item.productCount == 1 ? 'product' : 'products'}'
+                            : '${item.productCount} ${item.productCount == 1 ? 'prodotto' : 'prodotti'}',
                       ),
                       trailing: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           IconButton(
                             onPressed: () => onEdit(kind, item),
-                            tooltip: 'Rinomina',
+                            tooltip: AppStrings.isEnglish ? 'Rename' : 'Rinomina',
                             icon: const Icon(Icons.edit_outlined),
                           ),
                           IconButton(
                             onPressed: () => onDelete(kind, item),
-                            tooltip: 'Elimina / riassegna',
+                            tooltip: AppStrings.isEnglish
+                                ? 'Delete / reassign'
+                                : 'Elimina / riassegna',
                             icon: const Icon(Icons.delete_outline),
                           ),
                         ],
