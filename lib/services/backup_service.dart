@@ -49,7 +49,7 @@ class BackupService {
       }
       completed = true;
     } finally {
-      destination.dispose();
+      destination.close();
       if (!completed) {
         try {
           if (targetFile.existsSync()) targetFile.deleteSync();
