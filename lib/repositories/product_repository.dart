@@ -9,8 +9,11 @@ class ProductRepository {
   final DatabaseService database;
   Database get _db => database.db;
 
-  List<ProductVariant> search([String? query]) {
+  List<ProductVariant> search([String? query, int? limit]) {
     final q = query?.trim() ?? '';
+    final safeLimit = limit != null && limit > 0 ? limit : null;
+    final pattern = '%$q%';
+    final limitClause = safeLimit == null ? '' : 'LIMIT ?';
     final rows = _db.select('''
       $_variantSelect
       WHERE ? = ''
@@ -28,14 +31,17 @@ class ProductRepository {
                p.name COLLATE NOCASE,
                COALESCE(pv.variant, '') COLLATE NOCASE,
                COALESCE(pv.size, '') COLLATE NOCASE,
-               pv.sku COLLATE NOCASE;
-    ''', [q, for (var i = 0; i < 7; i++) '%$q%']);
+               pv.sku COLLATE NOCASE
+      $limitClause;
+    ''', [q, for (var i = 0; i < 7; i++) pattern, if (safeLimit != null) safeLimit]);
     return rows.map(_readVariant).toList();
   }
 
-  List<ProductSummary> searchProducts([String? query]) {
+  List<ProductSummary> searchProducts([String? query, int? limit]) {
     final q = query?.trim() ?? '';
+    final safeLimit = limit != null && limit > 0 ? limit : null;
     final pattern = '%$q%';
+    final limitClause = safeLimit == null ? '' : 'LIMIT ?';
     final rows = _db.select('''
       $_productSummarySelect
       WHERE ? = ''
@@ -51,8 +57,9 @@ class ProductRepository {
                   OR COALESCE(search_pv.variant, '') LIKE ? COLLATE NOCASE
                   OR COALESCE(search_pv.size, '') LIKE ? COLLATE NOCASE
                   OR COALESCE(search_pb.barcode, '') LIKE ? COLLATE NOCASE))
-      ORDER BY COALESCE(b.name, '') COLLATE NOCASE, p.name COLLATE NOCASE;
-    ''', [q, pattern, pattern, pattern, pattern, pattern, pattern, pattern]);
+      ORDER BY COALESCE(b.name, '') COLLATE NOCASE, p.name COLLATE NOCASE
+      $limitClause;
+    ''', [q, pattern, pattern, pattern, pattern, pattern, pattern, pattern, if (safeLimit != null) safeLimit]);
     return rows.map(_readSummary).toList();
   }
 
@@ -93,15 +100,21 @@ class ProductRepository {
   ProductVariant? findByBarcode(String barcodeOrSku) {
     final code = barcodeOrSku.trim();
     if (code.isEmpty) return null;
-    final rows = _db.select('''
-      $_variantSelect
-      WHERE pv.sku = ? COLLATE NOCASE
-         OR EXISTS (SELECT 1 FROM product_barcodes exact_pb
-                    WHERE exact_pb.variant_id = pv.id AND exact_pb.barcode = ?)
-      ORDER BY CASE WHEN pv.sku = ? COLLATE NOCASE THEN 1 ELSE 0 END DESC, pv.id
-      LIMIT 1;
-    ''', [code, code, code]);
-    return rows.isEmpty ? null : _readVariant(rows.first);
+
+    final skuRows = _db.select(
+      'SELECT id FROM product_variants WHERE sku = ? COLLATE NOCASE LIMIT 1;',
+      [code],
+    );
+    if (skuRows.isNotEmpty) {
+      return getById(skuRows.first['id'] as int);
+    }
+
+    final barcodeRows = _db.select(
+      'SELECT variant_id FROM product_barcodes WHERE barcode = ? LIMIT 1;',
+      [code],
+    );
+    if (barcodeRows.isEmpty) return null;
+    return getById(barcodeRows.first['variant_id'] as int);
   }
 
   int count() => _db.select('SELECT COUNT(*) AS count FROM products;').first['count'] as int;
