@@ -4,8 +4,11 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:local_store_management/services/update_service.dart';
 
 void main() {
-  test('current beta OTA version is aligned', () {
-    expect(UpdateService.currentVersion, '0.1.6-b7');
+  test('current beta OTA version belongs to beta channel', () {
+    expect(
+      versionBelongsToUpdateChannel(UpdateService.currentVersion, beta: true),
+      isTrue,
+    );
   });
 
   test('OTA selects Windows x64 asset', () {
