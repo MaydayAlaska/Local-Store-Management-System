@@ -73,7 +73,7 @@ jobs:
         with:
           channel: stable
           architecture: ${{ matrix.flutter_arch }}
-          cache: true
+          cache: ${{ matrix.arch == 'x64' }}
 
       - name: Show Flutter and host architecture
         shell: pwsh
@@ -81,6 +81,22 @@ jobs:
           flutter --version
           Write-Host "PROCESSOR_ARCHITECTURE=$env:PROCESSOR_ARCHITECTURE"
           Write-Host "PROCESSOR_ARCHITEW6432=$env:PROCESSOR_ARCHITEW6432"
+
+      - name: Force Flutter Windows ARM64 target detection
+        if: matrix.arch == 'arm64'
+        shell: pwsh
+        run: |
+          $source = Join-Path $env:FLUTTER_ROOT 'packages/flutter_tools/lib/src/commands/build_windows.dart'
+          $text = Get-Content -Raw $source
+          $pattern = "final defaultTargetPlatform = \(_operatingSystemUtils\.hostPlatform == HostPlatform\.windows_arm64\)\s*\?\s*'windows-arm64'\s*:\s*'windows-x64';"
+          if (-not [regex]::IsMatch($text, $pattern)) {
+            throw 'Impossibile applicare il workaround Windows ARM64: il codice Flutter atteso è cambiato.'
+          }
+          $patched = [regex]::Replace($text, $pattern, "final defaultTargetPlatform = 'windows-arm64';", 1)
+          [IO.File]::WriteAllText($source, $patched)
+          Remove-Item (Join-Path $env:FLUTTER_ROOT 'bin/cache/flutter_tools.snapshot') -Force -ErrorAction SilentlyContinue
+          Remove-Item (Join-Path $env:FLUTTER_ROOT 'bin/cache/flutter_tools.stamp') -Force -ErrorAction SilentlyContinue
+          flutter --version
 
       - name: Generate Windows runner
         run: flutter create --platforms=windows --project-name local_store_management --org com.maydayalaska .
