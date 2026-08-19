@@ -1,48 +1,128 @@
-name: Update ANPR birth place dataset
+name: Temporary cash keypad layout patch
 
 on:
-  push:
+  pull_request:
     branches: [Flutter]
-    paths:
-      - tool/update_birth_places.py
-      - tool/ensure_anpr_build_guard.py
-      - .github/workflows/update-birth-places.yml
-  schedule:
-    - cron: '17 5 * * *'
-  workflow_dispatch:
 
 permissions:
   contents: write
 
 jobs:
-  update:
-    name: Refresh official ANPR dataset
+  patch:
+    if: github.head_ref == 'chatgpt-keypad-layout-20260819'
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout Flutter
+      - name: Checkout patch branch
         uses: actions/checkout@v7
         with:
-          ref: Flutter
+          ref: chatgpt-keypad-layout-20260819
           fetch-depth: 0
 
-      - name: Generate and validate dataset
-        run: python3 tool/update_birth_places.py
-
-      - name: Ensure every build verifies ANPR freshness
-        run: python3 tool/ensure_anpr_build_guard.py
-
-      - name: Commit only when ANPR data or guard changed
+      - name: Patch only the cash keypad layout
         shell: bash
         run: |
           set -euo pipefail
-          if git diff --quiet -- assets/data/birth_places.json assets/data/birth_places_manifest.json .github/workflows/build.yml; then
-            echo "Archivio ANPR e controllo build invariati."
-            exit 0
-          fi
+          git fetch origin Flutter
+
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path('lib/pages/cash_page.dart')
+          text = path.read_text()
+
+          old_layout = """                    Expanded(
+                      child: _CashKeypad(
+                        priceText: formatMoney(_keypadPriceCents),
+                        onKey: _keypadInsert,
+                        onBackspace: _keypadBackspace,
+                        onClear: _keypadClear,
+                        onSubmit: _keypadSubmit,
+                      ),
+                    ),
+"""
+          new_layout = """                    Expanded(
+                      child: LayoutBuilder(
+                        builder: (context, constraints) {
+                          final keypadWidth = constraints.maxWidth > 500
+                              ? 500.0
+                              : constraints.maxWidth;
+                          final keypadHeight = constraints.maxHeight > 470
+                              ? 470.0
+                              : constraints.maxHeight;
+                          return Align(
+                            alignment: Alignment.topCenter,
+                            child: SizedBox(
+                              width: keypadWidth,
+                              height: keypadHeight,
+                              child: _CashKeypad(
+                                priceText: formatMoney(_keypadPriceCents),
+                                onKey: _keypadInsert,
+                                onBackspace: _keypadBackspace,
+                                onClear: _keypadClear,
+                                onSubmit: _keypadSubmit,
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+"""
+          if old_layout not in text:
+              raise SystemExit('Keypad placement block not found; refusing to overwrite newer code.')
+          text = text.replace(old_layout, new_layout, 1)
+
+          old_button = """  Widget _numberButton(String value, {int flex = 1}) => Expanded(
+        flex: flex,
+        child: SizedBox.expand(
+          child: OutlinedButton(
+            onPressed: () => onKey(value),
+            child: Text(value),
+          ),
+        ),
+      );
+"""
+          new_button = """  Widget _numberButton(String value, {int flex = 1}) => Expanded(
+        flex: flex,
+        child: SizedBox.expand(
+          child: OutlinedButton(
+            onPressed: () => onKey(value),
+            child: Text(
+              value,
+              style: const TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ),
+      );
+"""
+          if old_button not in text:
+              raise SystemExit('Keypad button block not found; refusing to overwrite newer code.')
+          text = text.replace(old_button, new_button, 1)
+
+          old_action_width = """                    SizedBox(
+                      width: 54,
+                      child: Column(
+"""
+          new_action_width = """                    SizedBox(
+                      width: 64,
+                      child: Column(
+"""
+          if old_action_width not in text:
+              raise SystemExit('Keypad action column not found; refusing to overwrite newer code.')
+          text = text.replace(old_action_width, new_action_width, 1)
+
+          path.write_text(text)
+          PY
+
+          # Restore the real ANPR workflow from the current Flutter branch and
+          # remove the temporary workflow so the PR contains only the UI change.
+          git checkout origin/Flutter -- .github/workflows/update-birth-places.yml
+          rm -f .github/workflows/one-shot-adjust-cash-keypad.yml
 
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add assets/data/birth_places.json assets/data/birth_places_manifest.json .github/workflows/build.yml
-          git commit -m "ci: refresh ANPR data and build guard"
-          git pull --rebase origin Flutter
-          git push origin HEAD:Flutter
+          git add lib/pages/cash_page.dart .github/workflows/update-birth-places.yml .github/workflows/one-shot-adjust-cash-keypad.yml
+          git commit -m "ui: rebalance cash keypad proportions"
+          git push origin HEAD:chatgpt-keypad-layout-20260819
