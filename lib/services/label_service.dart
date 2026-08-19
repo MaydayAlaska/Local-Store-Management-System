@@ -208,13 +208,17 @@ class LabelService {
     final detailsY = (height * 0.21).round();
     final barcodeY = details.isEmpty ? (height * 0.28).round() : (height * 0.32).round();
     final barcodeHeight = (height * 0.30).round().clamp(48, 120).toInt();
-    final codeY = barcodeY + barcodeHeight + 8;
     final footerY = (height * 0.82).round();
     final titleFont = (height * 0.105).round().clamp(22, 34).toInt();
     final detailsFont = (height * 0.07).round().clamp(15, 22).toInt();
     final footerFont = (height * 0.075).round().clamp(16, 24).toInt();
     final priceFont = (height * 0.11).round().clamp(22, 34).toInt();
     final barcode = _barcodeLayout(code: code, labelWidth: width, ean13: ean13);
+
+    // Gli EAN-13 hanno guard bar piu lunghi a sinistra, al centro e a destra.
+    // Lasciamo spazio sotto il simbolo prima di stampare la riga numerica manuale.
+    final codeClearance = 8 + (ean13 ? barcode.moduleWidth * 6 : 0);
+    final codeY = barcodeY + barcodeHeight + codeClearance;
 
     final out = StringBuffer()
       ..writeln('^XA')
