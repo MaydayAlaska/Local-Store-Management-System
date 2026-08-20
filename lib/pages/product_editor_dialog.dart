@@ -35,7 +35,7 @@ class _ProductEditorDialogState extends State<ProductEditorDialog> {
   bool _active = true;
   String? _error;
 
-  String _itEn(String it, String en) => AppStrings.isEnglish ? en : it;
+  String _itEn(String it, String en) => AppStrings.pair(it, en);
 
   void _evaluatePurchaseFormula() {
     try {
@@ -317,7 +317,7 @@ class _ProductEditorDialogState extends State<ProductEditorDialog> {
               Row(children: [
                 Expanded(
                   child: Text(
-                    AppStrings.isEnglish ? 'Variants' : 'Varianti',
+                    AppStrings.pair('Varianti', 'Variants'),
                     style: Theme.of(context).textTheme.titleMedium,
                   ),
                 ),
@@ -376,7 +376,7 @@ class _ProductEditorDialogState extends State<ProductEditorDialog> {
   static String _moneyInput(int? cents) {
     if (cents == null) return '';
     final value = (cents / 100).toStringAsFixed(2);
-    return AppStrings.isEnglish ? value : value.replaceAll('.', ',');
+    return AppRuntime.languageCode == 'en' ? value : value.replaceAll('.', ',');
   }
 }
 
@@ -401,7 +401,7 @@ class _VariantEditor extends StatefulWidget {
 }
 
 class _VariantEditorState extends State<_VariantEditor> {
-  String _itEn(String it, String en) => AppStrings.isEnglish ? en : it;
+  String _itEn(String it, String en) => AppStrings.pair(it, en);
 
   void _evaluateVariantPurchaseFormula() {
     try {
@@ -568,7 +568,7 @@ class _VariantEditorState extends State<_VariantEditor> {
                   onChanged: (value) =>
                       setLocal(() => widget.form.active = value),
                 ),
-                Text(AppStrings.isEnglish ? 'Active' : 'Attiva'),
+                Text(AppStrings.pair('Attiva', 'Active')),
               ]),
             ),
             const SizedBox(width: 12),
@@ -625,7 +625,7 @@ class _VariantForm {
   static String _moneyValue(int? cents) {
     if (cents == null) return '';
     final value = (cents / 100).toStringAsFixed(2);
-    return AppStrings.isEnglish ? value : value.replaceAll('.', ',');
+    return AppRuntime.languageCode == 'en' ? value : value.replaceAll('.', ',');
   }
 
   bool containsBarcode(String value) => barcodes.text
