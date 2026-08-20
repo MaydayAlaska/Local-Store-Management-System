@@ -29,6 +29,7 @@ class _CashPageState extends State<CashPage> {
   final List<_CashLine> _cart = [];
   final List<_FixedDiscountLine> _fixedDiscounts = [];
   Customer? _customer;
+  GiftCard? _giftCard;
   int _nextDiscountId = 1;
   int _nextGenericLineId = 1;
   int _keypadPriceCents = 0;
@@ -145,9 +146,10 @@ class _CashPageState extends State<CashPage> {
     if (existing != null) {
       setState(() {
         _customer = existing;
+        _giftCard = null;
         _searchStatus = _itEn(
-          'Cliente associato: ${existing.displayName}.',
-          'Customer linked: ${existing.displayName}.',
+          'Cliente associato: ${existing.displayName} (${existing.customerCodeDisplay}).',
+          'Customer linked: ${existing.displayName} (${existing.customerCodeDisplay}).',
         );
       });
       return;
@@ -161,9 +163,10 @@ class _CashPageState extends State<CashPage> {
     if (!mounted || created == null) return;
     setState(() {
       _customer = created;
+      _giftCard = null;
       _searchStatus = _itEn(
-        'Nuovo cliente associato: ${created.displayName}.',
-        'New customer linked: ${created.displayName}.',
+        'Nuovo cliente associato: ${created.displayName} (${created.customerCodeDisplay}).',
+        'New customer linked: ${created.displayName} (${created.customerCodeDisplay}).',
       );
     });
   }
@@ -176,9 +179,101 @@ class _CashPageState extends State<CashPage> {
     if (!mounted || customer == null) return;
     setState(() {
       _customer = customer;
+      _giftCard = null;
       _searchStatus = _itEn(
-        'Cliente associato: ${customer.displayName}.',
-        'Customer linked: ${customer.displayName}.',
+        'Cliente associato: ${customer.displayName} (${customer.customerCodeDisplay}).',
+        'Customer linked: ${customer.displayName} (${customer.customerCodeDisplay}).',
+      );
+    });
+  }
+
+  Future<void> _pickGiftCard() async {
+    final customer = _customer;
+    if (customer == null) {
+      return _cartMessage(_itEn(
+        'Associa prima un cliente per usare un buono regalo.',
+        'Link a customer before using a gift card.',
+      ));
+    }
+
+    final cards =
+        widget.services.customers.availableGiftCardsForCustomer(customer.id);
+    if (cards.isEmpty) {
+      return _cartMessage(_itEn(
+        'Il cliente non ha buoni regalo con credito residuo.',
+        'The customer has no gift cards with remaining credit.',
+      ));
+    }
+
+    final selected = await showDialog<GiftCard>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(_itEn('Seleziona buono regalo', 'Select gift card')),
+        content: SizedBox(
+          width: 520,
+          height: (cards.length * 76.0).clamp(150.0, 430.0),
+          child: ListView.separated(
+            itemCount: cards.length,
+            separatorBuilder: (_, _) => const Divider(height: 1),
+            itemBuilder: (context, index) {
+              final card = cards[index];
+              return ListTile(
+                leading: const Icon(Icons.card_giftcard_outlined),
+                title: Text(
+                  card.code,
+                  style: const TextStyle(fontWeight: FontWeight.w700),
+                ),
+                subtitle: Text(
+                  '${_itEn('Valore totale', 'Total value')}: ${card.totalDisplay} · '
+                  '${_itEn('Speso', 'Spent')}: ${card.spentDisplay}',
+                ),
+                trailing: Text(
+                  '${_itEn('Residuo', 'Remaining')}\n${card.remainingDisplay}',
+                  textAlign: TextAlign.right,
+                  style: const TextStyle(fontWeight: FontWeight.w700),
+                ),
+                onTap: () => Navigator.of(dialogContext).pop(card),
+              );
+            },
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: Text(AppStrings.t('cancel')),
+          ),
+        ],
+      ),
+    );
+    if (!mounted || selected == null) return;
+    setState(() {
+      _giftCard = selected;
+      _cartStatus = _itEn(
+        'Buono ${selected.code} aggiunto al carrello. Credito residuo: ${selected.remainingDisplay}.',
+        'Gift card ${selected.code} added to the cart. Remaining credit: ${selected.remainingDisplay}.',
+      );
+    });
+  }
+
+  void _removeCustomer() {
+    setState(() {
+      _customer = null;
+      _giftCard = null;
+      _cartStatus = _itEn(
+        'Cliente rimosso dal carrello. L’eventuale buono regalo è stato rimosso.',
+        'Customer removed from the cart. Any selected gift card was removed too.',
+      );
+    });
+  }
+
+  void _removeGiftCard() {
+    final card = _giftCard;
+    if (card == null) return;
+    setState(() {
+      _giftCard = null;
+      _cartStatus = _itEn(
+        'Buono ${card.code} rimosso dal carrello.',
+        'Gift card ${card.code} removed from the cart.',
       );
     });
   }
@@ -427,13 +522,14 @@ class _CashPageState extends State<CashPage> {
     _cart.clear();
     _fixedDiscounts.clear();
     _customer = null;
+    _giftCard = null;
     _totalPercent.clear();
     _fixedDiscount.clear();
     _keypadPriceCents = 0;
     if (!keepStatus) {
       setState(() => _cartStatus = _itEn(
-            'Carrello svuotato. Nessun movimento di magazzino è stato registrato.',
-            'Cart cleared. No stock movement was recorded.',
+            'Carrello svuotato. Nessun movimento di magazzino o buono regalo è stato registrato.',
+            'Cart cleared. No stock movement or gift-card usage was recorded.',
           ));
     }
   }
@@ -466,6 +562,26 @@ class _CashPageState extends State<CashPage> {
     return total < 0 ? 0 : total;
   }
 
+  int get _giftCardAppliedCents {
+    final card = _giftCard;
+    if (card == null || _finalTotalCents <= 0) return 0;
+    return card.remainingValueCents < _finalTotalCents
+        ? card.remainingValueCents
+        : _finalTotalCents;
+  }
+
+  int get _amountDueCents {
+    final value = _finalTotalCents - _giftCardAppliedCents;
+    return value < 0 ? 0 : value;
+  }
+
+  int get _giftCardRemainingAfterSaleCents {
+    final card = _giftCard;
+    if (card == null) return 0;
+    final value = card.remainingValueCents - _giftCardAppliedCents;
+    return value < 0 ? 0 : value;
+  }
+
   int _vatIncludedCents(int totalCents, double percent) {
     final rate = percent.clamp(0, 100).toDouble();
     if (totalCents <= 0 || rate <= 0) return 0;
@@ -486,9 +602,12 @@ class _CashPageState extends State<CashPage> {
     final totalPercentDiscountRaw = _subtotalCents - _afterPercentCents;
     final totalPercentDiscount =
         totalPercentDiscountRaw < 0 ? 0 : totalPercentDiscountRaw;
+    final giftApplied = _giftCardAppliedCents;
 
     final draft = SalesOrderDraft(
       customerId: _customer?.id,
+      giftCardId: giftApplied > 0 ? _giftCard?.id : null,
+      giftCardAppliedCents: giftApplied,
       lines: _cart
           .map((line) => SalesOrderDraftLine(
                 variantId: line.variantId,
@@ -513,12 +632,19 @@ class _CashPageState extends State<CashPage> {
 
     try {
       final order = widget.services.customers.recordSale(draft);
+      final usedGift = giftApplied > 0;
+      final giftCode = _giftCard?.code;
       _clear(keepStatus: true);
       setState(() {
-        _cartStatus = _itEn(
-          'Vendita ${order.orderNumber} registrata. Magazzino aggiornato dove previsto.',
-          'Sale ${order.orderNumber} registered. Stock updated where applicable.',
-        );
+        _cartStatus = usedGift
+            ? _itEn(
+                'Vendita ${order.orderNumber} registrata. Usati ${formatMoney(giftApplied)} dal buono $giftCode.',
+                'Sale ${order.orderNumber} registered. ${formatMoney(giftApplied)} used from gift card $giftCode.',
+              )
+            : _itEn(
+                'Vendita ${order.orderNumber} registrata. Magazzino aggiornato dove previsto.',
+                'Sale ${order.orderNumber} registered. Stock updated where applicable.',
+              );
         _searchStatus = _itEn(
           'Vendita completata. Scanner pronto per il prossimo cliente o prodotto.',
           'Sale completed. Scanner ready for the next customer or product.',
@@ -543,6 +669,10 @@ class _CashPageState extends State<CashPage> {
     final count = _cart.fold<int>(0, (sum, line) => sum + line.quantity);
     final vatPercent = widget.services.settings.load().vatPercent;
     final vatCents = _vatIncludedCents(_finalTotalCents, vatPercent);
+    final availableGiftCards = _customer == null
+        ? const <GiftCard>[]
+        : widget.services.customers.availableGiftCardsForCustomer(_customer!.id);
+    final fiscalCode = _customer?.fiscalCode?.trim();
 
     return HidBarcodeListener(
       enabled: widget.isActive,
@@ -620,6 +750,7 @@ class _CashPageState extends State<CashPage> {
                           onPressed: _cart.isEmpty &&
                                   _fixedDiscounts.isEmpty &&
                                   _customer == null &&
+                                  _giftCard == null &&
                                   _keypadPriceCents == 0
                               ? null
                               : _clear,
@@ -634,47 +765,84 @@ class _CashPageState extends State<CashPage> {
                         horizontal: 14,
                         vertical: 10,
                       ),
-                      child: Row(children: [
-                        const Icon(Icons.person_outline),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: _customer == null
-                              ? Text(AppStrings.t('no_customer'))
-                              : Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      _customer!.displayName,
-                                      style: const TextStyle(
-                                        fontWeight: FontWeight.w700,
+                      child: Column(children: [
+                        Row(children: [
+                          const Icon(Icons.person_outline),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: _customer == null
+                                ? Text(AppStrings.t('no_customer'))
+                                : Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        _customer!.displayName,
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.w700,
+                                        ),
                                       ),
-                                    ),
-                                    Text(_customer!.fiscalCode),
-                                  ],
-                                ),
-                        ),
-                        OutlinedButton.icon(
-                          onPressed: _pickCustomer,
-                          icon: const Icon(Icons.search),
-                          label: Text(AppStrings.t(
-                            _customer == null
-                                ? 'search_customer'
-                                : 'change_customer',
-                          )),
-                        ),
-                        if (_customer != null) ...[
-                          const SizedBox(width: 4),
-                          IconButton(
-                            tooltip: AppStrings.t('remove_customer'),
-                            onPressed: () => setState(() => _customer = null),
-                            icon: const Icon(Icons.close),
+                                      Text(
+                                        _customer!.customerCodeDisplay +
+                                            (fiscalCode?.isNotEmpty == true
+                                                ? ' · CF $fiscalCode'
+                                                : ''),
+                                      ),
+                                    ],
+                                  ),
                           ),
+                          OutlinedButton.icon(
+                            onPressed: _pickCustomer,
+                            icon: const Icon(Icons.search),
+                            label: Text(AppStrings.t(
+                              _customer == null
+                                  ? 'search_customer'
+                                  : 'change_customer',
+                            )),
+                          ),
+                          if (_customer != null) ...[
+                            const SizedBox(width: 4),
+                            IconButton(
+                              tooltip: AppStrings.t('remove_customer'),
+                              onPressed: _removeCustomer,
+                              icon: const Icon(Icons.close),
+                            ),
+                          ],
+                        ]),
+                        if (_customer != null) ...[
+                          const SizedBox(height: 8),
+                          Row(children: [
+                            const Icon(Icons.card_giftcard_outlined, size: 20),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                _giftCard == null
+                                    ? _itEn(
+                                        '${availableGiftCards.length} buoni con credito residuo',
+                                        '${availableGiftCards.length} gift cards with remaining credit',
+                                      )
+                                    : '${_giftCard!.code} · ${_itEn('residuo', 'remaining')} ${_giftCard!.remainingDisplay}',
+                              ),
+                            ),
+                            OutlinedButton.icon(
+                              onPressed: availableGiftCards.isEmpty
+                                  ? null
+                                  : _pickGiftCard,
+                              icon: const Icon(Icons.redeem_outlined),
+                              label: Text(
+                                _giftCard == null
+                                    ? _itEn('Usa buono', 'Use gift card')
+                                    : _itEn('Cambia buono', 'Change gift card'),
+                              ),
+                            ),
+                          ]),
                         ],
                       ]),
                     ),
                     const Divider(height: 1),
                     Expanded(
-                      child: _cart.isEmpty && _fixedDiscounts.isEmpty
+                      child: _cart.isEmpty &&
+                              _fixedDiscounts.isEmpty &&
+                              _giftCard == null
                           ? Center(child: Text(AppStrings.t('empty_cart')))
                           : ListView(children: [
                               ..._cart.map((line) => _CartTile(
@@ -703,6 +871,35 @@ class _CashPageState extends State<CashPage> {
                                       ],
                                     ),
                                   )),
+                              if (_giftCard != null)
+                                ListTile(
+                                  leading: const Icon(Icons.card_giftcard_outlined),
+                                  title: Text(
+                                    '${_itEn('Buono regalo', 'Gift card')} ${_giftCard!.code}',
+                                    style: const TextStyle(fontWeight: FontWeight.w700),
+                                  ),
+                                  subtitle: Text(
+                                    '${_itEn('Residuo disponibile', 'Available credit')}: ${_giftCard!.remainingDisplay} · '
+                                    '${_itEn('Residuo dopo vendita', 'Credit after sale')}: ${formatMoney(_giftCardRemainingAfterSaleCents)}',
+                                  ),
+                                  trailing: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Text(
+                                        _giftCardAppliedCents > 0
+                                            ? '−${formatMoney(_giftCardAppliedCents)}'
+                                            : formatMoney(0),
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                      ),
+                                      IconButton(
+                                        onPressed: _removeGiftCard,
+                                        icon: const Icon(Icons.close),
+                                      ),
+                                    ],
+                                  ),
+                                ),
                             ]),
                     ),
                     const Divider(height: 1),
@@ -761,16 +958,32 @@ class _CashPageState extends State<CashPage> {
                             Text(
                               '${AppStrings.t('fixed_discounts')}: −${formatMoney(_fixedCents)}',
                             ),
+                          if (_giftCard != null) ...[
+                            const SizedBox(height: 4),
+                            Text(
+                              '${_itEn('Totale vendita', 'Sale total')}: ${formatMoney(_finalTotalCents)}',
+                            ),
+                            if (_giftCardAppliedCents > 0)
+                              Text(
+                                '${_itEn('Buono regalo', 'Gift card')} ${_giftCard!.code}: −${formatMoney(_giftCardAppliedCents)}',
+                              ),
+                          ],
                           const SizedBox(height: 4),
                           Row(children: [
                             Expanded(
                               child: Text(
-                                AppStrings.t('total'),
+                                _giftCard == null
+                                    ? AppStrings.t('total')
+                                    : _itEn('Totale da pagare', 'Amount due'),
                                 style: Theme.of(context).textTheme.titleLarge,
                               ),
                             ),
                             Text(
-                              formatMoney(_finalTotalCents),
+                              formatMoney(
+                                _giftCard == null
+                                    ? _finalTotalCents
+                                    : _amountDueCents,
+                              ),
                               style: Theme.of(context).textTheme.headlineMedium,
                             ),
                           ]),
