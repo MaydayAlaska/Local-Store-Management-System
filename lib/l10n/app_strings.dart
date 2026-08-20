@@ -142,7 +142,8 @@ class AppStrings {
   /// Compatibility bridge for UI strings that have not yet been converted to
   /// stable translation keys. New code should always use [t]. Third-party
   /// language files can override these entries through the optional `legacy`
-  /// object, using the English fallback text as the key.
+  /// object, using the English fallback text or an English template containing
+  /// `{placeholder}` tokens as the key.
   static String pair(
     String italian,
     String english, [
@@ -155,9 +156,47 @@ class AppStrings {
     } else if (selected == 'en') {
       value = english;
     } else {
-      value = _catalogs[selected]?.legacy[english] ?? italian;
+      value = _legacyTranslation(_catalogs[selected], english) ?? italian;
     }
     return _interpolate(value, parameters);
+  }
+
+  static String? _legacyTranslation(
+    _TranslationCatalog? catalog,
+    String renderedEnglish,
+  ) {
+    if (catalog == null) return null;
+    final exact = catalog.legacy[renderedEnglish];
+    if (exact != null) return exact;
+
+    for (final entry in catalog.legacy.entries) {
+      final template = entry.key;
+      if (!template.contains('{')) continue;
+      final tokenPattern = RegExp(r'\{([A-Za-z0-9_]+)\}');
+      final tokens = tokenPattern.allMatches(template).toList(growable: false);
+      if (tokens.isEmpty) continue;
+
+      final names = <String>[];
+      final pattern = StringBuffer('^');
+      var cursor = 0;
+      for (final token in tokens) {
+        pattern.write(RegExp.escape(template.substring(cursor, token.start)));
+        pattern.write('(.+?)');
+        names.add(token.group(1)!);
+        cursor = token.end;
+      }
+      pattern.write(RegExp.escape(template.substring(cursor)));
+      pattern.write(r'$');
+
+      final match = RegExp(pattern.toString()).firstMatch(renderedEnglish);
+      if (match == null) continue;
+      final values = <String, Object?>{};
+      for (var index = 0; index < names.length; index += 1) {
+        values[names[index]] = match.group(index + 1) ?? '';
+      }
+      return _interpolate(entry.value, values);
+    }
+    return null;
   }
 
   static String _interpolate(
