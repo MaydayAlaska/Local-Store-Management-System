@@ -11,33 +11,46 @@ class CustomerRepository {
   final DatabaseService database;
 
   void _ensureSchema() {
+    if (!_tableExists('customers')) {
+      _createCustomerTable('customers');
+    } else {
+      _migrateCustomerSchemaIfNeeded();
+    }
+
     database.db.execute('''
-      CREATE TABLE IF NOT EXISTS customers (
+      CREATE TABLE IF NOT EXISTS gift_cards (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        fiscal_code TEXT NOT NULL COLLATE NOCASE UNIQUE,
-        first_name TEXT NOT NULL,
-        last_name TEXT NOT NULL,
-        birth_date TEXT NOT NULL,
-        sex TEXT NOT NULL,
-        birth_place_code TEXT NOT NULL,
-        notes TEXT,
+        code TEXT NOT NULL COLLATE NOCASE UNIQUE,
+        customer_id INTEGER NOT NULL,
+        total_value_cents INTEGER NOT NULL CHECK(total_value_cents > 0),
+        spent_value_cents INTEGER NOT NULL DEFAULT 0
+          CHECK(spent_value_cents >= 0 AND spent_value_cents <= total_value_cents),
         created_at_utc TEXT NOT NULL,
-        updated_at_utc TEXT NOT NULL
+        updated_at_utc TEXT NOT NULL,
+        FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE CASCADE
       );
       CREATE TABLE IF NOT EXISTS sales_orders (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         order_number TEXT NOT NULL UNIQUE,
         customer_id INTEGER,
+        customer_code INTEGER,
+        customer_display_name TEXT,
+        customer_fiscal_code TEXT,
         gross_total_cents INTEGER NOT NULL,
         item_discount_cents INTEGER NOT NULL DEFAULT 0,
         order_discount_basis_points INTEGER NOT NULL DEFAULT 0,
         order_percent_discount_cents INTEGER NOT NULL DEFAULT 0,
         fixed_discount_cents INTEGER NOT NULL DEFAULT 0,
         final_total_cents INTEGER NOT NULL,
+        gift_card_id INTEGER,
+        gift_card_code TEXT,
+        gift_card_applied_cents INTEGER NOT NULL DEFAULT 0,
         receipt_filename TEXT,
         receipt_blob BLOB,
+        cancelled_at_utc TEXT,
         created_at_utc TEXT NOT NULL,
-        FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE RESTRICT
+        FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE RESTRICT,
+        FOREIGN KEY (gift_card_id) REFERENCES gift_cards(id) ON DELETE SET NULL
       );
       CREATE TABLE IF NOT EXISTS sales_order_items (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -55,36 +68,140 @@ class CustomerRepository {
         FOREIGN KEY (order_id) REFERENCES sales_orders(id) ON DELETE CASCADE,
         FOREIGN KEY (variant_id) REFERENCES product_variants(id) ON DELETE SET NULL
       );
-      CREATE INDEX IF NOT EXISTS ix_customers_name ON customers(last_name COLLATE NOCASE, first_name COLLATE NOCASE);
-      CREATE INDEX IF NOT EXISTS ix_customers_fiscal_code ON customers(fiscal_code COLLATE NOCASE);
-      CREATE INDEX IF NOT EXISTS ix_sales_orders_customer_date ON sales_orders(customer_id, created_at_utc DESC, id DESC);
-      CREATE INDEX IF NOT EXISTS ix_sales_order_items_order ON sales_order_items(order_id, id);
+      CREATE INDEX IF NOT EXISTS ix_customers_name
+        ON customers(last_name COLLATE NOCASE, first_name COLLATE NOCASE);
+      CREATE INDEX IF NOT EXISTS ix_customers_fiscal_code
+        ON customers(fiscal_code COLLATE NOCASE);
+      CREATE INDEX IF NOT EXISTS ix_customers_customer_code
+        ON customers(customer_code);
+      CREATE INDEX IF NOT EXISTS ix_gift_cards_customer
+        ON gift_cards(customer_id, created_at_utc DESC, id DESC);
+      CREATE INDEX IF NOT EXISTS ix_sales_orders_customer_date
+        ON sales_orders(customer_id, created_at_utc DESC, id DESC);
+      CREATE INDEX IF NOT EXISTS ix_sales_order_items_order
+        ON sales_order_items(order_id, id);
     ''');
 
+    _ensureColumn('sales_orders', 'customer_code', 'INTEGER');
     _ensureColumn('sales_orders', 'customer_display_name', 'TEXT');
     _ensureColumn('sales_orders', 'customer_fiscal_code', 'TEXT');
+    _ensureColumn(
+      'sales_orders',
+      'gift_card_id',
+      'INTEGER REFERENCES gift_cards(id) ON DELETE SET NULL',
+    );
+    _ensureColumn('sales_orders', 'gift_card_code', 'TEXT');
+    _ensureColumn(
+      'sales_orders',
+      'gift_card_applied_cents',
+      'INTEGER NOT NULL DEFAULT 0',
+    );
     _ensureColumn('sales_orders', 'cancelled_at_utc', 'TEXT');
     database.db.execute('''
       CREATE INDEX IF NOT EXISTS ix_sales_orders_cancelled_date
-      ON sales_orders(cancelled_at_utc, created_at_utc DESC, id DESC);
+        ON sales_orders(cancelled_at_utc, created_at_utc DESC, id DESC);
+      CREATE INDEX IF NOT EXISTS ix_sales_orders_gift_card
+        ON sales_orders(gift_card_id, created_at_utc DESC, id DESC);
     ''');
     _backfillCustomerSnapshots();
+  }
+
+  void _createCustomerTable(String table) {
+    database.db.execute('''
+      CREATE TABLE $table (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        customer_code INTEGER NOT NULL UNIQUE CHECK(customer_code > 0),
+        fiscal_code TEXT COLLATE NOCASE UNIQUE,
+        first_name TEXT NOT NULL,
+        last_name TEXT NOT NULL,
+        birth_date TEXT,
+        sex TEXT,
+        birth_place_code TEXT,
+        notes TEXT,
+        created_at_utc TEXT NOT NULL,
+        updated_at_utc TEXT NOT NULL
+      );
+    ''');
+  }
+
+  void _migrateCustomerSchemaIfNeeded() {
+    final columns = database.db.select('PRAGMA table_info(customers);');
+    bool has(String name) => columns.any(
+          (row) => (row['name'] as String).toLowerCase() == name.toLowerCase(),
+        );
+    int notNull(String name) => columns
+        .firstWhere((row) =>
+            (row['name'] as String).toLowerCase() == name.toLowerCase())['notnull'] as int;
+
+    final needsMigration = !has('customer_code') ||
+        (has('fiscal_code') && notNull('fiscal_code') != 0) ||
+        (has('birth_date') && notNull('birth_date') != 0) ||
+        (has('sex') && notNull('sex') != 0) ||
+        (has('birth_place_code') && notNull('birth_place_code') != 0);
+    if (!needsMigration) return;
+
+    final hasCustomerCode = has('customer_code');
+    final db = database.db;
+    db.execute('PRAGMA foreign_keys = OFF;');
+    try {
+      db.execute('BEGIN IMMEDIATE;');
+      db.execute('DROP TABLE IF EXISTS customers_new;');
+      _createCustomerTable('customers_new');
+      final codeExpression =
+          hasCustomerCode ? 'COALESCE(customer_code, id)' : 'id';
+      db.execute('''
+        INSERT INTO customers_new (
+          id, customer_code, fiscal_code, first_name, last_name,
+          birth_date, sex, birth_place_code, notes, created_at_utc, updated_at_utc)
+        SELECT
+          id,
+          $codeExpression,
+          NULLIF(TRIM(fiscal_code), ''),
+          first_name,
+          last_name,
+          NULLIF(TRIM(birth_date), ''),
+          NULLIF(TRIM(sex), ''),
+          NULLIF(TRIM(birth_place_code), ''),
+          notes,
+          created_at_utc,
+          updated_at_utc
+        FROM customers;
+      ''');
+      db.execute('DROP TABLE customers;');
+      db.execute('ALTER TABLE customers_new RENAME TO customers;');
+      db.execute('COMMIT;');
+    } catch (_) {
+      db.execute('ROLLBACK;');
+      rethrow;
+    } finally {
+      db.execute('PRAGMA foreign_keys = ON;');
+    }
   }
 
   void _backfillCustomerSnapshots() {
     database.db.execute('''
       UPDATE sales_orders
       SET customer_display_name = (
-            SELECT TRIM(c.last_name || ' ' || c.first_name)
-            FROM customers c WHERE c.id = sales_orders.customer_id
-          ),
-          customer_fiscal_code = (
-            SELECT c.fiscal_code
-            FROM customers c WHERE c.id = sales_orders.customer_id
-          )
+        SELECT TRIM(c.last_name || ' ' || c.first_name)
+        FROM customers c WHERE c.id = sales_orders.customer_id
+      )
       WHERE customer_id IS NOT NULL
-        AND (customer_display_name IS NULL OR TRIM(customer_display_name) = ''
-          OR customer_fiscal_code IS NULL OR TRIM(customer_fiscal_code) = '');
+        AND (customer_display_name IS NULL OR TRIM(customer_display_name) = '');
+
+      UPDATE sales_orders
+      SET customer_code = (
+        SELECT c.customer_code
+        FROM customers c WHERE c.id = sales_orders.customer_id
+      )
+      WHERE customer_id IS NOT NULL AND customer_code IS NULL;
+
+      UPDATE sales_orders
+      SET customer_fiscal_code = (
+        SELECT c.fiscal_code
+        FROM customers c WHERE c.id = sales_orders.customer_id
+      )
+      WHERE customer_id IS NOT NULL
+        AND (customer_fiscal_code IS NULL OR TRIM(customer_fiscal_code) = '');
     ''');
   }
 
@@ -94,24 +211,40 @@ class CustomerRepository {
     final rows = database.db.select('''
       SELECT * FROM customers
       WHERE ?=''
-         OR fiscal_code LIKE ? COLLATE NOCASE
+         OR COALESCE(fiscal_code, '') LIKE ? COLLATE NOCASE
          OR first_name LIKE ? COLLATE NOCASE
          OR last_name LIKE ? COLLATE NOCASE
          OR (last_name || ' ' || first_name) LIKE ? COLLATE NOCASE
+         OR printf('CLI-%06d', customer_code) LIKE ? COLLATE NOCASE
+         OR CAST(customer_code AS TEXT) LIKE ? COLLATE NOCASE
          OR COALESCE(notes, '') LIKE ? COLLATE NOCASE
-      ORDER BY last_name COLLATE NOCASE, first_name COLLATE NOCASE, id
+      ORDER BY last_name COLLATE NOCASE, first_name COLLATE NOCASE, customer_code
       LIMIT ?;
-    ''', [q, pattern, pattern, pattern, pattern, pattern, limit.clamp(1, 5000)]);
+    ''', [
+      q,
+      pattern,
+      pattern,
+      pattern,
+      pattern,
+      pattern,
+      pattern,
+      pattern,
+      limit.clamp(1, 5000),
+    ]);
     return rows.map(_customerFromRow).toList();
   }
 
   Customer? getById(int id) {
-    final rows = database.db.select('SELECT * FROM customers WHERE id=? LIMIT 1;', [id]);
+    final rows = database.db.select(
+      'SELECT * FROM customers WHERE id=? LIMIT 1;',
+      [id],
+    );
     return rows.isEmpty ? null : _customerFromRow(rows.first);
   }
 
   Customer? findByFiscalCode(String fiscalCode) {
     final value = fiscalCode.trim().toUpperCase();
+    if (value.isEmpty) return null;
     final rows = database.db.select(
       'SELECT * FROM customers WHERE fiscal_code=? COLLATE NOCASE LIMIT 1;',
       [value],
@@ -126,48 +259,75 @@ class CustomerRepository {
     if (lastName.isEmpty) throw ArgumentError('Il cognome è obbligatorio.');
 
     final data = draft.fiscalCodeData;
+    final fiscalCode = data?.fiscalCode.trim().toUpperCase();
     final now = DateTime.now().toUtc().toIso8601String();
-    final birthDate = _dateOnly(data.birthDate);
+    final birthDate = data == null ? null : _dateOnly(data.birthDate);
     final notes = _optional(draft.notes);
+    final db = database.db;
 
-    if (draft.id == null) {
-      database.db.execute('''
-        INSERT INTO customers (
-          fiscal_code, first_name, last_name, birth_date, sex, birth_place_code,
-          notes, created_at_utc, updated_at_utc)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
-      ''', [
-        data.fiscalCode,
-        firstName,
-        lastName,
-        birthDate,
-        data.sex,
-        data.birthPlaceCode,
-        notes,
-        now,
-        now,
-      ]);
-      return getById(database.db.lastInsertRowId)!;
+    db.execute('BEGIN IMMEDIATE;');
+    try {
+      _assertFiscalCodeAvailable(fiscalCode, draft.id);
+      int id;
+      if (draft.id == null) {
+        final customerCode = _nextAvailableCustomerCode();
+        db.execute('''
+          INSERT INTO customers (
+            customer_code, fiscal_code, first_name, last_name, birth_date, sex,
+            birth_place_code, notes, created_at_utc, updated_at_utc)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+        ''', [
+          customerCode,
+          fiscalCode,
+          firstName,
+          lastName,
+          birthDate,
+          data?.sex,
+          data?.birthPlaceCode,
+          notes,
+          now,
+          now,
+        ]);
+        id = db.lastInsertRowId;
+      } else {
+        db.execute('''
+          UPDATE customers
+          SET fiscal_code=?, first_name=?, last_name=?, birth_date=?, sex=?,
+              birth_place_code=?, notes=?, updated_at_utc=?
+          WHERE id=?;
+        ''', [
+          fiscalCode,
+          firstName,
+          lastName,
+          birthDate,
+          data?.sex,
+          data?.birthPlaceCode,
+          notes,
+          now,
+          draft.id,
+        ]);
+        if (db.updatedRows == 0) throw StateError('Cliente non trovato.');
+        id = draft.id!;
+      }
+      db.execute('COMMIT;');
+      return getById(id)!;
+    } catch (_) {
+      db.execute('ROLLBACK;');
+      rethrow;
     }
+  }
 
-    database.db.execute('''
-      UPDATE customers
-      SET fiscal_code=?, first_name=?, last_name=?, birth_date=?, sex=?, birth_place_code=?, notes=?, updated_at_utc=?
-      WHERE id=?;
-    ''', [
-      data.fiscalCode,
-      firstName,
-      lastName,
-      birthDate,
-      data.sex,
-      data.birthPlaceCode,
-      notes,
-      now,
-      draft.id,
-    ]);
-    final updated = getById(draft.id!);
-    if (updated == null) throw StateError('Cliente non trovato.');
-    return updated;
+  void _assertFiscalCodeAvailable(String? fiscalCode, int? customerId) {
+    if (fiscalCode == null || fiscalCode.isEmpty) return;
+    final rows = database.db.select(
+      'SELECT id FROM customers WHERE fiscal_code=? COLLATE NOCASE LIMIT 1;',
+      [fiscalCode],
+    );
+    if (rows.isEmpty) return;
+    final existingId = rows.first['id'] as int;
+    if (existingId != customerId) {
+      throw ArgumentError('Il codice fiscale è già associato a un altro cliente.');
+    }
   }
 
   bool deleteCustomer(int customerId) {
@@ -175,7 +335,7 @@ class CustomerRepository {
     db.execute('BEGIN IMMEDIATE;');
     try {
       final rows = db.select(
-        'SELECT first_name, last_name, fiscal_code FROM customers WHERE id=? LIMIT 1;',
+        'SELECT customer_code, first_name, last_name, fiscal_code FROM customers WHERE id=? LIMIT 1;',
         [customerId],
       );
       if (rows.isEmpty) {
@@ -185,20 +345,22 @@ class CustomerRepository {
 
       final row = rows.first;
       final displayName = '${row['last_name']} ${row['first_name']}'.trim();
-      final fiscalCode = row['fiscal_code'] as String;
+      final customerCode = row['customer_code'] as int;
+      final fiscalCode = row['fiscal_code'] as String?;
       db.execute('''
         UPDATE sales_orders
         SET customer_display_name = CASE
               WHEN customer_display_name IS NULL OR TRIM(customer_display_name) = '' THEN ?
               ELSE customer_display_name
             END,
+            customer_code = COALESCE(customer_code, ?),
             customer_fiscal_code = CASE
               WHEN customer_fiscal_code IS NULL OR TRIM(customer_fiscal_code) = '' THEN ?
               ELSE customer_fiscal_code
             END,
             customer_id = NULL
         WHERE customer_id=?;
-      ''', [displayName, fiscalCode, customerId]);
+      ''', [displayName, customerCode, fiscalCode, customerId]);
       db.execute('DELETE FROM customers WHERE id=?;', [customerId]);
       db.execute('COMMIT;');
       return true;
@@ -206,6 +368,69 @@ class CustomerRepository {
       db.execute('ROLLBACK;');
       rethrow;
     }
+  }
+
+  List<GiftCard> giftCardsForCustomer(int customerId, [int limit = 500]) {
+    final rows = database.db.select('''
+      SELECT * FROM gift_cards
+      WHERE customer_id=?
+      ORDER BY created_at_utc DESC, id DESC
+      LIMIT ?;
+    ''', [customerId, limit.clamp(1, 5000)]);
+    return rows.map(_giftCardFromRow).toList();
+  }
+
+  List<GiftCard> availableGiftCardsForCustomer(int customerId, [int limit = 500]) {
+    final rows = database.db.select('''
+      SELECT * FROM gift_cards
+      WHERE customer_id=? AND spent_value_cents < total_value_cents
+      ORDER BY created_at_utc DESC, id DESC
+      LIMIT ?;
+    ''', [customerId, limit.clamp(1, 5000)]);
+    return rows.map(_giftCardFromRow).toList();
+  }
+
+  GiftCard? getGiftCard(int giftCardId) {
+    final rows = database.db.select(
+      'SELECT * FROM gift_cards WHERE id=? LIMIT 1;',
+      [giftCardId],
+    );
+    return rows.isEmpty ? null : _giftCardFromRow(rows.first);
+  }
+
+  GiftCard createGiftCard(int customerId, int totalValueCents) {
+    if (totalValueCents <= 0) {
+      throw ArgumentError('Il valore del buono regalo deve essere maggiore di zero.');
+    }
+    final db = database.db;
+    db.execute('BEGIN IMMEDIATE;');
+    try {
+      final customerExists = db.select(
+        'SELECT 1 FROM customers WHERE id=? LIMIT 1;',
+        [customerId],
+      ).isNotEmpty;
+      if (!customerExists) throw StateError('Il cliente selezionato non esiste più.');
+
+      final now = DateTime.now().toUtc().toIso8601String();
+      final code = _newUniqueGiftCardCode();
+      db.execute('''
+        INSERT INTO gift_cards (
+          code, customer_id, total_value_cents, spent_value_cents,
+          created_at_utc, updated_at_utc)
+        VALUES (?, ?, ?, 0, ?, ?);
+      ''', [code, customerId, totalValueCents, now, now]);
+      final id = db.lastInsertRowId;
+      db.execute('COMMIT;');
+      return getGiftCard(id)!;
+    } catch (_) {
+      db.execute('ROLLBACK;');
+      rethrow;
+    }
+  }
+
+  bool deleteGiftCard(int giftCardId) {
+    database.db.execute('DELETE FROM gift_cards WHERE id=?;', [giftCardId]);
+    return database.db.updatedRows > 0;
   }
 
   List<SalesOrderSummary> ordersForCustomer(int customerId, [int limit = 500]) {
@@ -231,6 +456,8 @@ class CustomerRepository {
          OR so.order_number LIKE ? COLLATE NOCASE
          OR COALESCE(so.customer_display_name, '') LIKE ? COLLATE NOCASE
          OR COALESCE(so.customer_fiscal_code, '') LIKE ? COLLATE NOCASE
+         OR printf('CLI-%06d', COALESCE(so.customer_code, 0)) LIKE ? COLLATE NOCASE
+         OR COALESCE(so.gift_card_code, '') LIKE ? COLLATE NOCASE
          OR so.created_at_utc LIKE ? COLLATE NOCASE
          OR EXISTS (
            SELECT 1 FROM sales_order_items soi
@@ -246,6 +473,8 @@ class CustomerRepository {
       LIMIT ?;
     ''', [
       q,
+      pattern,
+      pattern,
       pattern,
       pattern,
       pattern,
@@ -280,10 +509,10 @@ class CustomerRepository {
     final db = database.db;
     db.execute('BEGIN IMMEDIATE;');
     try {
-      final rows = db.select(
-        'SELECT order_number, cancelled_at_utc FROM sales_orders WHERE id=? LIMIT 1;',
-        [orderId],
-      );
+      final rows = db.select('''
+        SELECT order_number, cancelled_at_utc, gift_card_id, gift_card_applied_cents
+        FROM sales_orders WHERE id=? LIMIT 1;
+      ''', [orderId]);
       if (rows.isEmpty) {
         db.execute('ROLLBACK;');
         return false;
@@ -306,9 +535,21 @@ class CustomerRepository {
         final quantity = item['quantity'] as int;
         if (quantity <= 0) continue;
         db.execute('''
-          INSERT INTO stock_movements (variant_id, movement_type, quantity_delta, note, created_at_utc)
+          INSERT INTO stock_movements (
+            variant_id, movement_type, quantity_delta, note, created_at_utc)
           VALUES (?, 'IN', ?, ?, ?);
         ''', [variantId, quantity, 'Annullamento vendita $orderNumber', now]);
+      }
+
+      final giftCardId = row['gift_card_id'] as int?;
+      final giftApplied = (row['gift_card_applied_cents'] as int?) ?? 0;
+      if (giftCardId != null && giftApplied > 0) {
+        db.execute('''
+          UPDATE gift_cards
+          SET spent_value_cents = MAX(0, spent_value_cents - ?),
+              updated_at_utc = ?
+          WHERE id=?;
+        ''', [giftApplied, now, giftCardId]);
       }
 
       db.execute(
@@ -350,20 +591,64 @@ class CustomerRepository {
 
   SalesOrderSummary recordSale(SalesOrderDraft draft) {
     if (draft.lines.isEmpty) throw ArgumentError('La vendita non contiene articoli.');
+    if (draft.finalTotalCents < 0) {
+      throw ArgumentError('Il totale della vendita non può essere negativo.');
+    }
+    if (draft.giftCardAppliedCents < 0) {
+      throw ArgumentError('L’importo del buono regalo non può essere negativo.');
+    }
+
     final db = database.db;
     db.execute('BEGIN IMMEDIATE;');
     try {
+      int? customerCode;
       String? customerDisplayName;
       String? customerFiscalCode;
       if (draft.customerId != null) {
-        final customers = db.select(
-          'SELECT first_name, last_name, fiscal_code FROM customers WHERE id=? LIMIT 1;',
-          [draft.customerId],
-        );
-        if (customers.isEmpty) throw StateError('Il cliente selezionato non esiste più.');
+        final customers = db.select('''
+          SELECT customer_code, first_name, last_name, fiscal_code
+          FROM customers WHERE id=? LIMIT 1;
+        ''', [draft.customerId]);
+        if (customers.isEmpty) {
+          throw StateError('Il cliente selezionato non esiste più.');
+        }
         final customer = customers.first;
-        customerDisplayName = '${customer['last_name']} ${customer['first_name']}'.trim();
-        customerFiscalCode = customer['fiscal_code'] as String;
+        customerCode = customer['customer_code'] as int;
+        customerDisplayName =
+            '${customer['last_name']} ${customer['first_name']}'.trim();
+        customerFiscalCode = customer['fiscal_code'] as String?;
+      }
+
+      String? giftCardCode;
+      if (draft.giftCardId == null) {
+        if (draft.giftCardAppliedCents != 0) {
+          throw ArgumentError('Importo buono regalo senza un buono selezionato.');
+        }
+      } else {
+        if (draft.customerId == null) {
+          throw ArgumentError('Per usare un buono regalo è necessario associare il cliente.');
+        }
+        if (draft.giftCardAppliedCents <= 0) {
+          throw ArgumentError('Il buono regalo selezionato non ha un importo da utilizzare.');
+        }
+        if (draft.giftCardAppliedCents > draft.finalTotalCents) {
+          throw ArgumentError('Il buono regalo supera il totale della vendita.');
+        }
+        final cards = db.select(
+          'SELECT * FROM gift_cards WHERE id=? LIMIT 1;',
+          [draft.giftCardId],
+        );
+        if (cards.isEmpty) throw StateError('Il buono regalo selezionato non esiste più.');
+        final card = cards.first;
+        if ((card['customer_id'] as int) != draft.customerId) {
+          throw StateError('Il buono regalo non appartiene al cliente selezionato.');
+        }
+        final remaining =
+            (card['total_value_cents'] as int) - (card['spent_value_cents'] as int);
+        if (remaining < draft.giftCardAppliedCents) {
+          throw StateError('Credito del buono regalo insufficiente. Residuo disponibile: $remaining centesimi.');
+        }
+        giftCardCode = card['code'] as String;
       }
 
       for (final line in draft.lines) {
@@ -375,22 +660,27 @@ class CustomerRepository {
           [variantId],
         ).first['stock'] as int;
         if (available < line.quantity) {
-          throw StateError('${line.productName}: giacenza insufficiente. Disponibili: $available.');
+          throw StateError(
+            '${line.productName}: giacenza insufficiente. Disponibili: $available.',
+          );
         }
       }
 
       final now = DateTime.now().toUtc();
+      final nowText = now.toIso8601String();
       final orderNumber = _newUniqueOrderNumber(now);
       db.execute('''
         INSERT INTO sales_orders (
-          order_number, customer_id, customer_display_name, customer_fiscal_code,
-          gross_total_cents, item_discount_cents, order_discount_basis_points,
-          order_percent_discount_cents, fixed_discount_cents, final_total_cents,
-          created_at_utc)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+          order_number, customer_id, customer_code, customer_display_name,
+          customer_fiscal_code, gross_total_cents, item_discount_cents,
+          order_discount_basis_points, order_percent_discount_cents,
+          fixed_discount_cents, final_total_cents, gift_card_id,
+          gift_card_code, gift_card_applied_cents, created_at_utc)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
       ''', [
         orderNumber,
         draft.customerId,
+        customerCode,
         customerDisplayName,
         customerFiscalCode,
         draft.grossTotalCents,
@@ -399,7 +689,10 @@ class CustomerRepository {
         draft.orderPercentDiscountCents,
         draft.fixedDiscountCents,
         draft.finalTotalCents,
-        now.toIso8601String(),
+        draft.giftCardId,
+        giftCardCode,
+        draft.giftCardAppliedCents,
+        nowText,
       ]);
       final orderId = db.lastInsertRowId;
 
@@ -407,7 +700,8 @@ class CustomerRepository {
         db.execute('''
           INSERT INTO sales_order_items (
             order_id, variant_id, sku, barcode, product_name, variant_display,
-            quantity, unit_price_cents, discount_basis_points, gross_total_cents, final_total_cents)
+            quantity, unit_price_cents, discount_basis_points,
+            gross_total_cents, final_total_cents)
           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
         ''', [
           orderId,
@@ -426,9 +720,21 @@ class CustomerRepository {
         final variantId = line.variantId;
         if (variantId != null) {
           db.execute('''
-            INSERT INTO stock_movements (variant_id, movement_type, quantity_delta, note, created_at_utc)
+            INSERT INTO stock_movements (
+              variant_id, movement_type, quantity_delta, note, created_at_utc)
             VALUES (?, 'OUT', ?, ?, ?);
-          ''', [variantId, -line.quantity, 'Vendita $orderNumber', now.toIso8601String()]);
+          ''', [variantId, -line.quantity, 'Vendita $orderNumber', nowText]);
+        }
+      }
+
+      if (draft.giftCardId != null && draft.giftCardAppliedCents > 0) {
+        db.execute('''
+          UPDATE gift_cards
+          SET spent_value_cents = spent_value_cents + ?, updated_at_utc = ?
+          WHERE id=?;
+        ''', [draft.giftCardAppliedCents, nowText, draft.giftCardId]);
+        if (db.updatedRows != 1) {
+          throw StateError('Impossibile aggiornare il buono regalo.');
         }
       }
 
@@ -469,13 +775,26 @@ class CustomerRepository {
 
   Customer _customerFromRow(dynamic row) => Customer(
         id: row['id'] as int,
-        fiscalCode: row['fiscal_code'] as String,
+        customerCode: row['customer_code'] as int,
+        fiscalCode: row['fiscal_code'] as String?,
         firstName: row['first_name'] as String,
         lastName: row['last_name'] as String,
-        birthDate: DateTime.parse(row['birth_date'] as String),
-        sex: row['sex'] as String,
-        birthPlaceCode: row['birth_place_code'] as String,
+        birthDate: row['birth_date'] == null
+            ? null
+            : DateTime.parse(row['birth_date'] as String),
+        sex: row['sex'] as String?,
+        birthPlaceCode: row['birth_place_code'] as String?,
         notes: row['notes'] as String?,
+        createdAtUtc: DateTime.parse(row['created_at_utc'] as String).toUtc(),
+        updatedAtUtc: DateTime.parse(row['updated_at_utc'] as String).toUtc(),
+      );
+
+  GiftCard _giftCardFromRow(dynamic row) => GiftCard(
+        id: row['id'] as int,
+        code: row['code'] as String,
+        customerId: row['customer_id'] as int,
+        totalValueCents: row['total_value_cents'] as int,
+        spentValueCents: row['spent_value_cents'] as int,
         createdAtUtc: DateTime.parse(row['created_at_utc'] as String).toUtc(),
         updatedAtUtc: DateTime.parse(row['updated_at_utc'] as String).toUtc(),
       );
@@ -484,6 +803,7 @@ class CustomerRepository {
         id: row['id'] as int,
         orderNumber: row['order_number'] as String,
         customerId: row['customer_id'] as int?,
+        customerCode: row['customer_code'] as int?,
         customerDisplayName: row['customer_display_name'] as String?,
         customerFiscalCode: row['customer_fiscal_code'] as String?,
         itemCount: row['item_count'] as int,
@@ -493,6 +813,9 @@ class CustomerRepository {
         orderPercentDiscountCents: row['order_percent_discount_cents'] as int,
         fixedDiscountCents: row['fixed_discount_cents'] as int,
         finalTotalCents: row['final_total_cents'] as int,
+        giftCardId: row['gift_card_id'] as int?,
+        giftCardCode: row['gift_card_code'] as String?,
+        giftCardAppliedCents: (row['gift_card_applied_cents'] as int?) ?? 0,
         receiptFilename: row['receipt_filename'] as String?,
         cancelledAtUtc: row['cancelled_at_utc'] == null
             ? null
@@ -522,11 +845,41 @@ class CustomerRepository {
 
   bool _hasColumn(String table, String column) => database.db
       .select('PRAGMA table_info($table);')
-      .any((row) => (row['name'] as String).toLowerCase() == column.toLowerCase());
+      .any((row) =>
+          (row['name'] as String).toLowerCase() == column.toLowerCase());
+
+  bool _tableExists(String table) => database.db.select(
+        "SELECT 1 FROM sqlite_master WHERE type='table' AND name=? LIMIT 1;",
+        [table],
+      ).isNotEmpty;
+
+  int _nextAvailableCustomerCode() {
+    var candidate = 1;
+    final rows = database.db.select(
+      'SELECT customer_code FROM customers ORDER BY customer_code;',
+    );
+    for (final row in rows) {
+      final current = row['customer_code'] as int;
+      if (current < candidate) continue;
+      if (current == candidate) {
+        candidate++;
+        continue;
+      }
+      break;
+    }
+    return candidate;
+  }
 
   int _nextOrderSerial() {
     final rows = database.db.select(
       "SELECT seq FROM sqlite_sequence WHERE name='sales_orders' LIMIT 1;",
+    );
+    return rows.isEmpty ? 1 : (rows.first['seq'] as int) + 1;
+  }
+
+  int _nextGiftCardSerial() {
+    final rows = database.db.select(
+      "SELECT seq FROM sqlite_sequence WHERE name='gift_cards' LIMIT 1;",
     );
     return rows.isEmpty ? 1 : (rows.first['seq'] as int) + 1;
   }
@@ -544,6 +897,19 @@ class CustomerRepository {
     }
   }
 
+  String _newUniqueGiftCardCode() {
+    var serial = _nextGiftCardSerial();
+    while (true) {
+      final candidate = 'GIFT-${serial.toString().padLeft(8, '0')}';
+      final exists = database.db.select(
+        'SELECT 1 FROM gift_cards WHERE code=? COLLATE NOCASE LIMIT 1;',
+        [candidate],
+      ).isNotEmpty;
+      if (!exists) return candidate;
+      serial++;
+    }
+  }
+
   static String _dateOnly(DateTime value) =>
       '${value.year.toString().padLeft(4, '0')}-${value.month.toString().padLeft(2, '0')}-${value.day.toString().padLeft(2, '0')}';
 
@@ -554,5 +920,6 @@ class CustomerRepository {
     return 'ORD-${local.year}${two(local.month)}${two(local.day)}-${two(local.hour)}${two(local.minute)}${two(local.second)}-$suffix';
   }
 
-  static String? _optional(String? value) => value?.trim().isNotEmpty == true ? value!.trim() : null;
+  static String? _optional(String? value) =>
+      value?.trim().isNotEmpty == true ? value!.trim() : null;
 }
