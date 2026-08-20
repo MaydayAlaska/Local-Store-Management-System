@@ -1,0 +1,542 @@
+name: Apply export OTA and price formula update
+
+on:
+  push:
+    branches: [Flutter]
+    paths:
+      - '.apply-export-ota-price'
+      - '.github/workflows/apply-export-ota-price.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout latest Flutter branch
+        uses: actions/checkout@v7
+        with:
+          ref: Flutter
+          fetch-depth: 0
+
+      - name: Fast-forward before patching
+        shell: bash
+        run: git pull --ff-only origin Flutter
+
+      - name: Apply requested changes
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          def replace_once(text, old, new, label):
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f'{label}: expected exactly 1 occurrence, found {count}')
+              return text.replace(old, new, 1)
+
+          # Export labels: use explicit price wording in both export headers and filter chips.
+          path = Path('lib/services/export_service.dart')
+          text = path.read_text()
+          text = replace_once(
+              text,
+              """      InventoryExportField.purchase => AppStrings.t('purchase'),
+      InventoryExportField.sale => AppStrings.t('sale'),
+""",
+              """      InventoryExportField.purchase => AppStrings.isEnglish
+          ? 'Purchase Price'
+          : 'Prezzo di Acquisto',
+      InventoryExportField.sale => AppStrings.isEnglish
+          ? 'Sale Price'
+          : 'Prezzo di Vendita',
+""",
+              'export price labels',
+          )
+          path.write_text(text)
+
+          # Price formula parser. Percentages after + or - are relative to the current base.
+          # Example: 200-40% -> 120. Normal arithmetic honors * and / precedence.
+          path = Path('lib/core/formatters.dart')
+          text = path.read_text()
+          if 'parsePriceFormulaCents' in text:
+              raise SystemExit('parsePriceFormulaCents already exists; aborting to avoid duplicate patch')
+          text += r'''
+
+int? parsePriceFormulaCents(String value) {
+  final normalized = value
+      .trim()
+      .replaceAll('€', '')
+      .replaceAll(r'$', '')
+      .replaceAll('£', '')
+      .replaceAll('CHF', '')
+      .replaceAll(' ', '')
+      .replaceAll(',', '.');
+  if (normalized.isEmpty) return null;
+
+  try {
+    final result = _evaluatePriceExpression(normalized);
+    if (!result.isFinite || result < 0) {
+      throw const FormatException('Importo o formula non validi.');
+    }
+    return (result * 100).round();
+  } on FormatException {
+    rethrow;
+  } catch (_) {
+    throw const FormatException('Importo o formula non validi.');
+  }
+}
+
+double _evaluatePriceExpression(String expression) {
+  final percentSuffix = RegExp(
+    r'^(.+)([+-])(\d+(?:\.\d+)?)%$',
+  ).firstMatch(expression);
+  if (percentSuffix != null) {
+    final base = _evaluatePriceExpression(percentSuffix.group(1)!);
+    final percent = double.parse(percentSuffix.group(3)!);
+    final factor = percent / 100;
+    return percentSuffix.group(2) == '-'
+        ? base * (1 - factor)
+        : base * (1 + factor);
+  }
+
+  if (expression.contains('%')) {
+    throw const FormatException('Percentuale non valida nella formula.');
+  }
+  return _evaluateArithmeticExpression(expression);
+}
+
+double _evaluateArithmeticExpression(String expression) {
+  final matches = RegExp(r'\d+(?:\.\d+)?|[+\-*/]').allMatches(expression);
+  final tokens = matches.map((match) => match.group(0)!).toList();
+  if (tokens.isEmpty || tokens.join() != expression || tokens.length.isEven) {
+    throw const FormatException('Importo o formula non validi.');
+  }
+
+  final values = <double>[];
+  final lowPrecedenceOps = <String>[];
+  var current = double.tryParse(tokens.first);
+  if (current == null) {
+    throw const FormatException('Importo o formula non validi.');
+  }
+
+  for (var index = 1; index < tokens.length; index += 2) {
+    final op = tokens[index];
+    final operand = double.tryParse(tokens[index + 1]);
+    if (operand == null) {
+      throw const FormatException('Importo o formula non validi.');
+    }
+    if (op == '*') {
+      current *= operand;
+    } else if (op == '/') {
+      if (operand == 0) {
+        throw const FormatException('Divisione per zero non valida.');
+      }
+      current /= operand;
+    } else if (op == '+' || op == '-') {
+      values.add(current);
+      lowPrecedenceOps.add(op);
+      current = operand;
+    } else {
+      throw const FormatException('Operatore non valido.');
+    }
+  }
+  values.add(current);
+
+  var result = values.first;
+  for (var index = 0; index < lowPrecedenceOps.length; index++) {
+    result = lowPrecedenceOps[index] == '+'
+        ? result + values[index + 1]
+        : result - values[index + 1];
+  }
+  return result;
+}
+'''
+          path.write_text(text)
+
+          # Product editor: purchase price accepts formulas and resolves them on Enter.
+          path = Path('lib/pages/product_editor_dialog.dart')
+          text = path.read_text()
+          text = replace_once(
+              text,
+              """  String _itEn(String it, String en) => AppStrings.isEnglish ? en : it;
+
+  @override
+""",
+              """  String _itEn(String it, String en) => AppStrings.isEnglish ? en : it;
+
+  void _evaluatePurchaseFormula() {
+    try {
+      final cents = parsePriceFormulaCents(_purchase.text);
+      if (cents == null) return;
+      final formatted = _moneyInput(cents);
+      _purchase.value = TextEditingValue(
+        text: formatted,
+        selection: TextSelection.collapsed(offset: formatted.length),
+      );
+      setState(() => _error = null);
+    } catch (error) {
+      setState(() => _error = error
+          .toString()
+          .replaceFirst('FormatException: ', '')
+          .replaceFirst('Bad state: ', '')
+          .replaceFirst('Invalid argument(s): ', ''));
+    }
+  }
+
+  @override
+""",
+              'product purchase formula method',
+          )
+          text = replace_once(
+              text,
+              """        purchasePriceCents: parseEuroCents(_purchase.text),
+        salePriceCents: parseEuroCents(_sale.text),
+""",
+              """        purchasePriceCents: parsePriceFormulaCents(_purchase.text),
+        salePriceCents: parseEuroCents(_sale.text),
+""",
+              'product purchase parser',
+          )
+          text = replace_once(
+              text,
+              """                  child: TextField(
+                    controller: _purchase,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    decoration: InputDecoration(
+                      border: const OutlineInputBorder(),
+                      labelText: _itEn(
+                        'Prezzo acquisto prodotto $currency',
+                        'Product purchase price $currency',
+                      ),
+                    ),
+                  ),
+""",
+              """                  child: TextField(
+                    controller: _purchase,
+                    keyboardType: TextInputType.text,
+                    textInputAction: TextInputAction.done,
+                    onSubmitted: (_) => _evaluatePurchaseFormula(),
+                    decoration: InputDecoration(
+                      border: const OutlineInputBorder(),
+                      labelText: _itEn(
+                        'Prezzo acquisto prodotto $currency',
+                        'Product purchase price $currency',
+                      ),
+                      helperText: _itEn(
+                        'Accetta formule, es. 200-40% → 120',
+                        'Formulas supported, e.g. 200-40% → 120',
+                      ),
+                    ),
+                  ),
+""",
+              'product purchase field',
+          )
+          text = replace_once(
+              text,
+              """class _VariantEditorState extends State<_VariantEditor> {
+  String _itEn(String it, String en) => AppStrings.isEnglish ? en : it;
+
+  void _generateSku() {
+""",
+              """class _VariantEditorState extends State<_VariantEditor> {
+  String _itEn(String it, String en) => AppStrings.isEnglish ? en : it;
+
+  void _evaluatePurchaseFormula() {
+    try {
+      final cents = parsePriceFormulaCents(widget.form.purchase.text);
+      if (cents == null) return;
+      final formatted = _VariantForm._moneyValue(cents);
+      widget.form.purchase.value = TextEditingValue(
+        text: formatted,
+        selection: TextSelection.collapsed(offset: formatted.length),
+      );
+    } catch (error) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            error.toString().replaceFirst('FormatException: ', ''),
+          ),
+        ),
+      );
+    }
+  }
+
+  void _generateSku() {
+""",
+              'variant purchase formula method',
+          )
+          text = replace_once(
+              text,
+              """              child: TextField(
+                controller: widget.form.purchase,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                decoration: InputDecoration(
+                  border: const OutlineInputBorder(),
+                  labelText: _itEn(
+                    'Override acquisto $currency',
+                    'Purchase override $currency',
+                  ),
+                  hintText: _itEn('Eredita prodotto', 'Use product price'),
+                ),
+              ),
+""",
+              """              child: TextField(
+                controller: widget.form.purchase,
+                keyboardType: TextInputType.text,
+                textInputAction: TextInputAction.done,
+                onSubmitted: (_) => _evaluatePurchaseFormula(),
+                decoration: InputDecoration(
+                  border: const OutlineInputBorder(),
+                  labelText: _itEn(
+                    'Override acquisto $currency',
+                    'Purchase override $currency',
+                  ),
+                  hintText: _itEn('Eredita prodotto', 'Use product price'),
+                ),
+              ),
+""",
+              'variant purchase field',
+          )
+          text = replace_once(
+              text,
+              """        purchasePriceCents: parseEuroCents(purchase.text),
+        salePriceCents: parseEuroCents(sale.text),
+""",
+              """        purchasePriceCents: parsePriceFormulaCents(purchase.text),
+        salePriceCents: parseEuroCents(sale.text),
+""",
+              'variant purchase parser',
+          )
+          path.write_text(text)
+
+          # OTA: centralize exact platform/architecture matching and validate beta version in asset name.
+          path = Path('lib/services/update_service.dart')
+          text = path.read_text()
+          text = replace_once(
+              text,
+              """bool isBetaBranch(String branch) => branch.trim().toLowerCase() == 'flutter';
+""",
+              """bool updateAssetMatchesFor({
+  required String assetName,
+  required String operatingSystem,
+  required Abi abi,
+  required bool beta,
+}) {
+  final normalized = assetName.trim();
+  if (!beta) {
+    return normalized == updateAssetNameFor(
+      operatingSystem: operatingSystem,
+      abi: abi,
+    );
+  }
+
+  final suffix = betaUpdateAssetSuffixFor(
+    operatingSystem: operatingSystem,
+    abi: abi,
+  );
+  const prefix = 'LocalStoreManagement-';
+  if (!normalized.startsWith(prefix) || !normalized.endsWith(suffix)) {
+    return false;
+  }
+  final version = normalized.substring(
+    prefix.length,
+    normalized.length - suffix.length,
+  );
+  return versionBelongsToUpdateChannel(version, beta: true);
+}
+
+bool isBetaBranch(String branch) => branch.trim().toLowerCase() == 'flutter';
+""",
+              'OTA asset matcher helper',
+          )
+          text = replace_once(
+              text,
+              """  String _expectedBetaAssetSuffix() => betaUpdateAssetSuffixFor(
+        operatingSystem: Platform.operatingSystem,
+        abi: Abi.current(),
+      );
+
+""",
+              """""",
+              'remove private beta suffix helper',
+          )
+          text = replace_once(
+              text,
+              """    final expected = _expectedAssetName();
+    final betaSuffix = beta ? _expectedBetaAssetSuffix() : null;
+
+    for (final raw in (release['assets'] as List<dynamic>? ?? const [])) {
+      final asset = raw as Map<String, dynamic>;
+      final name = asset['name'] as String? ?? '';
+      final matches = beta ? name.endsWith(betaSuffix!) : name == expected;
+      if (matches) return asset['url'] as String?;
+    }
+""",
+              """    for (final raw in (release['assets'] as List<dynamic>? ?? const [])) {
+      final asset = raw as Map<String, dynamic>;
+      final name = asset['name'] as String? ?? '';
+      final matches = updateAssetMatchesFor(
+        assetName: name,
+        operatingSystem: Platform.operatingSystem,
+        abi: Abi.current(),
+        beta: beta,
+      );
+      if (matches) return asset['url'] as String?;
+    }
+""",
+              'OTA release asset selection',
+          )
+          text = replace_once(
+              text,
+              "static const currentVersion = '0.1.6-b10';",
+              "static const currentVersion = '0.1.6-b11';",
+              'runtime beta version',
+          )
+          path.write_text(text)
+
+          # OTA regression tests: explicitly reject cross-architecture assets, including macOS Intel/Apple Silicon.
+          path = Path('test/update_service_test.dart')
+          text = path.read_text()
+          marker = """  test('only Flutter is the beta branch', () {
+"""
+          tests = """  test('beta OTA never crosses Windows architectures', () {
+    const x64Asset =
+        'LocalStoreManagement-0.1.6-b11-BETA-Setup-win-x64.exe';
+    const arm64Asset =
+        'LocalStoreManagement-0.1.6-b11-BETA-Setup-win-arm64.exe';
+
+    expect(
+      updateAssetMatchesFor(
+        assetName: x64Asset,
+        operatingSystem: 'windows',
+        abi: Abi.windowsX64,
+        beta: true,
+      ),
+      isTrue,
+    );
+    expect(
+      updateAssetMatchesFor(
+        assetName: arm64Asset,
+        operatingSystem: 'windows',
+        abi: Abi.windowsX64,
+        beta: true,
+      ),
+      isFalse,
+    );
+    expect(
+      updateAssetMatchesFor(
+        assetName: x64Asset,
+        operatingSystem: 'windows',
+        abi: Abi.windowsArm64,
+        beta: true,
+      ),
+      isFalse,
+    );
+  });
+
+  test('beta OTA never crosses macOS Intel and Apple Silicon', () {
+    const x64Asset = 'LocalStoreManagement-0.1.6-b11-BETA-macos-x64.dmg';
+    const arm64Asset =
+        'LocalStoreManagement-0.1.6-b11-BETA-macos-arm64.dmg';
+
+    expect(
+      updateAssetMatchesFor(
+        assetName: x64Asset,
+        operatingSystem: 'macos',
+        abi: Abi.macosX64,
+        beta: true,
+      ),
+      isTrue,
+    );
+    expect(
+      updateAssetMatchesFor(
+        assetName: arm64Asset,
+        operatingSystem: 'macos',
+        abi: Abi.macosX64,
+        beta: true,
+      ),
+      isFalse,
+    );
+    expect(
+      updateAssetMatchesFor(
+        assetName: arm64Asset,
+        operatingSystem: 'macos',
+        abi: Abi.macosArm64,
+        beta: true,
+      ),
+      isTrue,
+    );
+    expect(
+      updateAssetMatchesFor(
+        assetName: x64Asset,
+        operatingSystem: 'macos',
+        abi: Abi.macosArm64,
+        beta: true,
+      ),
+      isFalse,
+    );
+  });
+
+  test('beta OTA requires a beta version in the asset name', () {
+    expect(
+      updateAssetMatchesFor(
+        assetName: 'LocalStoreManagement-0.1.6-BETA-Setup-win-x64.exe',
+        operatingSystem: 'windows',
+        abi: Abi.windowsX64,
+        beta: true,
+      ),
+      isFalse,
+    );
+  });
+
+"""
+          text = replace_once(text, marker, tests + marker, 'OTA architecture tests')
+          path.write_text(text)
+
+          # Formula parser regression tests.
+          Path('test/price_formula_test.dart').write_text(r'''import 'package:flutter_test/flutter_test.dart';
+import 'package:local_store_management/core/formatters.dart';
+
+void main() {
+  test('purchase price formula applies percentage discount', () {
+    expect(parsePriceFormulaCents('200-40%'), 12000);
+    expect(parsePriceFormulaCents('200,00 - 40%'), 12000);
+  });
+
+  test('purchase price formula supports chained percentages', () {
+    expect(parsePriceFormulaCents('200-40%-10%'), 10800);
+    expect(parsePriceFormulaCents('100+20%'), 12000);
+  });
+
+  test('purchase price formula honors multiplication precedence', () {
+    expect(parsePriceFormulaCents('10+5*2'), 2000);
+    expect(parsePriceFormulaCents('100/4'), 2500);
+  });
+
+  test('purchase price formula rejects invalid expressions', () {
+    expect(() => parsePriceFormulaCents('200-abc'), throwsFormatException);
+    expect(() => parsePriceFormulaCents('100/0'), throwsFormatException);
+  });
+}
+''')
+
+          # Advance beta version.
+          path = Path('pubspec.yaml')
+          text = path.read_text()
+          text = replace_once(text, 'version: 0.1.6-b10', 'version: 0.1.6-b11', 'pubspec beta version')
+          path.write_text(text)
+          PY
+
+      - name: Remove one-shot workflow files and commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f .apply-export-ota-price .github/workflows/apply-export-ota-price.yml
+          git config user.name 'MaydayAlaska'
+          git config user.email '43659965+MaydayAlaska@users.noreply.github.com'
+          git add -A
+          git diff --cached --check
+          git commit -m 'feat: improve export pricing OTA and purchase formulas'
+          git push origin HEAD:Flutter
