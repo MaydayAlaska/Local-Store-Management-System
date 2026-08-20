@@ -14,7 +14,7 @@ class GlassTheme {
     );
 
     final glass = isDark ? const Color(0x1FFFFFFF) : const Color(0x8FFFFFFF);
-    final glassStrong = isDark ? const Color(0xD9232936) : const Color(0xEFFFFFFF);
+    final glassStrong = isDark ? const Color(0xF2232936) : const Color(0xFAFFFFFF);
     final glassSubtle = isDark ? const Color(0x14FFFFFF) : const Color(0x70FFFFFF);
     final border = isDark ? const Color(0x38FFFFFF) : const Color(0xA8FFFFFF);
     final softBorder = isDark ? const Color(0x24FFFFFF) : const Color(0x72FFFFFF);
@@ -24,12 +24,28 @@ class GlassTheme {
           borderSide: BorderSide(color: color, width: width),
         );
 
+    final menuShape = RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(16),
+      side: BorderSide(color: border),
+    );
+    final menuStyle = MenuStyle(
+      backgroundColor: WidgetStatePropertyAll(glassStrong),
+      surfaceTintColor: const WidgetStatePropertyAll(Colors.transparent),
+      shadowColor: WidgetStatePropertyAll(
+        Colors.black.withValues(alpha: isDark ? 0.42 : 0.18),
+      ),
+      elevation: const WidgetStatePropertyAll(8),
+      shape: WidgetStatePropertyAll(menuShape),
+    );
+
     return ThemeData(
       useMaterial3: true,
       brightness: brightness,
       colorScheme: scheme,
       scaffoldBackgroundColor: Colors.transparent,
-      canvasColor: Colors.transparent,
+      // DropdownButton/DropdownButtonFormField usano ancora canvasColor per
+      // la superficie del menu. Non deve quindi essere trasparente.
+      canvasColor: glassStrong,
       visualDensity: VisualDensity.compact,
       cardTheme: CardThemeData(
         color: glass,
@@ -48,7 +64,10 @@ class GlassTheme {
         contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         border: inputBorder(softBorder),
         enabledBorder: inputBorder(softBorder),
-        focusedBorder: inputBorder(scheme.primary.withValues(alpha: 0.7), width: 1.5),
+        focusedBorder: inputBorder(
+          scheme.primary.withValues(alpha: 0.7),
+          width: 1.5,
+        ),
         errorBorder: inputBorder(scheme.error.withValues(alpha: 0.75)),
         focusedErrorBorder: inputBorder(scheme.error, width: 1.5),
       ),
@@ -56,8 +75,13 @@ class GlassTheme {
         backgroundColor: Colors.transparent,
         indicatorColor: scheme.primary.withValues(alpha: isDark ? 0.24 : 0.16),
         selectedIconTheme: IconThemeData(color: scheme.primary),
-        selectedLabelTextStyle: TextStyle(color: scheme.primary, fontWeight: FontWeight.w700),
-        unselectedIconTheme: IconThemeData(color: scheme.onSurfaceVariant.withValues(alpha: 0.82)),
+        selectedLabelTextStyle: TextStyle(
+          color: scheme.primary,
+          fontWeight: FontWeight.w700,
+        ),
+        unselectedIconTheme: IconThemeData(
+          color: scheme.onSurfaceVariant.withValues(alpha: 0.82),
+        ),
         unselectedLabelTextStyle: TextStyle(color: scheme.onSurfaceVariant),
       ),
       dividerTheme: DividerThemeData(
@@ -75,14 +99,14 @@ class GlassTheme {
           side: BorderSide(color: border),
         ),
       ),
+      menuTheme: MenuThemeData(style: menuStyle),
+      dropdownMenuTheme: DropdownMenuThemeData(menuStyle: menuStyle),
       popupMenuTheme: PopupMenuThemeData(
         color: glassStrong,
         surfaceTintColor: Colors.transparent,
-        elevation: 4,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-          side: BorderSide(color: border),
-        ),
+        elevation: 8,
+        shadowColor: Colors.black.withValues(alpha: isDark ? 0.42 : 0.18),
+        shape: menuShape,
       ),
       snackBarTheme: SnackBarThemeData(
         behavior: SnackBarBehavior.floating,
