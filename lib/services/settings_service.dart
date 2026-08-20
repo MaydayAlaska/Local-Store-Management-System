@@ -5,6 +5,7 @@ import 'package:image/image.dart' as img;
 import 'package:path/path.dart' as p;
 
 import '../core/app_paths.dart';
+import '../l10n/app_strings.dart';
 import '../models/app_settings.dart';
 
 class SettingsService {
@@ -14,7 +15,9 @@ class SettingsService {
     try {
       final decoded = jsonDecode(file.readAsStringSync());
       if (decoded is! Map<String, dynamic>) return AppSettings.defaults;
-      return AppSettings.fromJson(decoded);
+      final settings = AppSettings.fromJson(decoded);
+      if (AppStrings.hasLanguage(settings.languageCode)) return settings;
+      return settings.copyWith(languageCode: AppStrings.fallbackLanguageCode);
     } catch (_) {
       return AppSettings.defaults;
     }
@@ -53,10 +56,10 @@ class SettingsService {
         AppSettings.supportedThemeModes.contains(themeMode.toLowerCase())
             ? themeMode.toLowerCase()
             : AppSettings.defaults.themeMode;
-    final normalizedLanguage =
-        AppSettings.supportedLanguages.contains(languageCode.toLowerCase())
-            ? languageCode.toLowerCase()
-            : AppSettings.defaults.languageCode;
+    final requestedLanguage = AppStrings.normalizeLanguageCode(languageCode);
+    final normalizedLanguage = AppStrings.hasLanguage(requestedLanguage)
+        ? requestedLanguage
+        : AppStrings.fallbackLanguageCode;
     final settings = AppSettings(
       shopName: name,
       iconFileName: icon,
