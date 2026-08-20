@@ -591,33 +591,6 @@ class _CashPageState extends State<CashPage> {
                               ),
                       ),
                     ),
-                    const SizedBox(height: 8),
-                    Expanded(
-                      child: LayoutBuilder(
-                        builder: (context, constraints) {
-                          final keypadWidth = constraints.maxWidth > 500
-                              ? 500.0
-                              : constraints.maxWidth;
-                          final keypadHeight = constraints.maxHeight > 460
-                              ? 460.0
-                              : constraints.maxHeight;
-                          return Align(
-                            alignment: Alignment.topCenter,
-                            child: SizedBox(
-                              width: keypadWidth,
-                              height: keypadHeight,
-                              child: _CashKeypad(
-                                priceText: formatMoney(_keypadPriceCents),
-                                onKey: _keypadInsert,
-                                onBackspace: _keypadBackspace,
-                                onClear: _keypadClear,
-                                onSubmit: _keypadSubmit,
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-                    ),
                   ],
                 ),
               ),
@@ -793,6 +766,23 @@ class _CashPageState extends State<CashPage> {
                               style: Theme.of(context).textTheme.headlineMedium,
                             ),
                           ]),
+                          const SizedBox(height: 12),
+                          Align(
+                            alignment: Alignment.center,
+                            child: SizedBox(
+                              width: 500,
+                              height: (MediaQuery.sizeOf(context).height * 0.32)
+                                  .clamp(300.0, 460.0)
+                                  .toDouble(),
+                              child: _CashKeypad(
+                                priceText: formatMoney(_keypadPriceCents),
+                                onKey: _keypadInsert,
+                                onBackspace: _keypadBackspace,
+                                onClear: _keypadClear,
+                                onSubmit: _keypadSubmit,
+                              ),
+                            ),
+                          ),
                           const SizedBox(height: 8),
                           Text(
                             _cartStatus,
