@@ -38,7 +38,7 @@ jobs:
           set -euo pipefail
           python3 - <<'PY'
           import xml.etree.ElementTree as ET
-          ET.parse('packaging/linux/local-store-management.appdata.xml')
+          ET.parse('packaging/linux/io.github.MaydayAlaska.LocalStoreManagementSystem.metainfo.xml')
           PY
 
       - name: Setup Flutter
@@ -525,13 +525,15 @@ jobs:
           set -euo pipefail
           rm -rf AppDir dist
           mkdir -p AppDir/usr/bin \
+                   AppDir/usr/share/applications \
                    AppDir/usr/share/icons/hicolor/64x64/apps \
                    AppDir/usr/share/metainfo \
                    dist
           cp -a build/linux/${{ matrix.build_arch }}/release/bundle/. AppDir/usr/bin/
           cp packaging/linux/AppRun AppDir/AppRun
           cp packaging/linux/local-store-management.desktop AppDir/local-store-management.desktop
-          cp packaging/linux/local-store-management.appdata.xml AppDir/usr/share/metainfo/local-store-management.appdata.xml
+          cp packaging/linux/local-store-management.desktop AppDir/usr/share/applications/local-store-management.desktop
+          cp packaging/linux/io.github.MaydayAlaska.LocalStoreManagementSystem.metainfo.xml AppDir/usr/share/metainfo/io.github.MaydayAlaska.LocalStoreManagementSystem.metainfo.xml
           base64 --decode "${ICON_BASE64}" > AppDir/local-store-management.png
           cp AppDir/local-store-management.png AppDir/usr/share/icons/hicolor/64x64/apps/local-store-management.png
           ln -s local-store-management.png AppDir/.DirIcon
@@ -563,7 +565,7 @@ jobs:
                    DebRoot/usr/share/metainfo
           cp -a build/linux/${{ matrix.build_arch }}/release/bundle/. DebRoot/usr/lib/local-store-management/
           cp packaging/linux/local-store-management.desktop DebRoot/usr/share/applications/local-store-management.desktop
-          cp packaging/linux/local-store-management.appdata.xml DebRoot/usr/share/metainfo/local-store-management.appdata.xml
+          cp packaging/linux/io.github.MaydayAlaska.LocalStoreManagementSystem.metainfo.xml DebRoot/usr/share/metainfo/io.github.MaydayAlaska.LocalStoreManagementSystem.metainfo.xml
           base64 --decode "${ICON_BASE64}" > DebRoot/usr/share/icons/hicolor/64x64/apps/local-store-management.png
           cat > DebRoot/usr/bin/local_store_management <<'EOF'
           #!/bin/sh

@@ -11,6 +11,10 @@
       prodotti, magazzino, vendite, clienti, ordini, etichette e periferiche locali.
     </p>
   </description>
+  <developer id="io.github.MaydayAlaska">
+    <name>MaydayAlaska</name>
+  </developer>
+  <content_rating type="oars-1.1"/>
   <launchable type="desktop-id">local-store-management.desktop</launchable>
   <provides>
     <binary>local_store_management</binary>
