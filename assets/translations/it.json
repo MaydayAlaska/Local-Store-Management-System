@@ -25,6 +25,10 @@
     "save_settings": "Salva impostazioni",
     "saving": "Salvataggio…",
     "data_path": "Dati",
+    "database_path": "Percorso database",
+    "database_active_path": "Database attivo",
+    "database_path_help": "Inserisci il percorso completo del file SQLite. Sono supportati file locali, percorsi UNC/LAN e condivisioni o mount di rete raggiungibili anche tramite VPN. Il nuovo percorso viene usato al riavvio dell'applicazione.",
+    "database_restart_required": "Impostazioni salvate. Il nuovo percorso database verrà usato al prossimo avvio.",
     "appearance_language": "Aspetto, lingua e valuta",
     "theme": "Tema",
     "theme_system": "Sistema",
@@ -112,6 +116,6 @@
     "cancel": "Annulla",
     "translation_files": "File di traduzione",
     "translation_folder": "Cartella traduzioni",
-    "translation_help": "Per aggiungere una lingua, copia un file JSON esistente, modifica languageCode e languageName e traduci tutti i valori della sezione strings. Riavvia l’applicazione per caricare nuovi file."
+    "translation_help": "Per aggiungere una lingua, copia un file JSON esistente, modifica languageCode e languageName e traduci tutti i valori della sezione strings. Premi il pulsante di aggiornamento accanto al menu Lingua per rileggere i file."
   }
 }
