@@ -11,6 +11,7 @@ import 'l10n/app_strings.dart';
 import 'pages/startup_error_page.dart';
 import 'services/app_services.dart';
 import 'services/birth_place_service.dart';
+import 'services/database_location_service.dart';
 
 void main() {
   runZonedGuarded(() async {
@@ -33,9 +34,14 @@ Future<void> _bootstrap() async {
     await AppStrings.initialize();
     await BirthPlaceService.initialize();
 
-    database = DatabaseService(AppPaths.databasePath);
+    final databaseLocation = DatabaseLocationService();
+    final activeDatabasePath = databaseLocation.load();
+    database = DatabaseService(activeDatabasePath);
     await database.initialize();
-    final services = AppServices(database);
+    final services = AppServices(
+      database,
+      databaseLocation: databaseLocation,
+    );
     final settings = services.settings.load();
 
     const windowOptions = WindowOptions(
@@ -53,7 +59,10 @@ Future<void> _bootstrap() async {
     });
 
     runApp(StoreApp(services: services));
-    AppLog.info('Startup', 'Applicazione Flutter avviata correttamente.');
+    AppLog.info(
+      'Startup',
+      'Applicazione Flutter avviata correttamente. Database: $activeDatabasePath',
+    );
   } catch (error, stackTrace) {
     AppLog.error('Application startup failed', error, stackTrace);
     try {
