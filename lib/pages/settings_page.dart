@@ -29,6 +29,7 @@ class SettingsPage extends StatefulWidget {
 class _SettingsPageState extends State<SettingsPage> {
   late final TextEditingController _shopName;
   late final TextEditingController _vatPercent;
+  late final TextEditingController _databasePath;
   late bool _showName;
   late bool _showLogo;
   late String _currencyCode;
@@ -56,6 +57,9 @@ class _SettingsPageState extends State<SettingsPage> {
     _shopName = TextEditingController(text: widget.current.shopName);
     _vatPercent = TextEditingController(
       text: _formatPercent(widget.current.vatPercent),
+    );
+    _databasePath = TextEditingController(
+      text: widget.services.databaseLocation.load(),
     );
     _showName = widget.current.showShopNameInMenu;
     _showLogo = widget.current.showLogoInMenu;
@@ -91,6 +95,7 @@ class _SettingsPageState extends State<SettingsPage> {
   void dispose() {
     _shopName.dispose();
     _vatPercent.dispose();
+    _databasePath.dispose();
     super.dispose();
   }
 
@@ -113,6 +118,10 @@ class _SettingsPageState extends State<SettingsPage> {
             _vatPercent.text.trim().replaceAll(',', '.'),
           ) ??
           widget.current.vatPercent;
+      final configuredDatabasePath =
+          widget.services.databaseLocation.save(_databasePath.text);
+      final databasePathChanged =
+          configuredDatabasePath != widget.services.database.path;
       final settings = widget.services.settings.save(
         shopName: _shopName.text,
         showShopNameInMenu: _showName,
@@ -131,11 +140,16 @@ class _SettingsPageState extends State<SettingsPage> {
       setState(() {
         _iconSource = null;
         _logoSource = null;
+        _databasePath.text = configuredDatabasePath;
         _vatPercent.text = _formatPercent(settings.vatPercent);
         _labelPrinters = List<LabelPrinterProfile>.of(
           settings.labelPrinterProfiles,
         );
-        _status = AppStrings.t('settings_saved');
+        _status = AppStrings.t(
+          databasePathChanged
+              ? 'database_restart_required'
+              : 'settings_saved',
+        );
       });
     } catch (error) {
       if (mounted) {
@@ -549,7 +563,8 @@ class _SettingsPageState extends State<SettingsPage> {
     if (result == null || !mounted) return;
 
     final duplicate = _labelPrinters.any((profile) {
-      if (profile.id == result.id || profile.connectionType != result.connectionType) {
+      if (profile.id == result.id ||
+          profile.connectionType != result.connectionType) {
         return false;
       }
       if (result.isTcp) {
@@ -560,15 +575,17 @@ class _SettingsPageState extends State<SettingsPage> {
           profile.systemPrinterUrl == result.systemPrinterUrl;
     });
     if (duplicate) {
-      setState(() => _status = result.isTcp
-          ? _itEn(
-              'Esiste già un profilo per ${result.host}:${result.port}.',
-              'A profile for ${result.host}:${result.port} already exists.',
-            )
-          : _itEn(
-              'Questa stampante USB/sistema è già configurata.',
-              'This USB/system printer is already configured.',
-            ));
+      setState(
+        () => _status = result.isTcp
+            ? _itEn(
+                'Esiste già un profilo per ${result.host}:${result.port}.',
+                'A profile for ${result.host}:${result.port} already exists.',
+              )
+            : _itEn(
+                'Questa stampante USB/sistema è già configurata.',
+                'This USB/system printer is already configured.',
+              ),
+      );
       return;
     }
 
@@ -780,9 +797,11 @@ class _SettingsPageState extends State<SettingsPage> {
                               },
                         icon: const Icon(Icons.app_shortcut),
                         label: Text(
-                          AppStrings.t(_iconSource == null
-                              ? 'change_app_icon'
-                              : 'app_icon_selected'),
+                          AppStrings.t(
+                            _iconSource == null
+                                ? 'change_app_icon'
+                                : 'app_icon_selected',
+                          ),
                         ),
                       ),
                       OutlinedButton.icon(
@@ -796,9 +815,11 @@ class _SettingsPageState extends State<SettingsPage> {
                               },
                         icon: const Icon(Icons.image_outlined),
                         label: Text(
-                          AppStrings.t(_logoSource == null
-                              ? 'change_shop_logo'
-                              : 'shop_logo_selected'),
+                          AppStrings.t(
+                            _logoSource == null
+                                ? 'change_shop_logo'
+                                : 'shop_logo_selected',
+                          ),
                         ),
                       ),
                     ],
@@ -806,6 +827,23 @@ class _SettingsPageState extends State<SettingsPage> {
                   const SizedBox(height: 8),
                   Text(
                     '${AppStrings.t('data_path')}: ${AppPaths.dataDirectory}',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: _databasePath,
+                    enabled: !_saving,
+                    decoration: InputDecoration(
+                      border: const OutlineInputBorder(),
+                      labelText: AppStrings.t('database_path'),
+                      helperText: AppStrings.t('database_path_help'),
+                      helperMaxLines: 3,
+                      prefixIcon: const Icon(Icons.storage_rounded),
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '${AppStrings.t('database_active_path')}: ${widget.services.database.path}',
                     style: Theme.of(context).textTheme.bodySmall,
                   ),
                 ],
@@ -973,7 +1011,8 @@ class _SettingsPageState extends State<SettingsPage> {
                     ..._labelPrinters.map((profile) {
                       final testMessage = _printerTestMessages[profile.id];
                       final testing = _testingPrinterIds.contains(profile.id);
-                      final testSuccess = _printerTestSuccess.contains(profile.id);
+                      final testSuccess =
+                          _printerTestSuccess.contains(profile.id);
                       final subtitle = profile.isTcp
                           ? '${profile.host}:${profile.port} · ${profile.protocolLabel} · ${profile.dpi} dpi · ${_dimensionText(profile.defaultWidthMm)}×${_dimensionText(profile.defaultHeightMm)} mm'
                           : '${_itEn('USB / sistema', 'USB / system')} · ${profile.systemPrinterName ?? _itEn('stampante configurata', 'configured printer')} · ${_dimensionText(profile.defaultWidthMm)}×${_dimensionText(profile.defaultHeightMm)} mm';
@@ -996,7 +1035,8 @@ class _SettingsPageState extends State<SettingsPage> {
                                 subtitle: Text(subtitle),
                                 trailing: Wrap(
                                   spacing: 2,
-                                  crossAxisAlignment: WrapCrossAlignment.center,
+                                  crossAxisAlignment:
+                                      WrapCrossAlignment.center,
                                   children: [
                                     Switch(
                                       value: profile.enabled,
@@ -1004,12 +1044,16 @@ class _SettingsPageState extends State<SettingsPage> {
                                           ? null
                                           : (value) {
                                               setState(() {
-                                                final index = _labelPrinters.indexWhere(
-                                                  (item) => item.id == profile.id,
+                                                final index = _labelPrinters
+                                                    .indexWhere(
+                                                  (item) =>
+                                                      item.id == profile.id,
                                                 );
                                                 if (index >= 0) {
                                                   _labelPrinters[index] =
-                                                      profile.copyWith(enabled: value);
+                                                      profile.copyWith(
+                                                    enabled: value,
+                                                  );
                                                 }
                                               });
                                             },
@@ -1043,9 +1087,15 @@ class _SettingsPageState extends State<SettingsPage> {
                               ),
                               if (testMessage != null)
                                 Padding(
-                                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
+                                  padding: const EdgeInsets.fromLTRB(
+                                    16,
+                                    0,
+                                    16,
+                                    14,
+                                  ),
                                   child: Row(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       if (testing)
                                         const SizedBox(
@@ -1062,8 +1112,12 @@ class _SettingsPageState extends State<SettingsPage> {
                                               : Icons.error_outline,
                                           size: 18,
                                           color: testSuccess
-                                              ? Theme.of(context).colorScheme.primary
-                                              : Theme.of(context).colorScheme.error,
+                                              ? Theme.of(context)
+                                                  .colorScheme
+                                                  .primary
+                                              : Theme.of(context)
+                                                  .colorScheme
+                                                  .error,
                                         ),
                                       const SizedBox(width: 8),
                                       Expanded(
@@ -1136,7 +1190,9 @@ class _SettingsPageState extends State<SettingsPage> {
                         onPressed: _checking ? null : _checkUpdates,
                         icon: const Icon(Icons.system_update),
                         label: Text(
-                          AppStrings.t(_checking ? 'checking' : 'check_updates'),
+                          AppStrings.t(
+                            _checking ? 'checking' : 'check_updates',
+                          ),
                         ),
                       ),
                       if (_update?.updateAvailable == true &&
