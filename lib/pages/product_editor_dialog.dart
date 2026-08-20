@@ -37,6 +37,25 @@ class _ProductEditorDialogState extends State<ProductEditorDialog> {
 
   String _itEn(String it, String en) => AppStrings.isEnglish ? en : it;
 
+  void _evaluatePurchaseFormula() {
+    try {
+      final cents = parsePriceFormulaCents(_purchase.text);
+      if (cents == null) return;
+      final formatted = _moneyInput(cents);
+      _purchase.value = TextEditingValue(
+        text: formatted,
+        selection: TextSelection.collapsed(offset: formatted.length),
+      );
+      setState(() => _error = null);
+    } catch (error) {
+      setState(() => _error = error
+          .toString()
+          .replaceFirst('FormatException: ', '')
+          .replaceFirst('Bad state: ', '')
+          .replaceFirst('Invalid argument(s): ', ''));
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -120,7 +139,7 @@ class _ProductEditorDialogState extends State<ProductEditorDialog> {
         name: _name.text,
         categoryId: _categoryId,
         brandId: _brandId,
-        purchasePriceCents: parseEuroCents(_purchase.text),
+        purchasePriceCents: parsePriceFormulaCents(_purchase.text),
         salePriceCents: parseEuroCents(_sale.text),
         notes: _notes.text,
         isActive: _active,
@@ -237,12 +256,18 @@ class _ProductEditorDialogState extends State<ProductEditorDialog> {
                 Expanded(
                   child: TextField(
                     controller: _purchase,
-                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    keyboardType: TextInputType.text,
+                    textInputAction: TextInputAction.done,
+                    onSubmitted: (_) => _evaluatePurchaseFormula(),
                     decoration: InputDecoration(
                       border: const OutlineInputBorder(),
                       labelText: _itEn(
                         'Prezzo acquisto prodotto $currency',
                         'Product purchase price $currency',
+                      ),
+                      helperText: _itEn(
+                        'Accetta formule, es. 200-40% → 120',
+                        'Formulas supported, e.g. 200-40% → 120',
                       ),
                     ),
                   ),
@@ -374,6 +399,26 @@ class _VariantEditor extends StatefulWidget {
 class _VariantEditorState extends State<_VariantEditor> {
   String _itEn(String it, String en) => AppStrings.isEnglish ? en : it;
 
+  void _evaluateVariantPurchaseFormula() {
+    try {
+      final cents = parsePriceFormulaCents(widget.form.purchase.text);
+      if (cents == null) return;
+      final formatted = _VariantForm._moneyValue(cents);
+      widget.form.purchase.value = TextEditingValue(
+        text: formatted,
+        selection: TextSelection.collapsed(offset: formatted.length),
+      );
+    } catch (error) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            error.toString().replaceFirst('FormatException: ', ''),
+          ),
+        ),
+      );
+    }
+  }
+
   void _generateSku() {
     final sku = widget.onGenerateSku();
     widget.form.sku.value = TextEditingValue(
@@ -483,7 +528,9 @@ class _VariantEditorState extends State<_VariantEditor> {
             Expanded(
               child: TextField(
                 controller: widget.form.purchase,
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                keyboardType: TextInputType.text,
+                textInputAction: TextInputAction.done,
+                onSubmitted: (_) => _evaluateVariantPurchaseFormula(),
                 decoration: InputDecoration(
                   border: const OutlineInputBorder(),
                   labelText: _itEn(
@@ -587,7 +634,7 @@ class _VariantForm {
         sku: sku.text,
         variant: variant.text,
         size: size.text,
-        purchasePriceCents: parseEuroCents(purchase.text),
+        purchasePriceCents: parsePriceFormulaCents(purchase.text),
         salePriceCents: parseEuroCents(sale.text),
         isActive: active,
         barcodes: barcodes.text
