@@ -25,6 +25,10 @@
     "save_settings": "Save settings",
     "saving": "Saving…",
     "data_path": "Data",
+    "database_path": "Database path",
+    "database_active_path": "Active database",
+    "database_path_help": "Enter the full path to the SQLite file. Local files, UNC/LAN paths, and network shares or mounts reachable through a VPN are supported. The new path is used after restarting the application.",
+    "database_restart_required": "Settings saved. The new database path will be used on the next start.",
     "appearance_language": "Appearance, language and currency",
     "theme": "Theme",
     "theme_system": "System",
@@ -112,6 +116,6 @@
     "cancel": "Cancel",
     "translation_files": "Translation files",
     "translation_folder": "Translations folder",
-    "translation_help": "To add a language, copy an existing JSON file, change languageCode and languageName, and translate every value in the strings section. Restart the application to load new files."
+    "translation_help": "To add a language, copy an existing JSON file, change languageCode and languageName, and translate every value in the strings section. Press the refresh button next to the Language menu to reload the files."
   }
 }
