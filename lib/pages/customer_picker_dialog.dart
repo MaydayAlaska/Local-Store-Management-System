@@ -48,8 +48,8 @@ class _CustomerPickerDialogState extends State<_CustomerPickerDialog> {
               border: const OutlineInputBorder(),
               prefixIcon: const Icon(Icons.search),
               labelText: AppStrings.isEnglish
-                  ? 'First name, last name or tax code'
-                  : 'Nome, cognome o codice fiscale',
+                  ? 'Name, customer code or tax code'
+                  : 'Nome, codice cliente o codice fiscale',
             ),
           ),
           const SizedBox(height: 10),
@@ -67,12 +67,16 @@ class _CustomerPickerDialogState extends State<_CustomerPickerDialog> {
                     separatorBuilder: (_, _) => const Divider(height: 1),
                     itemBuilder: (context, index) {
                       final customer = customers[index];
+                      final fiscalCode = customer.fiscalCode?.trim();
                       return ListTile(
                         leading: const CircleAvatar(
                           child: Icon(Icons.person_outline),
                         ),
                         title: Text(customer.displayName),
-                        subtitle: Text(customer.fiscalCode),
+                        subtitle: Text(
+                          '${customer.customerCodeDisplay}'
+                          '${fiscalCode?.isNotEmpty == true ? ' · CF $fiscalCode' : ''}',
+                        ),
                         trailing: const Icon(Icons.chevron_right),
                         onTap: () => Navigator.of(context).pop(customer),
                       );
