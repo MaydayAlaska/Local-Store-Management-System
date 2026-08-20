@@ -27,7 +27,7 @@ class _DashboardPageState extends State<DashboardPage> {
   String? _scannedCode;
   ProductVariant? _scannedProduct;
 
-  String _itEn(String it, String en) => AppStrings.isEnglish ? en : it;
+  String _itEn(String it, String en) => AppStrings.pair(it, en);
 
   @override
   void initState() {
