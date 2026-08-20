@@ -265,10 +265,6 @@ class _ProductEditorDialogState extends State<ProductEditorDialog> {
                         'Prezzo acquisto prodotto $currency',
                         'Product purchase price $currency',
                       ),
-                      helperText: _itEn(
-                        'Accetta formule, es. 200-40% → 120',
-                        'Formulas supported, e.g. 200-40% → 120',
-                      ),
                     ),
                   ),
                 ),
@@ -302,6 +298,14 @@ class _ProductEditorDialogState extends State<ProductEditorDialog> {
                 Text(AppStrings.t('active')),
               ]),
               const SizedBox(height: 12),
+              Text(
+                _itEn(
+                  'I prezzi di acquisto accettano formule, es. 200-40% → 120.',
+                  'Purchase prices accept formulas, e.g. 200-40% → 120.',
+                ),
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+              const SizedBox(height: 2),
               Text(
                 _itEn(
                   'I prezzi del prodotto vengono usati da tutte le varianti. Compila un prezzo nella variante solo se deve sovrascrivere quello del prodotto.',
