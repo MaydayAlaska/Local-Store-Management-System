@@ -16,8 +16,8 @@ class LookupsPage extends StatefulWidget {
 
 class _LookupsPageState extends State<LookupsPage> {
   String _kindLabel(LookupKind kind) => kind == LookupKind.brand
-      ? (AppStrings.isEnglish ? 'brand' : 'marca')
-      : (AppStrings.isEnglish ? 'category' : 'categoria');
+      ? AppStrings.pair('marca', 'brand')
+      : AppStrings.pair('categoria', 'category');
 
   Future<void> _edit(LookupKind kind, [LookupItem? item]) async {
     final controller = TextEditingController(text: item?.name ?? '');
@@ -27,15 +27,15 @@ class _LookupsPageState extends State<LookupsPage> {
       builder: (context) => AlertDialog(
         title: Text(
           item == null
-              ? (AppStrings.isEnglish ? 'New $label' : 'Nuova $label')
-              : (AppStrings.isEnglish ? 'Rename $label' : 'Rinomina $label'),
+              ? AppStrings.pair('Nuova $label', 'New $label')
+              : AppStrings.pair('Rinomina $label', 'Rename $label'),
         ),
         content: TextField(
           controller: controller,
           autofocus: true,
           onSubmitted: (value) => Navigator.pop(context, value),
           decoration: InputDecoration(
-            labelText: AppStrings.isEnglish ? '$label name' : 'Nome $label',
+            labelText: AppStrings.pair('Nome $label', '$label name'),
           ),
         ),
         actions: [
@@ -76,9 +76,10 @@ class _LookupsPageState extends State<LookupsPage> {
       builder: (context) => StatefulBuilder(
         builder: (context, setLocal) => AlertDialog(
           title: Text(
-            AppStrings.isEnglish
-                ? 'Delete “${item.name}”'
-                : 'Elimina «${item.name}»',
+            AppStrings.pair(
+              'Elimina «${item.name}»',
+              'Delete “${item.name}”',
+            ),
           ),
           content: SizedBox(
             width: 420,
@@ -87,9 +88,10 @@ class _LookupsPageState extends State<LookupsPage> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Text(
-                  AppStrings.isEnglish
-                      ? '${item.productCount} products use this entry. You can leave them unassigned or reassign them.'
-                      : '${item.productCount} prodotti usano questa voce. Puoi lasciarli senza assegnazione oppure riassegnarli.',
+                  AppStrings.pair(
+                    '${item.productCount} prodotti usano questa voce. Puoi lasciarli senza assegnazione oppure riassegnarli.',
+                    '${item.productCount} products use this entry. You can leave them unassigned or reassign them.',
+                  ),
                 ),
                 const SizedBox(height: 12),
                 RadioGroup<bool>(
@@ -101,15 +103,16 @@ class _LookupsPageState extends State<LookupsPage> {
                       RadioListTile<bool>(
                         value: true,
                         title: Text(
-                          AppStrings.isEnglish
-                              ? 'Leave unassigned'
-                              : 'Lascia senza assegnazione',
+                          AppStrings.pair(
+                            'Lascia senza assegnazione',
+                            'Leave unassigned',
+                          ),
                         ),
                       ),
                       RadioListTile<bool>(
                         value: false,
                         title: Text(
-                          AppStrings.isEnglish ? 'Reassign to:' : 'Riassegna a:',
+                          AppStrings.pair('Riassegna a:', 'Reassign to:'),
                         ),
                       ),
                     ],
@@ -118,11 +121,11 @@ class _LookupsPageState extends State<LookupsPage> {
                 if (!assignNone)
                   GlassDropdown<int>(
                     value: target,
-                    labelText:
-                        AppStrings.isEnglish ? 'Destination' : 'Destinazione',
-                    hintText: AppStrings.isEnglish
-                        ? 'Select destination'
-                        : 'Seleziona destinazione',
+                    labelText: AppStrings.pair('Destinazione', 'Destination'),
+                    hintText: AppStrings.pair(
+                      'Seleziona destinazione',
+                      'Select destination',
+                    ),
                     items: all
                         .map(
                           (entry) => GlassDropdownItem<int>(
@@ -145,7 +148,7 @@ class _LookupsPageState extends State<LookupsPage> {
               onPressed: !assignNone && target == null
                   ? null
                   : () => Navigator.pop(context, true),
-              child: Text(AppStrings.isEnglish ? 'Delete' : 'Elimina'),
+              child: Text(AppStrings.pair('Elimina', 'Delete')),
             ),
           ],
         ),
@@ -177,7 +180,7 @@ class _LookupsPageState extends State<LookupsPage> {
           padding: const EdgeInsets.all(24),
           child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
             Text(
-              AppStrings.isEnglish ? 'Brands and categories' : 'Marche e categorie',
+              AppStrings.pair('Marche e categorie', 'Brands and categories'),
               style: Theme.of(context).textTheme.headlineMedium,
             ),
             const SizedBox(height: 12),
@@ -231,8 +234,8 @@ class _LookupList extends StatelessWidget {
   final Future<void> Function(LookupKind, LookupItem) onDelete;
 
   String get _label => kind == LookupKind.brand
-      ? (AppStrings.isEnglish ? 'brand' : 'marca')
-      : (AppStrings.isEnglish ? 'category' : 'categoria');
+      ? AppStrings.pair('marca', 'brand')
+      : AppStrings.pair('categoria', 'category');
 
   @override
   Widget build(BuildContext context) {
@@ -248,7 +251,7 @@ class _LookupList extends StatelessWidget {
               onPressed: () => onEdit(kind),
               icon: const Icon(Icons.add),
               label: Text(
-                AppStrings.isEnglish ? 'New $label' : 'Nuova $label',
+                AppStrings.pair('Nuova $label', 'New $label'),
               ),
             ),
           ),
@@ -258,7 +261,7 @@ class _LookupList extends StatelessWidget {
           child: items.isEmpty
               ? Center(
                   child: Text(
-                    AppStrings.isEnglish ? 'No $label entries.' : 'Nessuna $label.',
+                    AppStrings.pair('Nessuna $label.', 'No $label entries.'),
                   ),
                 )
               : ListView.separated(
@@ -269,23 +272,22 @@ class _LookupList extends StatelessWidget {
                     return ListTile(
                       title: Text(item.name),
                       subtitle: Text(
-                        AppStrings.isEnglish
-                            ? '${item.productCount} ${item.productCount == 1 ? 'product' : 'products'}'
-                            : '${item.productCount} ${item.productCount == 1 ? 'prodotto' : 'prodotti'}',
+                        '${item.productCount} ${item.productCount == 1 ? AppStrings.pair('prodotto', 'product') : AppStrings.pair('prodotti', 'products')}',
                       ),
                       trailing: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           IconButton(
                             onPressed: () => onEdit(kind, item),
-                            tooltip: AppStrings.isEnglish ? 'Rename' : 'Rinomina',
+                            tooltip: AppStrings.pair('Rinomina', 'Rename'),
                             icon: const Icon(Icons.edit_outlined),
                           ),
                           IconButton(
                             onPressed: () => onDelete(kind, item),
-                            tooltip: AppStrings.isEnglish
-                                ? 'Delete / reassign'
-                                : 'Elimina / riassegna',
+                            tooltip: AppStrings.pair(
+                              'Elimina / riassegna',
+                              'Delete / reassign',
+                            ),
                             icon: const Icon(Icons.delete_outline),
                           ),
                         ],
