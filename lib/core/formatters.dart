@@ -107,10 +107,11 @@ double _evaluateArithmeticExpression(String expression) {
 
   final values = <double>[];
   final lowOps = <String>[];
-  var current = double.tryParse(tokens.first);
-  if (current == null) {
+  final initialValue = double.tryParse(tokens.first);
+  if (initialValue == null) {
     throw const FormatException('Importo o formula non validi.');
   }
+  double current = initialValue;
 
   for (var i = 1; i < tokens.length; i += 2) {
     final op = tokens[i];
