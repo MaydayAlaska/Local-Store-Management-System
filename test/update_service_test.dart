@@ -104,6 +104,111 @@ void main() {
     );
   });
 
+  test('beta OTA never crosses Windows architectures', () {
+    const x64 = 'LocalStoreManagement-0.1.6-b11-BETA-Setup-win-x64.exe';
+    const arm64 = 'LocalStoreManagement-0.1.6-b11-BETA-Setup-win-arm64.exe';
+
+    expect(
+      updateAssetMatchesFor(
+        assetName: x64,
+        operatingSystem: 'windows',
+        abi: Abi.windowsX64,
+        beta: true,
+      ),
+      isTrue,
+    );
+    expect(
+      updateAssetMatchesFor(
+        assetName: arm64,
+        operatingSystem: 'windows',
+        abi: Abi.windowsX64,
+        beta: true,
+      ),
+      isFalse,
+    );
+    expect(
+      updateAssetMatchesFor(
+        assetName: x64,
+        operatingSystem: 'windows',
+        abi: Abi.windowsArm64,
+        beta: true,
+      ),
+      isFalse,
+    );
+    expect(
+      updateAssetMatchesFor(
+        assetName: arm64,
+        operatingSystem: 'windows',
+        abi: Abi.windowsArm64,
+        beta: true,
+      ),
+      isTrue,
+    );
+  });
+
+  test('beta OTA never crosses macOS Intel and Apple Silicon', () {
+    const x64 = 'LocalStoreManagement-0.1.6-b11-BETA-macos-x64.dmg';
+    const arm64 = 'LocalStoreManagement-0.1.6-b11-BETA-macos-arm64.dmg';
+
+    expect(
+      updateAssetMatchesFor(
+        assetName: x64,
+        operatingSystem: 'macos',
+        abi: Abi.macosX64,
+        beta: true,
+      ),
+      isTrue,
+    );
+    expect(
+      updateAssetMatchesFor(
+        assetName: arm64,
+        operatingSystem: 'macos',
+        abi: Abi.macosX64,
+        beta: true,
+      ),
+      isFalse,
+    );
+    expect(
+      updateAssetMatchesFor(
+        assetName: arm64,
+        operatingSystem: 'macos',
+        abi: Abi.macosArm64,
+        beta: true,
+      ),
+      isTrue,
+    );
+    expect(
+      updateAssetMatchesFor(
+        assetName: x64,
+        operatingSystem: 'macos',
+        abi: Abi.macosArm64,
+        beta: true,
+      ),
+      isFalse,
+    );
+  });
+
+  test('beta OTA rejects non-beta or wrong-platform assets', () {
+    expect(
+      updateAssetMatchesFor(
+        assetName: 'LocalStoreManagement-0.1.6-BETA-Setup-win-x64.exe',
+        operatingSystem: 'windows',
+        abi: Abi.windowsX64,
+        beta: true,
+      ),
+      isFalse,
+    );
+    expect(
+      updateAssetMatchesFor(
+        assetName: 'LocalStoreManagement-0.1.6-b11-BETA-macos-x64.dmg',
+        operatingSystem: 'windows',
+        abi: Abi.windowsX64,
+        beta: true,
+      ),
+      isFalse,
+    );
+  });
+
   test('only Flutter is the beta branch', () {
     expect(isBetaBranch('Flutter'), isTrue);
     expect(isBetaBranch('flutter'), isTrue);
