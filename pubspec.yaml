@@ -15,7 +15,7 @@ dependencies:
   barcode_widget: ^2.0.4
   excel: ^4.0.6
   file_selector: ^1.1.0
-  image: 4.3.0
+  image: ^4.9.0
   path: ^1.9.1
   path_provider: ^2.1.6
   pdf: ^3.13.0
