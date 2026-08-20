@@ -76,15 +76,22 @@ class _OrderDialogState extends State<_OrderDialog> {
     final detail = _detail;
     if (detail == null || detail.summary.isCancelled) return;
     final order = detail.summary;
+    final giftNote = order.hasGiftCard
+        ? _itEn(
+            ' Il credito di ${formatMoney(order.giftCardAppliedCents)} usato dal buono ${order.giftCardCode} verrà restituito se il buono esiste ancora.',
+            ' The ${formatMoney(order.giftCardAppliedCents)} credit used from gift card ${order.giftCardCode} will be restored if the gift card still exists.',
+          )
+        : '';
     final confirmed = await showDialog<bool>(
           context: context,
           builder: (dialogContext) => AlertDialog(
             title: Text(_itEn('Annulla ordine', 'Cancel order')),
             content: Text(
               _itEn(
-                'Confermi l’annullamento di ${order.orderNumber}? Gli articoli venduti verranno riaggiunti al magazzino. L’ordine resterà nello storico come ANNULLATO.',
-                'Cancel ${order.orderNumber}? Sold items will be returned to stock. The order will remain in history as CANCELLED.',
-              ),
+                    'Confermi l’annullamento di ${order.orderNumber}? Gli articoli venduti verranno riaggiunti al magazzino. L’ordine resterà nello storico come ANNULLATO.',
+                    'Cancel ${order.orderNumber}? Sold items will be returned to stock. The order will remain in history as CANCELLED.',
+                  ) +
+                  giftNote,
             ),
             actions: [
               TextButton(
@@ -106,8 +113,8 @@ class _OrderDialogState extends State<_OrderDialog> {
       if (!mounted) return;
       setState(() => _status = cancelled
           ? _itEn(
-              'Ordine annullato. Gli articoli sono stati riaggiunti al magazzino.',
-              'Order cancelled. Items were returned to stock.',
+              'Ordine annullato. Gli articoli sono stati riaggiunti al magazzino e l’eventuale credito del buono è stato ripristinato.',
+              'Order cancelled. Items were returned to stock and any available gift-card credit was restored.',
             )
           : _itEn(
               'L’ordine era già annullato oppure non esiste più.',
@@ -128,12 +135,12 @@ class _OrderDialogState extends State<_OrderDialog> {
     final order = detail.summary;
     final warning = order.isCancelled
         ? _itEn(
-            'L’ordine è già ANNULLATO: le quantità sono già state ripristinate. Eliminandolo, il magazzino non verrà modificato ulteriormente.',
-            'The order is already CANCELLED: quantities have already been restored. Deleting it will not change stock again.',
+            'L’ordine è già ANNULLATO: le quantità e l’eventuale credito del buono sono già stati ripristinati dove possibile. Eliminandolo, magazzino e buoni non verranno modificati ulteriormente.',
+            'The order is already CANCELLED: quantities and any available gift-card credit have already been restored. Deleting it will not change stock or gift cards again.',
           )
         : _itEn(
-            'ATTENZIONE: eliminando un ordine attivo, gli articoli NON verranno riaggiunti al magazzino. Solo “Annulla ordine” ripristina le quantità.',
-            'WARNING: deleting an active order will NOT return items to stock. Only “Cancel order” restores quantities.',
+            'ATTENZIONE: eliminando un ordine attivo, gli articoli NON verranno riaggiunti al magazzino e l’eventuale credito del buono NON verrà restituito. Solo “Annulla ordine” ripristina questi valori.',
+            'WARNING: deleting an active order will NOT return items to stock and will NOT restore any gift-card credit. Only “Cancel order” restores these values.',
           );
     final confirmed = await showDialog<bool>(
           context: context,
@@ -190,6 +197,9 @@ class _OrderDialogState extends State<_OrderDialog> {
     final date = formatLocalDateTime(order.createdAtUtc);
     final customer = order.customerDisplayName?.trim();
     final fiscalCode = order.customerFiscalCode?.trim();
+    final customerCode = order.customerCode == null
+        ? null
+        : 'CLI-${order.customerCode!.toString().padLeft(6, '0')}';
     final colors = Theme.of(context).colorScheme;
 
     return AlertDialog(
@@ -218,8 +228,8 @@ class _OrderDialogState extends State<_OrderDialog> {
               ),
               child: Text(
                 _itEn(
-                  'Ordine annullato: gli articoli venduti sono stati riaggiunti al magazzino.',
-                  'Cancelled order: sold items were returned to stock.',
+                  'Ordine annullato: gli articoli venduti sono stati riaggiunti al magazzino e l’eventuale credito del buono è stato ripristinato se il buono esisteva ancora.',
+                  'Cancelled order: sold items were returned to stock and any gift-card credit was restored if the gift card still existed.',
                 ),
                 style: TextStyle(
                   color: colors.onErrorContainer,
@@ -236,6 +246,8 @@ class _OrderDialogState extends State<_OrderDialog> {
                   ? '${_itEn('Cliente', 'Customer')}: $customer'
                   : _itEn('Vendita senza cliente', 'Sale without customer'),
             ),
+            if (customerCode != null)
+              Text('${_itEn('Codice cliente', 'Customer code')}: $customerCode'),
             if (fiscalCode?.isNotEmpty == true)
               Text('${_itEn('CF', 'Tax code')}: $fiscalCode'),
           ]),
@@ -255,9 +267,18 @@ class _OrderDialogState extends State<_OrderDialog> {
                 '${AppStrings.t('fixed_discounts')}: −${formatMoney(order.fixedDiscountCents)}',
               ),
             Text(
-              '${_itEn('Pagato', 'Paid')}: ${formatMoney(order.finalTotalCents)}',
+              '${_itEn('Totale vendita', 'Sale total')}: ${formatMoney(order.finalTotalCents)}',
               style: const TextStyle(fontWeight: FontWeight.w700),
             ),
+            if (order.hasGiftCard)
+              Text(
+                '${_itEn('Buono regalo', 'Gift card')} ${order.giftCardCode}: −${formatMoney(order.giftCardAppliedCents)}',
+              ),
+            if (order.hasGiftCard)
+              Text(
+                '${_itEn('Totale da pagare', 'Amount due')}: ${order.amountDueDisplay}',
+                style: const TextStyle(fontWeight: FontWeight.w700),
+              ),
           ]),
           const SizedBox(height: 12),
           const Divider(height: 1),
