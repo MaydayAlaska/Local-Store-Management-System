@@ -25,7 +25,7 @@ class _StockPageState extends State<StockPage> {
   StockMovementKind _kind = StockMovementKind.incoming;
   String? _status;
 
-  String _itEn(String it, String en) => AppStrings.isEnglish ? en : it;
+  String _itEn(String it, String en) => AppStrings.pair(it, en);
 
   @override
   void dispose() {
