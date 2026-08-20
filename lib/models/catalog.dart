@@ -53,8 +53,8 @@ class ProductVariant {
   String get salePriceDisplay => formatMoney(salePriceCents);
   String get purchasePriceDisplay => formatMoney(purchasePriceCents);
   String get statusDisplay => isActive
-      ? (AppStrings.isEnglish ? 'Active' : 'Attivo')
-      : (AppStrings.isEnglish ? 'Disabled' : 'Disattivato');
+      ? AppStrings.pair('Attivo', 'Active')
+      : AppStrings.pair('Disattivato', 'Disabled');
 
   String get variantDisplay {
     final parts = <String>[];
@@ -63,7 +63,7 @@ class ProductVariant {
       parts.add('${AppStrings.t('size')} ${size!.trim()}');
     }
     return parts.isEmpty
-        ? (AppStrings.isEnglish ? 'Base variant' : 'Variante base')
+        ? AppStrings.pair('Variante base', 'Base variant')
         : parts.join(' · ');
   }
 }
@@ -101,12 +101,9 @@ class ProductSummary {
   final int? minimumSalePriceCents;
   final int? maximumSalePriceCents;
 
-  String get variantCountDisplay {
-    if (AppStrings.isEnglish) {
-      return '$variantCount ${variantCount == 1 ? 'variant' : 'variants'}';
-    }
-    return '$variantCount ${variantCount == 1 ? 'variante' : 'varianti'}';
-  }
+  String get variantCountDisplay => '$variantCount ${variantCount == 1
+      ? AppStrings.pair('variante', 'variant')
+      : AppStrings.pair('varianti', 'variants')}';
 
   String get salePriceDisplay =>
       formatMoneyRange(minimumSalePriceCents, maximumSalePriceCents);
@@ -166,7 +163,7 @@ class ProductVariantDraft {
       parts.add('${AppStrings.t('size')} ${size!.trim()}');
     }
     return parts.isEmpty
-        ? (AppStrings.isEnglish ? 'Base variant' : 'Variante base')
+        ? AppStrings.pair('Variante base', 'Base variant')
         : parts.join(' · ');
   }
 }
