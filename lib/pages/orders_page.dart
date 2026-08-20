@@ -54,105 +54,118 @@ class _OrdersPageState extends State<OrdersPage> {
     final selection = await showDialog<_OrderAgeSelection>(
       context: context,
       builder: (dialogContext) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title: Text(_itEn('Elimina ordini vecchi', 'Delete old orders')),
-          content: SizedBox(
-            width: 430,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Text(
-                  _itEn(
-                    'Elimina definitivamente gli ordini più vecchi dell’intervallo indicato. Questa operazione non modifica il magazzino.',
-                    'Permanently delete orders older than the selected interval. This operation does not change stock.',
-                  ),
-                ),
-                const SizedBox(height: 16),
-                Row(children: [
-                  Expanded(
-                    child: TextField(
-                      controller: amountController,
-                      keyboardType: TextInputType.number,
-                      decoration: InputDecoration(
-                        border: const OutlineInputBorder(),
-                        labelText: _itEn('Quantità', 'Amount'),
-                        errorText: validationError,
-                      ),
-                      onChanged: (_) {
-                        if (validationError != null) {
-                          setDialogState(() => validationError = null);
-                        }
-                      },
+        builder: (context, setDialogState) {
+          final theme = Theme.of(context);
+          return AlertDialog(
+            title: Text(_itEn('Elimina ordini vecchi', 'Delete old orders')),
+            content: SizedBox(
+              width: 430,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(
+                    _itEn(
+                      'Elimina definitivamente gli ordini più vecchi dell’intervallo indicato. Questa operazione non modifica né il magazzino né il credito dei buoni regalo.',
+                      'Permanently delete orders older than the selected interval. This operation changes neither stock nor gift-card credit.',
                     ),
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: DropdownButtonFormField<String>(
-                      value: unit,
-                      decoration: InputDecoration(
-                        border: const OutlineInputBorder(),
-                        labelText: _itEn('Unità', 'Unit'),
+                  const SizedBox(height: 16),
+                  Row(children: [
+                    Expanded(
+                      child: TextField(
+                        controller: amountController,
+                        keyboardType: TextInputType.number,
+                        decoration: InputDecoration(
+                          border: const OutlineInputBorder(),
+                          labelText: _itEn('Quantità', 'Amount'),
+                          errorText: validationError,
+                        ),
+                        onChanged: (_) {
+                          if (validationError != null) {
+                            setDialogState(() => validationError = null);
+                          }
+                        },
                       ),
-                      items: [
-                        DropdownMenuItem(
-                          value: 'days',
-                          child: Text(_itEn('Giorni', 'Days')),
-                        ),
-                        DropdownMenuItem(
-                          value: 'months',
-                          child: Text(_itEn('Mesi', 'Months')),
-                        ),
-                        DropdownMenuItem(
-                          value: 'years',
-                          child: Text(_itEn('Anni', 'Years')),
-                        ),
-                      ],
-                      onChanged: (value) {
-                        if (value != null) setDialogState(() => unit = value);
-                      },
                     ),
-                  ),
-                ]),
-              ],
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: DropdownButtonFormField<String>(
+                        value: unit,
+                        dropdownColor: theme.canvasColor,
+                        borderRadius: BorderRadius.circular(16),
+                        iconEnabledColor: theme.colorScheme.onSurfaceVariant,
+                        style: theme.textTheme.bodyLarge?.copyWith(
+                          color: theme.colorScheme.onSurface,
+                        ),
+                        decoration: InputDecoration(
+                          border: const OutlineInputBorder(),
+                          labelText: _itEn('Unità', 'Unit'),
+                        ),
+                        items: [
+                          DropdownMenuItem(
+                            value: 'days',
+                            child: Text(_itEn('Giorni', 'Days')),
+                          ),
+                          DropdownMenuItem(
+                            value: 'months',
+                            child: Text(_itEn('Mesi', 'Months')),
+                          ),
+                          DropdownMenuItem(
+                            value: 'years',
+                            child: Text(_itEn('Anni', 'Years')),
+                          ),
+                        ],
+                        onChanged: (value) {
+                          if (value != null) setDialogState(() => unit = value);
+                        },
+                      ),
+                    ),
+                  ]),
+                ],
+              ),
             ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(),
-              child: Text(_itEn('Annulla', 'Cancel')),
-            ),
-            FilledButton.icon(
-              onPressed: () {
-                final amount = int.tryParse(amountController.text.trim());
-                if (amount == null || amount <= 0) {
-                  setDialogState(() => validationError = _itEn(
-                        'Inserisci un numero maggiore di zero.',
-                        'Enter a number greater than zero.',
-                      ));
-                  return;
-                }
-                Navigator.of(dialogContext).pop(_OrderAgeSelection(amount, unit));
-              },
-              icon: const Icon(Icons.delete_sweep_outlined),
-              label: Text(_itEn('Continua', 'Continue')),
-            ),
-          ],
-        ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(dialogContext).pop(),
+                child: Text(_itEn('Annulla', 'Cancel')),
+              ),
+              FilledButton.icon(
+                onPressed: () {
+                  final amount = int.tryParse(amountController.text.trim());
+                  if (amount == null || amount <= 0) {
+                    setDialogState(() => validationError = _itEn(
+                          'Inserisci un numero maggiore di zero.',
+                          'Enter a number greater than zero.',
+                        ));
+                    return;
+                  }
+                  Navigator.of(dialogContext)
+                      .pop(_OrderAgeSelection(amount, unit));
+                },
+                icon: const Icon(Icons.delete_sweep_outlined),
+                label: Text(_itEn('Continua', 'Continue')),
+              ),
+            ],
+          );
+        },
       ),
     );
     amountController.dispose();
     if (selection == null || !mounted) return;
 
-    final cutoffLocal = _subtractAge(DateTime.now(), selection.amount, selection.unit);
+    final cutoffLocal =
+        _subtractAge(DateTime.now(), selection.amount, selection.unit);
     final cutoffUtc = cutoffLocal.toUtc();
     final count = widget.services.customers.countOrdersOlderThan(cutoffUtc);
     if (count == 0) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(_itEn(
-          'Nessun ordine rientra nell’intervallo selezionato.',
-          'No orders match the selected age.',
-        ))),
+        SnackBar(
+          content: Text(_itEn(
+            'Nessun ordine rientra nell’intervallo selezionato.',
+            'No orders match the selected age.',
+          )),
+        ),
       );
       return;
     }
@@ -163,8 +176,8 @@ class _OrdersPageState extends State<OrdersPage> {
             title: Text(_itEn('Conferma eliminazione', 'Confirm deletion')),
             content: Text(
               _itEn(
-                'Verranno eliminati definitivamente $count ordini creati prima del ${formatLocalDateTime(cutoffUtc)}. Gli articoli NON verranno riaggiunti al magazzino.',
-                '$count orders created before ${formatLocalDateTime(cutoffUtc)} will be permanently deleted. Items will NOT be returned to stock.',
+                'Verranno eliminati definitivamente $count ordini creati prima del ${formatLocalDateTime(cutoffUtc)}. Gli articoli NON verranno riaggiunti al magazzino e l’eventuale credito usato dai buoni NON verrà restituito.',
+                '$count orders created before ${formatLocalDateTime(cutoffUtc)} will be permanently deleted. Items will NOT be returned to stock and any gift-card credit used will NOT be restored.',
               ),
             ),
             actions: [
@@ -186,10 +199,12 @@ class _OrdersPageState extends State<OrdersPage> {
     if (!mounted) return;
     setState(() {});
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(_itEn(
-        '$deleted ordini eliminati. Il magazzino non è stato modificato.',
-        '$deleted orders deleted. Stock was not changed.',
-      ))),
+      SnackBar(
+        content: Text(_itEn(
+          '$deleted ordini eliminati. Magazzino e buoni regalo non sono stati modificati.',
+          '$deleted orders deleted. Stock and gift cards were not changed.',
+        )),
+      ),
     );
   }
 
@@ -228,8 +243,8 @@ class _OrdersPageState extends State<OrdersPage> {
             prefixIcon: const Icon(Icons.search),
             labelText: _itEn('Cerca ordine o vendita', 'Search order or sale'),
             hintText: _itEn(
-              'Numero ordine, cliente, CF oppure prodotto + attributi (es. Maglietta Blu M)',
-              'Order number, customer, tax code or product + attributes (e.g. Shirt Blue M)',
+              'Numero ordine, codice cliente, cliente, CF, buono regalo oppure prodotto + attributi',
+              'Order number, customer code, customer, tax code, gift card or product + attributes',
             ),
           ),
         ),
@@ -267,9 +282,16 @@ class _OrdersPageState extends State<OrdersPage> {
                       final date = formatLocalDateTime(order.createdAtUtc);
                       final customer = order.customerDisplayName?.trim();
                       final fiscal = order.customerFiscalCode?.trim();
+                      final code = order.customerCode == null
+                          ? null
+                          : 'CLI-${order.customerCode!.toString().padLeft(6, '0')}';
                       final customerText = customer?.isNotEmpty == true
-                          ? '$customer${fiscal?.isNotEmpty == true ? ' · $fiscal' : ''}'
-                          : _itEn('Vendita senza cliente', 'Sale without customer');
+                          ? '${code == null ? '' : '$code · '}$customer'
+                              '${fiscal?.isNotEmpty == true ? ' · CF $fiscal' : ''}'
+                          : _itEn(
+                              'Vendita senza cliente',
+                              'Sale without customer',
+                            );
                       final errorColor = Theme.of(context).colorScheme.error;
                       return ListTile(
                         leading: Icon(
@@ -299,6 +321,7 @@ class _OrdersPageState extends State<OrdersPage> {
                         ]),
                         subtitle: Text(
                           '$date · $customerText · ${order.itemCount} ${AppStrings.t(order.itemCount == 1 ? 'item' : 'items')}'
+                          '${order.hasGiftCard ? ' · ${_itEn('buono', 'gift card')} ${order.giftCardCode}: −${formatMoney(order.giftCardAppliedCents)}' : ''}'
                           '${order.hasReceipt ? _itEn(' · scontrino salvato', ' · receipt saved') : ''}',
                         ),
                         trailing: const Icon(Icons.chevron_right),
