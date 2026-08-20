@@ -22,6 +22,7 @@ class FiscalCodeData {
 class Customer {
   const Customer({
     required this.id,
+    required this.customerCode,
     required this.fiscalCode,
     required this.firstName,
     required this.lastName,
@@ -34,35 +35,69 @@ class Customer {
   });
 
   final int id;
-  final String fiscalCode;
+  final int customerCode;
+  final String? fiscalCode;
   final String firstName;
   final String lastName;
-  final DateTime birthDate;
-  final String sex;
-  final String birthPlaceCode;
+  final DateTime? birthDate;
+  final String? sex;
+  final String? birthPlaceCode;
   final String? notes;
   final DateTime createdAtUtc;
   final DateTime updatedAtUtc;
 
   String get displayName => '$lastName $firstName'.trim();
-  String get birthDateDisplay =>
-      '${birthDate.day.toString().padLeft(2, '0')}/${birthDate.month.toString().padLeft(2, '0')}/${birthDate.year}';
+  String get customerCodeDisplay =>
+      'CLI-${customerCode.toString().padLeft(6, '0')}';
+  String? get birthDateDisplay => birthDate == null
+      ? null
+      : '${birthDate!.day.toString().padLeft(2, '0')}/${birthDate!.month.toString().padLeft(2, '0')}/${birthDate!.year}';
 }
 
 class CustomerDraft {
   const CustomerDraft({
     this.id,
-    required this.fiscalCodeData,
+    this.fiscalCodeData,
     required this.firstName,
     required this.lastName,
     this.notes,
   });
 
   final int? id;
-  final FiscalCodeData fiscalCodeData;
+  final FiscalCodeData? fiscalCodeData;
   final String firstName;
   final String lastName;
   final String? notes;
+}
+
+class GiftCard {
+  const GiftCard({
+    required this.id,
+    required this.code,
+    required this.customerId,
+    required this.totalValueCents,
+    required this.spentValueCents,
+    required this.createdAtUtc,
+    required this.updatedAtUtc,
+  });
+
+  final int id;
+  final String code;
+  final int customerId;
+  final int totalValueCents;
+  final int spentValueCents;
+  final DateTime createdAtUtc;
+  final DateTime updatedAtUtc;
+
+  int get remainingValueCents {
+    final remaining = totalValueCents - spentValueCents;
+    return remaining < 0 ? 0 : remaining;
+  }
+
+  bool get isExhausted => remainingValueCents == 0;
+  String get totalDisplay => formatMoney(totalValueCents);
+  String get spentDisplay => formatMoney(spentValueCents);
+  String get remainingDisplay => formatMoney(remainingValueCents);
 }
 
 class SalesOrderDraftLine {
@@ -94,6 +129,8 @@ class SalesOrderDraftLine {
 class SalesOrderDraft {
   const SalesOrderDraft({
     this.customerId,
+    this.giftCardId,
+    this.giftCardAppliedCents = 0,
     required this.lines,
     required this.grossTotalCents,
     required this.itemDiscountCents,
@@ -104,12 +141,17 @@ class SalesOrderDraft {
   });
 
   final int? customerId;
+  final int? giftCardId;
+  final int giftCardAppliedCents;
   final List<SalesOrderDraftLine> lines;
   final int grossTotalCents;
   final int itemDiscountCents;
   final int orderDiscountBasisPoints;
   final int orderPercentDiscountCents;
   final int fixedDiscountCents;
+
+  /// Valore della vendita dopo gli sconti, prima dell'eventuale pagamento
+  /// tramite buono regalo.
   final int finalTotalCents;
 }
 
@@ -118,6 +160,7 @@ class SalesOrderSummary {
     required this.id,
     required this.orderNumber,
     required this.customerId,
+    this.customerCode,
     this.customerDisplayName,
     this.customerFiscalCode,
     required this.itemCount,
@@ -127,6 +170,9 @@ class SalesOrderSummary {
     required this.orderPercentDiscountCents,
     required this.fixedDiscountCents,
     required this.finalTotalCents,
+    this.giftCardId,
+    this.giftCardCode,
+    this.giftCardAppliedCents = 0,
     this.receiptFilename,
     this.cancelledAtUtc,
     required this.createdAtUtc,
@@ -135,6 +181,7 @@ class SalesOrderSummary {
   final int id;
   final String orderNumber;
   final int? customerId;
+  final int? customerCode;
   final String? customerDisplayName;
   final String? customerFiscalCode;
   final int itemCount;
@@ -144,13 +191,24 @@ class SalesOrderSummary {
   final int orderPercentDiscountCents;
   final int fixedDiscountCents;
   final int finalTotalCents;
+  final int? giftCardId;
+  final String? giftCardCode;
+  final int giftCardAppliedCents;
   final String? receiptFilename;
   final DateTime? cancelledAtUtc;
   final DateTime createdAtUtc;
 
+  int get amountDueCents {
+    final value = finalTotalCents - giftCardAppliedCents;
+    return value < 0 ? 0 : value;
+  }
+
   String get totalDisplay => formatMoney(finalTotalCents);
+  String get amountDueDisplay => formatMoney(amountDueCents);
   bool get hasReceipt => receiptFilename?.trim().isNotEmpty == true;
   bool get hasCustomerSnapshot => customerDisplayName?.trim().isNotEmpty == true;
+  bool get hasGiftCard =>
+      giftCardAppliedCents > 0 && giftCardCode?.trim().isNotEmpty == true;
   bool get isCancelled => cancelledAtUtc != null;
 }
 
