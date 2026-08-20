@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>io.github.MaydayAlaska.LocalStoreManagementSystem</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>AGPL-3.0-only</project_license>
+  <name>Local Store Management System</name>
+  <summary>Gestionale desktop per negozi</summary>
+  <description>
+    <p>
+      Local Store Management System è un gestionale desktop per negozi con gestione
+      prodotti, magazzino, vendite, clienti, ordini, etichette e periferiche locali.
+    </p>
+  </description>
+  <launchable type="desktop-id">local-store-management.desktop</launchable>
+  <provides>
+    <binary>local_store_management</binary>
+  </provides>
+  <categories>
+    <category>Office</category>
+  </categories>
+  <url type="homepage">https://github.com/MaydayAlaska/Local-Store-Management-System</url>
+  <url type="bugtracker">https://github.com/MaydayAlaska/Local-Store-Management-System/issues</url>
+</component>

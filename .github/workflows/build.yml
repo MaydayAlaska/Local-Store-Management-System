@@ -32,6 +32,15 @@ jobs:
             exit 1
           fi
 
+      - name: Verify Linux AppStream metadata
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import xml.etree.ElementTree as ET
+          ET.parse('packaging/linux/local-store-management.appdata.xml')
+          PY
+
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
@@ -232,9 +241,9 @@ jobs:
             flutter_arch: arm64
             macho_arch: arm64
             excluded_arch: x86_64
-          - runner: macos-15-intel
+          - runner: macos-15
             arch: x64
-            flutter_arch: x64
+            flutter_arch: arm64
             macho_arch: x86_64
             excluded_arch: arm64
     runs-on: ${{ matrix.runner }}
@@ -257,6 +266,10 @@ jobs:
           uname -m
           flutter --version
           xcodebuild -version
+          if [ "$(uname -m)" != "arm64" ]; then
+            echo '::error::La build macOS deve usare esclusivamente un host Apple Silicon.'
+            exit 1
+          fi
 
       - name: Generate macOS runner
         shell: bash
@@ -302,6 +315,28 @@ jobs:
           )
           with info_path.open('wb') as handle:
               plistlib.dump(info, handle, sort_keys=False)
+
+          pbxproj_path = Path('macos/Runner.xcodeproj/project.pbxproj')
+          project = pbxproj_path.read_text()
+          tripwire_index = project.find('touch Flutter/ephemeral/tripwire')
+          if tripwire_index < 0:
+              raise RuntimeError('Build phase Flutter Assemble non trovata.')
+          phase_start = project.rfind('/* ShellScript */ = {', 0, tripwire_index)
+          phase_end = project.find('\n\t\t};', tripwire_index)
+          if phase_start < 0 or phase_end < 0:
+              raise RuntimeError('Impossibile delimitare la build phase Flutter Assemble.')
+          phase = project[phase_start:phase_end]
+          if 'alwaysOutOfDate = 1;' not in phase:
+              isa_line = '\t\t\tisa = PBXShellScriptBuildPhase;\n'
+              if isa_line not in phase:
+                  raise RuntimeError('Formato PBXShellScriptBuildPhase inatteso.')
+              phase = phase.replace(
+                  isa_line,
+                  isa_line + '\t\t\talwaysOutOfDate = 1;\n',
+                  1,
+              )
+              project = project[:phase_start] + phase + project[phase_end:]
+              pbxproj_path.write_text(project)
 
           entitlement_keys = {
               'com.apple.security.app-sandbox': True,
@@ -489,10 +524,14 @@ jobs:
         run: |
           set -euo pipefail
           rm -rf AppDir dist
-          mkdir -p AppDir/usr/bin AppDir/usr/share/icons/hicolor/64x64/apps dist
+          mkdir -p AppDir/usr/bin \
+                   AppDir/usr/share/icons/hicolor/64x64/apps \
+                   AppDir/usr/share/metainfo \
+                   dist
           cp -a build/linux/${{ matrix.build_arch }}/release/bundle/. AppDir/usr/bin/
           cp packaging/linux/AppRun AppDir/AppRun
           cp packaging/linux/local-store-management.desktop AppDir/local-store-management.desktop
+          cp packaging/linux/local-store-management.appdata.xml AppDir/usr/share/metainfo/local-store-management.appdata.xml
           base64 --decode "${ICON_BASE64}" > AppDir/local-store-management.png
           cp AppDir/local-store-management.png AppDir/usr/share/icons/hicolor/64x64/apps/local-store-management.png
           ln -s local-store-management.png AppDir/.DirIcon
@@ -520,9 +559,11 @@ jobs:
                    DebRoot/usr/bin \
                    DebRoot/usr/lib/local-store-management \
                    DebRoot/usr/share/applications \
-                   DebRoot/usr/share/icons/hicolor/64x64/apps
+                   DebRoot/usr/share/icons/hicolor/64x64/apps \
+                   DebRoot/usr/share/metainfo
           cp -a build/linux/${{ matrix.build_arch }}/release/bundle/. DebRoot/usr/lib/local-store-management/
           cp packaging/linux/local-store-management.desktop DebRoot/usr/share/applications/local-store-management.desktop
+          cp packaging/linux/local-store-management.appdata.xml DebRoot/usr/share/metainfo/local-store-management.appdata.xml
           base64 --decode "${ICON_BASE64}" > DebRoot/usr/share/icons/hicolor/64x64/apps/local-store-management.png
           cat > DebRoot/usr/bin/local_store_management <<'EOF'
           #!/bin/sh
