@@ -6,13 +6,23 @@ import 'package:path/path.dart' as p;
 import '../core/app_paths.dart';
 
 class DatabaseLocationService {
+  DatabaseLocationService({
+    String? dataDirectory,
+    String? defaultDatabasePath,
+  })  : _dataDirectory = dataDirectory ?? AppPaths.dataDirectory,
+        _defaultDatabasePath =
+            defaultDatabasePath ?? AppPaths.defaultDatabasePath;
+
   static const _configurationFileName = 'database-location.json';
   static const _databasePathKey = 'DatabasePath';
 
-  String get configurationPath =>
-      p.join(AppPaths.dataDirectory, _configurationFileName);
+  final String _dataDirectory;
+  final String _defaultDatabasePath;
 
-  String get defaultPath => AppPaths.defaultDatabasePath;
+  String get configurationPath =>
+      p.join(_dataDirectory, _configurationFileName);
+
+  String get defaultPath => _defaultDatabasePath;
 
   String load() {
     final environmentOverride =
@@ -66,15 +76,16 @@ class DatabaseLocationService {
     if (p.isAbsolute(input) || looksLikeWindowsDrive || looksLikeUnc) {
       return p.normalize(input);
     }
-    return p.normalize(p.join(AppPaths.dataDirectory, input));
+    return p.normalize(p.join(_dataDirectory, input));
   }
 
   String save(String value) {
     final normalized = normalize(value);
     final targetType = FileSystemEntity.typeSync(normalized, followLinks: true);
     if (targetType == FileSystemEntityType.directory) {
-      throw const FileSystemException(
+      throw FileSystemException(
         'Il percorso del database deve indicare un file, non una cartella.',
+        normalized,
       );
     }
 
