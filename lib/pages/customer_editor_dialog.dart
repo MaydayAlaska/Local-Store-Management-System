@@ -67,17 +67,9 @@ class _CustomerEditorDialogState extends State<_CustomerEditorDialog> {
   }
 
   FiscalCodeData? get _preview {
-    final existing = widget.customer;
-    if (existing != null) {
-      return FiscalCodeData(
-        fiscalCode: existing.fiscalCode,
-        birthDate: existing.birthDate,
-        sex: existing.sex,
-        birthPlaceCode: existing.birthPlaceCode,
-      );
-    }
-    if (widget.scanned != null) return widget.scanned;
-    return FiscalCodeService.tryParse(_fiscalCode.text);
+    final value = _fiscalCode.text.trim();
+    if (value.isEmpty) return null;
+    return FiscalCodeService.tryParse(value);
   }
 
   void _save() {
@@ -91,11 +83,12 @@ class _CustomerEditorDialogState extends State<_CustomerEditorDialog> {
       return;
     }
 
-    final data = _preview;
-    if (data == null) {
+    final fiscalValue = _fiscalCode.text.trim();
+    final data = fiscalValue.isEmpty ? null : FiscalCodeService.tryParse(fiscalValue);
+    if (fiscalValue.isNotEmpty && data == null) {
       setState(() => _error = _itEn(
-            'Il codice fiscale non è valido. Controlla la scansione o il valore inserito.',
-            'The tax code is invalid. Check the scan or the entered value.',
+            'Il codice fiscale inserito non è valido. Puoi correggerlo oppure lasciarlo vuoto e aggiungerlo successivamente.',
+            'The tax code is invalid. Correct it or leave it empty and add it later.',
           ));
       return;
     }
@@ -126,7 +119,9 @@ class _CustomerEditorDialogState extends State<_CustomerEditorDialog> {
             preview.birthPlaceCode,
             preview.birthDate,
           );
-    final lockedFiscalCode = widget.customer != null || widget.scanned != null;
+    final fiscalValue = _fiscalCode.text.trim();
+    final fiscalIsInvalid = fiscalValue.isNotEmpty && preview == null;
+
     return AlertDialog(
       title: Text(
         widget.customer == null
@@ -140,15 +135,44 @@ class _CustomerEditorDialogState extends State<_CustomerEditorDialog> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              if (widget.customer != null) ...[
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Row(children: [
+                    const Icon(Icons.badge_outlined),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        '${_itEn('Codice cliente', 'Customer code')}: ${widget.customer!.customerCodeDisplay}',
+                        style: const TextStyle(fontWeight: FontWeight.w700),
+                      ),
+                    ),
+                  ]),
+                ),
+                const SizedBox(height: 12),
+              ],
               TextField(
                 controller: _fiscalCode,
-                readOnly: lockedFiscalCode,
                 textCapitalization: TextCapitalization.characters,
                 onChanged: (_) => setState(() => _error = null),
                 decoration: InputDecoration(
                   border: const OutlineInputBorder(),
-                  labelText: _itEn('Codice fiscale', 'Tax code'),
+                  labelText: _itEn(
+                    'Codice fiscale (facoltativo)',
+                    'Tax code (optional)',
+                  ),
+                  helperText: _itEn(
+                    'Può essere aggiunto o modificato anche in seguito.',
+                    'It can be added or changed later.',
+                  ),
                   prefixIcon: const Icon(Icons.badge_outlined),
+                  errorText: fiscalIsInvalid
+                      ? _itEn('Codice fiscale non valido.', 'Invalid tax code.')
+                      : null,
                 ),
               ),
               const SizedBox(height: 12),
@@ -183,7 +207,9 @@ class _CustomerEditorDialogState extends State<_CustomerEditorDialog> {
                       spacing: 22,
                       runSpacing: 8,
                       children: [
-                        Text('${_itEn('Nascita', 'Birth date')}: ${preview.birthDateDisplay}'),
+                        Text(
+                          '${_itEn('Nascita', 'Birth date')}: ${preview.birthDateDisplay}',
+                        ),
                         Text('${_itEn('Sesso', 'Sex')}: ${preview.sex}'),
                         Text(
                           '${_itEn('Luogo di nascita', 'Birth place')}: '
@@ -193,11 +219,11 @@ class _CustomerEditorDialogState extends State<_CustomerEditorDialog> {
                     ),
                   ),
                 )
-              else
+              else if (fiscalValue.isEmpty)
                 Text(
                   _itEn(
-                    'Inserisci un codice fiscale valido per ricavare automaticamente i dati disponibili.',
-                    'Enter a valid tax code to automatically extract the available data.',
+                    'Il cliente può essere salvato senza codice fiscale. I dati di nascita verranno compilati automaticamente quando verrà aggiunto un codice fiscale valido.',
+                    'The customer can be saved without a tax code. Birth data will be filled automatically when a valid tax code is added.',
                   ),
                 ),
               const SizedBox(height: 12),
