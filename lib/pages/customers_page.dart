@@ -272,12 +272,9 @@ class _CustomersPageState extends State<CustomersPage> {
                                     child: Icon(Icons.person_outline),
                                   ),
                                   title: Text(customer.displayName),
-                                  subtitle: Text(
-                                    customer.customerCodeDisplay +
-                                        (fiscalCode?.isNotEmpty == true
-                                            ? ' · CF $fiscalCode'
-                                            : ''),
-                                  ),
+                                  subtitle: fiscalCode?.isNotEmpty == true
+                                      ? Text('CF $fiscalCode')
+                                      : null,
                                   onTap: () =>
                                       setState(() => _selected = customer),
                                 );
