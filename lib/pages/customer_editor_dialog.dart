@@ -44,7 +44,7 @@ class _CustomerEditorDialogState extends State<_CustomerEditorDialog> {
   late final TextEditingController _notes;
   String? _error;
 
-  String _itEn(String it, String en) => AppStrings.isEnglish ? en : it;
+  String _itEn(String it, String en) => AppStrings.pair(it, en);
 
   @override
   void initState() {
