@@ -31,8 +31,10 @@ String inventoryExportFieldLabel(InventoryExportField field) => switch (field) {
       InventoryExportField.barcode => AppStrings.t('barcode'),
       InventoryExportField.category => AppStrings.t('category'),
       InventoryExportField.stock => AppStrings.t('quantity'),
-      InventoryExportField.purchase => AppStrings.t('purchase'),
-      InventoryExportField.sale => AppStrings.t('sale'),
+      InventoryExportField.purchase =>
+        AppStrings.isEnglish ? 'Purchase Price' : 'Prezzo di Acquisto',
+      InventoryExportField.sale =>
+        AppStrings.isEnglish ? 'Sale Price' : 'Prezzo di Vendita',
     };
 
 class ExportService {
