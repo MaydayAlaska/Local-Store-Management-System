@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:local_store_management/l10n/app_strings.dart';
 
 Map<String, dynamic> _readCatalog(String code) {
   final file = File('assets/translations/$code.json');
@@ -15,6 +16,21 @@ Set<String> _keys(Map<String, dynamic> catalog) =>
     Map<String, dynamic>.from(catalog['strings'] as Map).keys.toSet();
 
 void main() {
+  test('Flutter bundle always includes the fallback translation', () {
+    final pubspec = File('pubspec.yaml').readAsStringSync();
+    expect(
+      RegExp(r'(?m)^\s*-\s*assets/translations/\s*$').hasMatch(pubspec),
+      isTrue,
+      reason:
+          'pubspec.yaml must bundle assets/translations/ or installed builds may start without a language catalog.',
+    );
+
+    final fallbackCode = AppStrings.fallbackLanguageCode;
+    final fallback = _readCatalog(fallbackCode);
+    expect(fallback['languageCode'], fallbackCode);
+    expect(_keys(fallback), isNotEmpty);
+  });
+
   test('bundled translations expose valid native language metadata', () {
     final italian = _readCatalog('it');
     final english = _readCatalog('en');
