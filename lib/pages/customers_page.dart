@@ -332,7 +332,9 @@ class _CustomerDetailState extends State<_CustomerDetail> {
       widget.customer.id,
       _historySearch.text,
     );
-    final spent = orders.fold<int>(0, (sum, order) => sum + order.finalTotalCents);
+    final spent = orders
+        .where((order) => !order.isCancelled)
+        .fold<int>(0, (sum, order) => sum + order.finalTotalCents);
     final hasFilter = _historySearch.text.trim().isNotEmpty;
     final birthPlaceName = BirthPlaceService.resolve(
       widget.customer.birthPlaceCode,
@@ -383,10 +385,10 @@ class _CustomerDetailState extends State<_CustomerDetail> {
             const SizedBox(height: 12),
             Wrap(spacing: 26, children: [
               Text(
-                '${orders.length} ${_itEn(orders.length == 1 ? 'acquisto' : 'acquisti', orders.length == 1 ? 'purchase' : 'purchases')}',
+                '${orders.length} ${_itEn(orders.length == 1 ? 'ordine storico' : 'ordini storici', orders.length == 1 ? 'historical order' : 'historical orders')}',
               ),
               Text(
-                '${_itEn('Totale storico', 'History total')}: ${formatMoney(spent)}',
+                '${_itEn('Totale acquisti validi', 'Valid purchases total')}: ${formatMoney(spent)}',
               ),
             ]),
           ]),
@@ -457,13 +459,23 @@ class _CustomerDetailState extends State<_CustomerDetail> {
                   itemBuilder: (context, index) {
                     final order = visibleOrders[index];
                     final date = formatLocalDateTime(order.createdAtUtc);
+                    final errorColor = Theme.of(context).colorScheme.error;
                     return ListTile(
                       leading: Icon(
-                        order.hasReceipt
-                            ? Icons.receipt_long
-                            : Icons.shopping_bag_outlined,
+                        order.isCancelled
+                            ? Icons.cancel_outlined
+                            : order.hasReceipt
+                                ? Icons.receipt_long
+                                : Icons.shopping_bag_outlined,
+                        color: order.isCancelled ? errorColor : null,
                       ),
-                      title: Text('${order.orderNumber} · ${order.totalDisplay}'),
+                      title: Text(
+                        '${order.orderNumber} · ${order.totalDisplay}'
+                        '${order.isCancelled ? _itEn(' · ANNULLATO', ' · CANCELLED') : ''}',
+                        style: order.isCancelled
+                            ? TextStyle(color: errorColor, fontWeight: FontWeight.w600)
+                            : null,
+                      ),
                       subtitle: Text(
                         '$date · ${order.itemCount} ${AppStrings.t(order.itemCount == 1 ? 'item' : 'items')}'
                         '${order.hasReceipt ? _itEn(' · scontrino salvato', ' · receipt saved') : ''}',
