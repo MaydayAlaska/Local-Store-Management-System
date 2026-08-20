@@ -18,8 +18,12 @@ Set<String> _keys(Map<String, dynamic> catalog) =>
 void main() {
   test('Flutter bundle always includes the fallback translation', () {
     final pubspec = File('pubspec.yaml').readAsStringSync();
+    final translationAssetsBundled = pubspec
+        .split('\n')
+        .map((line) => line.trim())
+        .contains('- assets/translations/');
     expect(
-      RegExp(r'(?m)^\s*-\s*assets/translations/\s*$').hasMatch(pubspec),
+      translationAssetsBundled,
       isTrue,
       reason:
           'pubspec.yaml must bundle assets/translations/ or installed builds may start without a language catalog.',
