@@ -28,6 +28,7 @@ class SettingsPage extends StatefulWidget {
 
 class _SettingsPageState extends State<SettingsPage> {
   late final TextEditingController _shopName;
+  late final TextEditingController _vatPercent;
   late bool _showName;
   late bool _showLogo;
   late String _currencyCode;
@@ -46,10 +47,16 @@ class _SettingsPageState extends State<SettingsPage> {
 
   String _itEn(String it, String en) => AppStrings.isEnglish ? en : it;
 
+  String _formatPercent(double value) =>
+      value.toStringAsFixed(2).replaceFirst(RegExp(r'\.?0+$'), '');
+
   @override
   void initState() {
     super.initState();
     _shopName = TextEditingController(text: widget.current.shopName);
+    _vatPercent = TextEditingController(
+      text: _formatPercent(widget.current.vatPercent),
+    );
     _showName = widget.current.showShopNameInMenu;
     _showLogo = widget.current.showLogoInMenu;
     _currencyCode = widget.current.currencyCode;
@@ -71,6 +78,7 @@ class _SettingsPageState extends State<SettingsPage> {
       _status = widget.initialUpdate!.message;
     }
     if (!identical(widget.current, oldWidget.current)) {
+      _vatPercent.text = _formatPercent(widget.current.vatPercent);
       _labelPrinters = List<LabelPrinterProfile>.of(
         widget.current.labelPrinterProfiles,
       );
@@ -80,6 +88,7 @@ class _SettingsPageState extends State<SettingsPage> {
   @override
   void dispose() {
     _shopName.dispose();
+    _vatPercent.dispose();
     super.dispose();
   }
 
@@ -98,11 +107,16 @@ class _SettingsPageState extends State<SettingsPage> {
   Future<void> _save() async {
     setState(() => _saving = true);
     try {
+      final parsedVat = double.tryParse(
+            _vatPercent.text.trim().replaceAll(',', '.'),
+          ) ??
+          widget.current.vatPercent;
       final settings = widget.services.settings.save(
         shopName: _shopName.text,
         showShopNameInMenu: _showName,
         showLogoInMenu: _showLogo,
         currencyCode: _currencyCode,
+        vatPercent: parsedVat,
         themeMode: _themeMode,
         languageCode: _languageCode,
         labelPrinterProfiles: _labelPrinters,
@@ -115,6 +129,7 @@ class _SettingsPageState extends State<SettingsPage> {
       setState(() {
         _iconSource = null;
         _logoSource = null;
+        _vatPercent.text = _formatPercent(settings.vatPercent);
         _labelPrinters = List<LabelPrinterProfile>.of(
           settings.labelPrinterProfiles,
         );
@@ -866,6 +881,28 @@ class _SettingsPageState extends State<SettingsPage> {
                         ),
                       ),
                     ],
+                  ),
+                  const SizedBox(height: 12),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: SizedBox(
+                      width: 240,
+                      child: TextField(
+                        controller: _vatPercent,
+                        keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true,
+                        ),
+                        decoration: InputDecoration(
+                          border: const OutlineInputBorder(),
+                          labelText: _itEn('VAT / IVA (%)', 'VAT (%)'),
+                          suffixText: '%',
+                          helperText: _itEn(
+                            'Aliquota inclusa nei prezzi di vendita.',
+                            'Rate included in sale prices.',
+                          ),
+                        ),
+                      ),
+                    ),
                   ),
                 ],
               ),

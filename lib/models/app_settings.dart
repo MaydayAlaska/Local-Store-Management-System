@@ -159,6 +159,7 @@ class AppSettings {
     this.lastLabelPrinterName,
     this.labelPrinterProfiles = const [],
     this.currencyCode = 'EUR',
+    this.vatPercent = 22,
     this.themeMode = 'system',
     this.languageCode = 'it',
   });
@@ -172,6 +173,7 @@ class AppSettings {
   final String? lastLabelPrinterName;
   final List<LabelPrinterProfile> labelPrinterProfiles;
   final String currencyCode;
+  final double vatPercent;
   final String themeMode;
   final String languageCode;
 
@@ -183,6 +185,8 @@ class AppSettings {
 
   factory AppSettings.fromJson(Map<String, dynamic> json) {
     final currency = (json['CurrencyCode'] as String?)?.trim().toUpperCase();
+    final rawVatPercent =
+        (json['VatPercent'] as num?)?.toDouble() ?? defaults.vatPercent;
     final theme = (json['ThemeMode'] as String?)?.trim().toLowerCase();
     final language = (json['LanguageCode'] as String?)?.trim().toLowerCase();
 
@@ -223,6 +227,7 @@ class AppSettings {
               : null,
       labelPrinterProfiles: profiles,
       currencyCode: supportedCurrencies.contains(currency) ? currency! : 'EUR',
+      vatPercent: rawVatPercent.clamp(0, 100).toDouble(),
       themeMode: supportedThemeModes.contains(theme) ? theme! : 'system',
       languageCode: supportedLanguages.contains(language) ? language! : 'it',
     );
@@ -239,6 +244,7 @@ class AppSettings {
         'LabelPrinters':
             labelPrinterProfiles.map((profile) => profile.toJson()).toList(),
         'CurrencyCode': currencyCode,
+        'VatPercent': vatPercent,
         'ThemeMode': themeMode,
         'LanguageCode': languageCode,
       };
@@ -282,6 +288,7 @@ class AppSettings {
     String? lastLabelPrinterName,
     List<LabelPrinterProfile>? labelPrinterProfiles,
     String? currencyCode,
+    double? vatPercent,
     String? themeMode,
     String? languageCode,
   }) =>
@@ -295,6 +302,7 @@ class AppSettings {
         lastLabelPrinterName: lastLabelPrinterName ?? this.lastLabelPrinterName,
         labelPrinterProfiles: labelPrinterProfiles ?? this.labelPrinterProfiles,
         currencyCode: currencyCode ?? this.currencyCode,
+        vatPercent: vatPercent ?? this.vatPercent,
         themeMode: themeMode ?? this.themeMode,
         languageCode: languageCode ?? this.languageCode,
       );

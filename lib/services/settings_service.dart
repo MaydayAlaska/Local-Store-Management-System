@@ -25,6 +25,7 @@ class SettingsService {
     required bool showShopNameInMenu,
     required bool showLogoInMenu,
     required String currencyCode,
+    required double vatPercent,
     required String themeMode,
     required String languageCode,
     List<LabelPrinterProfile>? labelPrinterProfiles,
@@ -45,6 +46,9 @@ class SettingsService {
         AppSettings.supportedCurrencies.contains(currencyCode.toUpperCase())
             ? currencyCode.toUpperCase()
             : AppSettings.defaults.currencyCode;
+    final normalizedVatPercent = vatPercent.isFinite
+        ? vatPercent.clamp(0, 100).toDouble()
+        : current.vatPercent;
     final normalizedTheme =
         AppSettings.supportedThemeModes.contains(themeMode.toLowerCase())
             ? themeMode.toLowerCase()
@@ -66,6 +70,7 @@ class SettingsService {
         labelPrinterProfiles ?? current.labelPrinterProfiles,
       ),
       currencyCode: normalizedCurrency,
+      vatPercent: normalizedVatPercent,
       themeMode: normalizedTheme,
       languageCode: normalizedLanguage,
     );
@@ -86,6 +91,7 @@ class SettingsService {
       lastLabelPrinterName: name.trim().isEmpty ? null : name.trim(),
       labelPrinterProfiles: current.labelPrinterProfiles,
       currencyCode: current.currencyCode,
+      vatPercent: current.vatPercent,
       themeMode: current.themeMode,
       languageCode: current.languageCode,
     );

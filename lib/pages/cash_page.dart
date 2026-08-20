@@ -466,6 +466,12 @@ class _CashPageState extends State<CashPage> {
     return total < 0 ? 0 : total;
   }
 
+  int _vatIncludedCents(int totalCents, double percent) {
+    final rate = percent.clamp(0, 100).toDouble();
+    if (totalCents <= 0 || rate <= 0) return 0;
+    return (totalCents * rate / (100 + rate)).round();
+  }
+
   int _applyPercent(int cents, double percent) =>
       (cents * (1 - _clampPercent(percent) / 100)).round();
   double _clampPercent(double value) => value.clamp(0, 100).toDouble();
@@ -535,6 +541,8 @@ class _CashPageState extends State<CashPage> {
     final totalPercentDiscount =
         totalPercentDiscountRaw < 0 ? 0 : totalPercentDiscountRaw;
     final count = _cart.fold<int>(0, (sum, line) => sum + line.quantity);
+    final vatPercent = widget.services.settings.load().vatPercent;
+    final vatCents = _vatIncludedCents(_finalTotalCents, vatPercent);
 
     return HidBarcodeListener(
       enabled: widget.isActive,
@@ -567,8 +575,7 @@ class _CashPageState extends State<CashPage> {
                     const SizedBox(height: 8),
                     Text(_searchStatus),
                     const SizedBox(height: 8),
-                    SizedBox(
-                      height: 188,
+                    Expanded(
                       child: Card(
                         clipBehavior: Clip.antiAlias,
                         child: results.isEmpty
@@ -595,7 +602,8 @@ class _CashPageState extends State<CashPage> {
                 ),
               ),
               const SizedBox(width: 16),
-              Expanded(
+              SizedBox(
+                width: 500,
                 child: Card(
                   clipBehavior: Clip.antiAlias,
                   child: Column(children: [
@@ -699,7 +707,7 @@ class _CashPageState extends State<CashPage> {
                     ),
                     const Divider(height: 1),
                     Padding(
-                      padding: const EdgeInsets.all(14),
+                      padding: const EdgeInsets.fromLTRB(14, 14, 14, 0),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
@@ -766,24 +774,44 @@ class _CashPageState extends State<CashPage> {
                               style: Theme.of(context).textTheme.headlineMedium,
                             ),
                           ]),
-                          const SizedBox(height: 12),
-                          Align(
-                            alignment: Alignment.center,
-                            child: SizedBox(
-                              width: 500,
-                              height: (MediaQuery.sizeOf(context).height * 0.32)
-                                  .clamp(300.0, 460.0)
-                                  .toDouble(),
-                              child: _CashKeypad(
-                                priceText: formatMoney(_keypadPriceCents),
-                                onKey: _keypadInsert,
-                                onBackspace: _keypadBackspace,
-                                onClear: _keypadClear,
-                                onSubmit: _keypadSubmit,
+                          const SizedBox(height: 4),
+                          Row(children: [
+                            Expanded(
+                              child: Text(
+                                _itEn(
+                                  'VAT inclusa (${_percentText(vatPercent)}%)',
+                                  'VAT included (${_percentText(vatPercent)}%)',
+                                ),
+                                style: Theme.of(context).textTheme.bodyMedium,
                               ),
                             ),
-                          ),
-                          const SizedBox(height: 8),
+                            Text(
+                              formatMoney(vatCents),
+                              style: Theme.of(context).textTheme.titleMedium,
+                            ),
+                          ]),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    SizedBox(
+                      width: double.infinity,
+                      height: (MediaQuery.sizeOf(context).height * 0.32)
+                          .clamp(300.0, 460.0)
+                          .toDouble(),
+                      child: _CashKeypad(
+                        priceText: formatMoney(_keypadPriceCents),
+                        onKey: _keypadInsert,
+                        onBackspace: _keypadBackspace,
+                        onClear: _keypadClear,
+                        onSubmit: _keypadSubmit,
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(14, 8, 14, 14),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
                           Text(
                             _cartStatus,
                             style: Theme.of(context).textTheme.bodySmall,
@@ -857,21 +885,6 @@ class _CashKeypad extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Row(
-                children: [
-                  const Icon(Icons.dialpad_rounded, size: 18),
-                  const SizedBox(width: 6),
-                  Expanded(
-                    child: Text(
-                      AppStrings.isEnglish
-                          ? 'Generic item price'
-                          : 'Prezzo articolo generico',
-                      style: Theme.of(context).textTheme.titleSmall,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 4),
               Text(
                 AppStrings.isEnglish
                     ? 'Enter the amount, then confirm to add it to the cart.'

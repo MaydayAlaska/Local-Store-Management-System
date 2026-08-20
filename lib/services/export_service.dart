@@ -22,7 +22,6 @@ enum InventoryExportField {
   stock,
   purchase,
   sale,
-  status,
 }
 
 String inventoryExportFieldLabel(InventoryExportField field) => switch (field) {
@@ -34,7 +33,6 @@ String inventoryExportFieldLabel(InventoryExportField field) => switch (field) {
       InventoryExportField.stock => AppStrings.t('quantity'),
       InventoryExportField.purchase => AppStrings.t('purchase'),
       InventoryExportField.sale => AppStrings.t('sale'),
-      InventoryExportField.status => AppStrings.t('status'),
     };
 
 class ExportService {
@@ -48,7 +46,7 @@ class ExportService {
           (product.brandId != null && brandIds.contains(product.brandId));
       final categoryOk = categoryIds.isEmpty ||
           (product.categoryId != null && categoryIds.contains(product.categoryId));
-      return brandOk && categoryOk;
+      return product.stockQuantity > 0 && brandOk && categoryOk;
     }).toList();
   }
 
@@ -185,7 +183,6 @@ class ExportService {
         InventoryExportField.sale => product.salePriceCents == null
             ? TextCellValue('')
             : DoubleCellValue(product.salePriceCents! / 100),
-        InventoryExportField.status => TextCellValue(product.statusDisplay),
       };
 
   String _pdfValue(InventoryExportField field, ProductVariant product) =>
@@ -198,7 +195,6 @@ class ExportService {
         InventoryExportField.stock => '${product.stockQuantity}',
         InventoryExportField.purchase => formatMoney(product.purchasePriceCents),
         InventoryExportField.sale => formatMoney(product.salePriceCents),
-        InventoryExportField.status => product.statusDisplay,
       };
 
   pw.ThemeData _loadPdfTheme() {
