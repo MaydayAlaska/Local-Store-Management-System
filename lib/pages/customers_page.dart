@@ -77,8 +77,8 @@ class _CustomersPageState extends State<CustomersPage> {
     setState(() {
       _selected = created;
       _status = _itEn(
-        'Cliente ${created.displayName} registrato.',
-        'Customer ${created.displayName} registered.',
+        'Cliente ${created.displayName} registrato con codice ${created.customerCodeDisplay}.',
+        'Customer ${created.displayName} registered with code ${created.customerCodeDisplay}.',
       );
     });
   }
@@ -92,8 +92,8 @@ class _CustomersPageState extends State<CustomersPage> {
     setState(() {
       _selected = created;
       _status = _itEn(
-        'Cliente ${created.displayName} registrato.',
-        'Customer ${created.displayName} registered.',
+        'Cliente ${created.displayName} registrato con codice ${created.customerCodeDisplay}.',
+        'Customer ${created.displayName} registered with code ${created.customerCodeDisplay}.',
       );
     });
   }
@@ -117,22 +117,39 @@ class _CustomersPageState extends State<CustomersPage> {
     final selected = _selected;
     if (selected == null) return;
     final orders = widget.services.customers.ordersForCustomer(selected.id);
+    final giftCards = widget.services.customers.giftCardsForCustomer(selected.id);
+    final remainingGiftValue = giftCards.fold<int>(
+      0,
+      (sum, card) => sum + card.remainingValueCents,
+    );
+    final fiscalCode = selected.fiscalCode?.trim();
+    final identity = '${selected.displayName} (${selected.customerCodeDisplay}'
+        '${fiscalCode?.isNotEmpty == true ? ' · CF $fiscalCode' : ''})';
+
+    final details = <String>[];
+    if (orders.isNotEmpty) {
+      details.add(_itEn(
+        'I ${orders.length} ordini associati resteranno nello storico Vendite con i dati cliente memorizzati, ma non saranno più collegati a un cliente attivo.',
+        'The ${orders.length} linked orders will remain in Sales history with the stored customer details, but will no longer be linked to an active customer.',
+      ));
+    }
+    if (giftCards.isNotEmpty) {
+      details.add(_itEn(
+        'Verranno eliminati anche ${giftCards.length} buoni regalo associati. Il credito residuo complessivo di ${formatMoney(remainingGiftValue)} verrà perso.',
+        '${giftCards.length} linked gift cards will also be deleted. Their total remaining credit of ${formatMoney(remainingGiftValue)} will be lost.',
+      ));
+    }
+    details.add(_itEn(
+      'Il codice ${selected.customerCodeDisplay} tornerà disponibile e potrà essere assegnato a un nuovo cliente.',
+      'Code ${selected.customerCodeDisplay} will become available and may be assigned to a new customer.',
+    ));
+
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: Text(_itEn('Eliminare il cliente?', 'Delete customer?')),
         content: Text(
-          orders.isEmpty
-              ? _itEn(
-                  'Vuoi eliminare definitivamente ${selected.displayName} (${selected.fiscalCode})?',
-                  'Do you want to permanently delete ${selected.displayName} (${selected.fiscalCode})?',
-                )
-              : _itEn(
-                  'Vuoi eliminare definitivamente ${selected.displayName} (${selected.fiscalCode})?\n\n'
-                  'I ${orders.length} ordini associati resteranno nello storico Vendite con nome e codice fiscale memorizzati, ma non saranno più collegati a un cliente attivo.',
-                  'Do you want to permanently delete ${selected.displayName} (${selected.fiscalCode})?\n\n'
-                  'The ${orders.length} linked orders will remain in Sales history with the stored name and tax code, but will no longer be linked to an active customer.',
-                ),
+          '${_itEn('Vuoi eliminare definitivamente', 'Do you want to permanently delete')} $identity?\n\n${details.join('\n\n')}',
         ),
         actions: [
           TextButton(
@@ -159,8 +176,8 @@ class _CustomersPageState extends State<CustomersPage> {
         _selected = null;
         _status = deleted
             ? _itEn(
-                'Cliente ${selected.displayName} eliminato. Lo storico vendite è stato conservato.',
-                'Customer ${selected.displayName} deleted. Sales history was preserved.',
+                'Cliente ${selected.displayName} eliminato. Il codice ${selected.customerCodeDisplay} è nuovamente disponibile.',
+                'Customer ${selected.displayName} deleted. Code ${selected.customerCodeDisplay} is available again.',
               )
             : _itEn('Il cliente non esiste più.', 'The customer no longer exists.');
       });
@@ -226,8 +243,8 @@ class _CustomersPageState extends State<CustomersPage> {
                           prefixIcon: const Icon(Icons.search),
                           labelText: AppStrings.t('search_customer'),
                           hintText: _itEn(
-                            'Nome, cognome o codice fiscale',
-                            'First name, last name or tax code',
+                            'Nome, codice cliente o codice fiscale',
+                            'Name, customer code or tax code',
                           ),
                         ),
                       ),
@@ -248,13 +265,19 @@ class _CustomersPageState extends State<CustomersPage> {
                               separatorBuilder: (_, _) => const Divider(height: 1),
                               itemBuilder: (context, index) {
                                 final customer = customers[index];
+                                final fiscalCode = customer.fiscalCode?.trim();
                                 return ListTile(
                                   selected: selected?.id == customer.id,
                                   leading: const CircleAvatar(
                                     child: Icon(Icons.person_outline),
                                   ),
                                   title: Text(customer.displayName),
-                                  subtitle: Text(customer.fiscalCode),
+                                  subtitle: Text(
+                                    customer.customerCodeDisplay +
+                                        (fiscalCode?.isNotEmpty == true
+                                            ? ' · CF $fiscalCode'
+                                            : ''),
+                                  ),
                                   onTap: () =>
                                       setState(() => _selected = customer),
                                 );
@@ -271,8 +294,8 @@ class _CustomersPageState extends State<CustomersPage> {
                         child: Center(
                           child: Text(
                             _itEn(
-                              'Seleziona un cliente oppure scansiona la Tessera Sanitaria.',
-                              'Select a customer or scan the health card / tax code.',
+                              'Seleziona un cliente, creane uno nuovo oppure scansiona la Tessera Sanitaria.',
+                              'Select a customer, create a new one, or scan the health card / tax code.',
                             ),
                           ),
                         ),
@@ -316,6 +339,7 @@ class _CustomerDetail extends StatefulWidget {
 
 class _CustomerDetailState extends State<_CustomerDetail> {
   final _historySearch = TextEditingController();
+  String? _giftStatus;
 
   String _itEn(String it, String en) => AppStrings.isEnglish ? en : it;
 
@@ -325,6 +349,141 @@ class _CustomerDetailState extends State<_CustomerDetail> {
     super.dispose();
   }
 
+  Future<void> _createGiftCard() async {
+    final valueController = TextEditingController();
+    String? error;
+    final cents = await showDialog<int>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: Text(_itEn('Nuovo buono regalo', 'New gift card')),
+          content: SizedBox(
+            width: 420,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  _itEn(
+                    'Il buono verrà associato a ${widget.customer.displayName}. Il valore speso partirà da zero.',
+                    'The gift card will be linked to ${widget.customer.displayName}. Its spent value will start at zero.',
+                  ),
+                ),
+                const SizedBox(height: 14),
+                TextField(
+                  controller: valueController,
+                  autofocus: true,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  decoration: InputDecoration(
+                    border: const OutlineInputBorder(),
+                    labelText: _itEn('Valore totale', 'Total value'),
+                    prefixText: '€ ',
+                    errorText: error,
+                  ),
+                  onChanged: (_) {
+                    if (error != null) setDialogState(() => error = null);
+                  },
+                  onSubmitted: (_) {
+                    final parsed = double.tryParse(
+                      valueController.text.trim().replaceAll(',', '.'),
+                    );
+                    final valueCents = parsed == null ? 0 : (parsed * 100).round();
+                    if (valueCents <= 0) {
+                      setDialogState(() => error = _itEn(
+                            'Inserisci un valore maggiore di zero.',
+                            'Enter a value greater than zero.',
+                          ));
+                      return;
+                    }
+                    Navigator.of(dialogContext).pop(valueCents);
+                  },
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: Text(AppStrings.t('cancel')),
+            ),
+            FilledButton.icon(
+              onPressed: () {
+                final parsed = double.tryParse(
+                  valueController.text.trim().replaceAll(',', '.'),
+                );
+                final valueCents = parsed == null ? 0 : (parsed * 100).round();
+                if (valueCents <= 0) {
+                  setDialogState(() => error = _itEn(
+                        'Inserisci un valore maggiore di zero.',
+                        'Enter a value greater than zero.',
+                      ));
+                  return;
+                }
+                Navigator.of(dialogContext).pop(valueCents);
+              },
+              icon: const Icon(Icons.card_giftcard),
+              label: Text(_itEn('Crea buono', 'Create gift card')),
+            ),
+          ],
+        ),
+      ),
+    );
+    valueController.dispose();
+    if (cents == null || !mounted) return;
+
+    try {
+      final card = widget.repository.createGiftCard(widget.customer.id, cents);
+      if (!mounted) return;
+      setState(() => _giftStatus = _itEn(
+            'Buono ${card.code} creato con valore ${card.totalDisplay}.',
+            'Gift card ${card.code} created with value ${card.totalDisplay}.',
+          ));
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _giftStatus = _itEn(
+            'Impossibile creare il buono regalo: $error',
+            'Unable to create gift card: $error',
+          ));
+    }
+  }
+
+  Future<void> _deleteGiftCard(GiftCard card) async {
+    final confirmed = await showDialog<bool>(
+          context: context,
+          builder: (dialogContext) => AlertDialog(
+            title: Text(_itEn('Elimina buono regalo', 'Delete gift card')),
+            content: Text(
+              _itEn(
+                'Eliminare definitivamente ${card.code}? Il credito residuo di ${card.remainingDisplay} verrà perso. Gli ordini storici conserveranno il codice e l’importo del buono eventualmente utilizzato.',
+                'Permanently delete ${card.code}? Its remaining credit of ${card.remainingDisplay} will be lost. Historical orders will keep the gift card code and any amount that was used.',
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(dialogContext).pop(false),
+                child: Text(AppStrings.t('cancel')),
+              ),
+              FilledButton.icon(
+                style: FilledButton.styleFrom(
+                  backgroundColor: Theme.of(dialogContext).colorScheme.error,
+                ),
+                onPressed: () => Navigator.of(dialogContext).pop(true),
+                icon: const Icon(Icons.delete_outline),
+                label: Text(_itEn('Elimina buono', 'Delete gift card')),
+              ),
+            ],
+          ),
+        ) ??
+        false;
+    if (!confirmed || !mounted) return;
+
+    final deleted = widget.repository.deleteGiftCard(card.id);
+    if (!mounted) return;
+    setState(() => _giftStatus = deleted
+        ? _itEn('Buono ${card.code} eliminato.', 'Gift card ${card.code} deleted.')
+        : _itEn('Il buono non esiste più.', 'The gift card no longer exists.'));
+  }
+
   @override
   Widget build(BuildContext context) {
     final orders = widget.repository.ordersForCustomer(widget.customer.id);
@@ -332,14 +491,18 @@ class _CustomerDetailState extends State<_CustomerDetail> {
       widget.customer.id,
       _historySearch.text,
     );
+    final giftCards = widget.repository.giftCardsForCustomer(widget.customer.id);
     final spent = orders
         .where((order) => !order.isCancelled)
         .fold<int>(0, (sum, order) => sum + order.finalTotalCents);
     final hasFilter = _historySearch.text.trim().isNotEmpty;
-    final birthPlaceName = BirthPlaceService.resolve(
-      widget.customer.birthPlaceCode,
-      widget.customer.birthDate,
-    );
+    final birthDate = widget.customer.birthDate;
+    final birthPlaceCode = widget.customer.birthPlaceCode;
+    final birthPlaceName = birthDate != null && birthPlaceCode != null
+        ? BirthPlaceService.resolve(birthPlaceCode, birthDate)
+        : null;
+    final fiscalCode = widget.customer.fiscalCode?.trim();
+
     return Card(
       clipBehavior: Clip.antiAlias,
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
@@ -370,29 +533,108 @@ class _CustomerDetailState extends State<_CustomerDetail> {
             ]),
             const SizedBox(height: 8),
             Wrap(spacing: 22, runSpacing: 8, children: [
-              Text('${_itEn('CF', 'Tax code')}: ${widget.customer.fiscalCode}'),
-              Text('${_itEn('Nascita', 'Birth date')}: ${widget.customer.birthDateDisplay}'),
-              Text('${_itEn('Sesso', 'Sex')}: ${widget.customer.sex}'),
               Text(
-                '${_itEn('Luogo di nascita', 'Birth place')}: '
-                '${birthPlaceName ?? _itEn('Non disponibile', 'Not available')}',
+                '${_itEn('Codice cliente', 'Customer code')}: ${widget.customer.customerCodeDisplay}',
+                style: const TextStyle(fontWeight: FontWeight.w700),
               ),
+              Text(
+                '${_itEn('CF', 'Tax code')}: ${fiscalCode?.isNotEmpty == true ? fiscalCode : _itEn('non inserito', 'not set')}',
+              ),
+              if (widget.customer.birthDateDisplay != null)
+                Text(
+                  '${_itEn('Nascita', 'Birth date')}: ${widget.customer.birthDateDisplay}',
+                ),
+              if (widget.customer.sex?.trim().isNotEmpty == true)
+                Text('${_itEn('Sesso', 'Sex')}: ${widget.customer.sex}'),
+              if (birthDate != null && birthPlaceCode != null)
+                Text(
+                  '${_itEn('Luogo di nascita', 'Birth place')}: '
+                  '${birthPlaceName ?? _itEn('Non disponibile', 'Not available')}',
+                ),
             ]),
             if (widget.customer.notes?.trim().isNotEmpty == true) ...[
               const SizedBox(height: 8),
               Text('${AppStrings.t('notes')}: ${widget.customer.notes}'),
             ],
             const SizedBox(height: 12),
-            Wrap(spacing: 26, children: [
+            Wrap(spacing: 26, runSpacing: 6, children: [
               Text(
                 '${orders.length} ${_itEn(orders.length == 1 ? 'ordine storico' : 'ordini storici', orders.length == 1 ? 'historical order' : 'historical orders')}',
               ),
               Text(
                 '${_itEn('Totale acquisti validi', 'Valid purchases total')}: ${formatMoney(spent)}',
               ),
+              Text(
+                '${giftCards.length} ${_itEn(giftCards.length == 1 ? 'buono regalo' : 'buoni regalo', giftCards.length == 1 ? 'gift card' : 'gift cards')}',
+              ),
             ]),
           ]),
         ),
+        const Divider(height: 1),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+          child: Row(children: [
+            Expanded(
+              child: Text(
+                _itEn('Buoni regalo', 'Gift cards'),
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
+            ),
+            FilledButton.icon(
+              onPressed: _createGiftCard,
+              icon: const Icon(Icons.card_giftcard),
+              label: Text(_itEn('Nuovo buono', 'New gift card')),
+            ),
+          ]),
+        ),
+        if (_giftStatus != null)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+            child: Text(_giftStatus!, style: Theme.of(context).textTheme.bodySmall),
+          ),
+        if (giftCards.isEmpty)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+            child: Text(
+              _itEn(
+                'Nessun buono regalo associato a questo cliente.',
+                'No gift cards are linked to this customer.',
+              ),
+            ),
+          )
+        else
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxHeight: 190),
+            child: ListView.separated(
+              shrinkWrap: true,
+              itemCount: giftCards.length,
+              separatorBuilder: (_, _) => const Divider(height: 1),
+              itemBuilder: (context, index) {
+                final card = giftCards[index];
+                return ListTile(
+                  leading: Icon(
+                    card.isExhausted
+                        ? Icons.redeem_outlined
+                        : Icons.card_giftcard_outlined,
+                  ),
+                  title: Text(
+                    '${card.code} · ${_itEn(card.isExhausted ? 'ESAURITO' : 'ATTIVO', card.isExhausted ? 'USED UP' : 'ACTIVE')}',
+                    style: const TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                  subtitle: Text(
+                    '${_itEn('Totale', 'Total')}: ${card.totalDisplay} · '
+                    '${_itEn('Speso', 'Spent')}: ${card.spentDisplay} · '
+                    '${_itEn('Residuo', 'Remaining')}: ${card.remainingDisplay}',
+                  ),
+                  trailing: IconButton(
+                    tooltip: _itEn('Elimina buono', 'Delete gift card'),
+                    onPressed: () => _deleteGiftCard(card),
+                    icon: const Icon(Icons.delete_outline),
+                  ),
+                );
+              },
+            ),
+          ),
         const Divider(height: 1),
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 14, 16, 8),
@@ -473,11 +715,15 @@ class _CustomerDetailState extends State<_CustomerDetail> {
                         '${order.orderNumber} · ${order.totalDisplay}'
                         '${order.isCancelled ? _itEn(' · ANNULLATO', ' · CANCELLED') : ''}',
                         style: order.isCancelled
-                            ? TextStyle(color: errorColor, fontWeight: FontWeight.w600)
+                            ? TextStyle(
+                                color: errorColor,
+                                fontWeight: FontWeight.w600,
+                              )
                             : null,
                       ),
                       subtitle: Text(
                         '$date · ${order.itemCount} ${AppStrings.t(order.itemCount == 1 ? 'item' : 'items')}'
+                        '${order.hasGiftCard ? ' · ${_itEn('buono', 'gift card')} ${order.giftCardCode}: −${formatMoney(order.giftCardAppliedCents)}' : ''}'
                         '${order.hasReceipt ? _itEn(' · scontrino salvato', ' · receipt saved') : ''}',
                       ),
                       trailing: const Icon(Icons.chevron_right),
