@@ -13,7 +13,7 @@ dependencies:
     sdk: flutter
   barcode: ^2.2.9
   barcode_widget: ^2.0.4
-  excel: ^4.0.6
+  excel_plus: ^2.14.2
   file_selector: ^1.1.0
   image: ^4.9.0
   path: ^1.9.1
