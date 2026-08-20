@@ -1,121 +1,261 @@
+import 'dart:convert';
+import 'dart:io';
+
+import 'package:flutter/services.dart';
+import 'package:path/path.dart' as p;
+
+import '../core/app_paths.dart';
 import '../core/app_runtime.dart';
 
-class AppStrings {
-  static bool get isEnglish => AppRuntime.languageCode == 'en';
+class AppLanguage {
+  const AppLanguage({
+    required this.code,
+    required this.nativeName,
+    required this.filePath,
+  });
 
-  static String t(String key) {
-    final values = _strings[key];
-    if (values == null) return key;
-    return values[isEnglish ? 'en' : 'it'] ?? values['it'] ?? key;
+  final String code;
+  final String nativeName;
+  final String filePath;
+}
+
+class AppStrings {
+  static const fallbackLanguageCode = 'it';
+  static const _schemaVersion = 1;
+  static const _bundledLanguageAssets = <String>[
+    'assets/translations/it.json',
+    'assets/translations/en.json',
+  ];
+
+  static final Map<String, _TranslationCatalog> _catalogs = {};
+  static final Map<String, String> _invalidFiles = {};
+  static bool _initialized = false;
+
+  static bool get isEnglish => AppRuntime.languageCode == 'en';
+  static bool get isInitialized => _initialized;
+
+  static List<AppLanguage> get languages {
+    final values = _catalogs.values
+        .map(
+          (catalog) => AppLanguage(
+            code: catalog.code,
+            nativeName: catalog.nativeName,
+            filePath: catalog.filePath,
+          ),
+        )
+        .toList(growable: false)
+      ..sort(
+        (a, b) => a.nativeName.toLowerCase().compareTo(
+              b.nativeName.toLowerCase(),
+            ),
+      );
+    return values;
   }
 
-  static const Map<String, Map<String, String>> _strings = {
-    'dashboard': {'it': 'Dashboard', 'en': 'Dashboard'},
-    'cash': {'it': 'Cassa', 'en': 'Checkout'},
-    'sales': {'it': 'Vendite', 'en': 'Sales'},
-    'customers': {'it': 'Clienti', 'en': 'Customers'},
-    'labels': {'it': 'Etichette', 'en': 'Labels'},
-    'products': {'it': 'Prodotti', 'en': 'Products'},
-    'stock': {'it': 'Magazzino', 'en': 'Stock'},
-    'lookups': {'it': 'Anagrafiche', 'en': 'Lookups'},
-    'export': {'it': 'Export', 'en': 'Export'},
-    'settings': {'it': 'Impostazioni', 'en': 'Settings'},
-    'updates': {'it': 'Aggiornamenti', 'en': 'Updates'},
-    'shop_interface': {'it': 'Negozio e interfaccia', 'en': 'Shop and interface'},
-    'shop_name': {'it': 'Nome negozio', 'en': 'Shop name'},
-    'show_shop_name': {'it': 'Mostra nome negozio nel menu', 'en': 'Show shop name in menu'},
-    'show_logo': {'it': 'Mostra logo nel menu', 'en': 'Show logo in menu'},
-    'change_app_icon': {'it': 'Cambia icona applicazione', 'en': 'Change application icon'},
-    'app_icon_selected': {'it': 'Icona selezionata', 'en': 'Icon selected'},
-    'change_shop_logo': {'it': 'Cambia logo negozio', 'en': 'Change shop logo'},
-    'shop_logo_selected': {'it': 'Logo selezionato', 'en': 'Logo selected'},
-    'save_settings': {'it': 'Salva impostazioni', 'en': 'Save settings'},
-    'saving': {'it': 'Salvataggio…', 'en': 'Saving…'},
-    'data_path': {'it': 'Dati', 'en': 'Data'},
-    'appearance_language': {'it': 'Aspetto, lingua e valuta', 'en': 'Appearance, language and currency'},
-    'theme': {'it': 'Tema', 'en': 'Theme'},
-    'theme_system': {'it': 'Sistema', 'en': 'System'},
-    'theme_light': {'it': 'Chiaro', 'en': 'Light'},
-    'theme_dark': {'it': 'Scuro', 'en': 'Dark'},
-    'language': {'it': 'Lingua', 'en': 'Language'},
-    'italian': {'it': 'Italiano', 'en': 'Italiano'},
-    'english': {'it': 'English', 'en': 'English'},
-    'currency': {'it': 'Valuta', 'en': 'Currency'},
-    'version': {'it': 'Versione', 'en': 'Version'},
-    'commit': {'it': 'Commit', 'en': 'Commit'},
-    'check_updates': {'it': 'Controlla aggiornamenti', 'en': 'Check for updates'},
-    'checking': {'it': 'Controllo…', 'en': 'Checking…'},
-    'install_update': {'it': 'Installa aggiornamento', 'en': 'Install update'},
-    'update_available': {'it': 'Aggiornamento disponibile', 'en': 'Update available'},
-    'open_settings_update': {'it': 'Clicca per aprire Impostazioni', 'en': 'Click to open Settings'},
-    'close': {'it': 'Chiudi', 'en': 'Close'},
-    'minimize': {'it': 'Riduci a icona', 'en': 'Minimize'},
-    'maximize_restore': {'it': 'Massimizza / ripristina', 'en': 'Maximize / restore'},
-    'backup_export': {'it': 'Backup ed esportazione', 'en': 'Backup and export'},
-    'backup_database': {'it': 'Backup database', 'en': 'Database backup'},
-    'create_backup': {'it': 'Crea backup in Backups', 'en': 'Create backup in Backups'},
-    'save_backup_as': {'it': 'Salva backup come…', 'en': 'Save backup as…'},
-    'inventory_fields': {'it': 'Campi da esportare', 'en': 'Fields to export'},
-    'inventory_filters': {'it': 'Filtri inventario', 'en': 'Inventory filters'},
-    'brands': {'it': 'Marche', 'en': 'Brands'},
-    'categories': {'it': 'Categorie', 'en': 'Categories'},
-    'no_filter': {'it': 'Nessun filtro selezionato = inventario completo. I dati vengono raggruppati per marca in ordine alfabetico.', 'en': 'No filter selected = full inventory. Data is grouped by brand in alphabetical order.'},
-    'export_excel': {'it': 'Esporta Excel', 'en': 'Export Excel'},
-    'export_pdf': {'it': 'Esporta PDF', 'en': 'Export PDF'},
-    'reset_filters': {'it': 'Azzera filtri', 'en': 'Reset filters'},
-    'operation_cancelled': {'it': 'Operazione annullata.', 'en': 'Operation cancelled.'},
-    'file_created': {'it': 'File creato', 'en': 'File created'},
-    'error': {'it': 'Errore', 'en': 'Error'},
-    'product': {'it': 'Prodotto', 'en': 'Product'},
-    'variant': {'it': 'Variante', 'en': 'Variant'},
-    'sku': {'it': 'SKU', 'en': 'SKU'},
-    'barcode': {'it': 'Barcode', 'en': 'Barcode'},
-    'category': {'it': 'Categoria', 'en': 'Category'},
-    'quantity': {'it': 'Giacenza', 'en': 'Stock'},
-    'purchase': {'it': 'Acquisto', 'en': 'Purchase'},
-    'sale': {'it': 'Vendita', 'en': 'Sale'},
-    'status': {'it': 'Stato', 'en': 'Status'},
-    'inventory': {'it': 'Inventario', 'en': 'Inventory'},
-    'without_brand': {'it': 'Senza marca', 'en': 'No brand'},
-    'no_inventory_rows': {'it': 'Nessun articolo corrisponde ai filtri selezionati.', 'en': 'No items match the selected filters.'},
-    'settings_saved': {'it': 'Impostazioni salvate.', 'en': 'Settings saved.'},
-    'beta_channel': {'it': 'Canale aggiornamenti: BETA (beta-latest), branch Flutter. Le build BETA ricevono solo altre BETA.', 'en': 'Update channel: BETA (beta-latest), Flutter branch. BETA builds only receive other BETA builds.'},
-    'stable_channel': {'it': 'Canale aggiornamenti: STABILE, branch main. Le build stabili ricevono solo release stabili.', 'en': 'Update channel: STABLE, main branch. Stable builds only receive stable releases.'},
-    'dev_channel': {'it': 'Build di sviluppo: il controllo è disponibile, l’installazione OTA richiede una release pubblicata.', 'en': 'Development build: update checks are available, OTA installation requires a published release.'},
-    'images': {'it': 'Immagini', 'en': 'Images'},
-    'scan_search': {'it': 'Scansiona prodotto o cerca', 'en': 'Scan product or search'},
-    'scanner_hint': {'it': 'Lo scanner HID funziona anche senza cliccare questo campo', 'en': 'The HID scanner works even without clicking this field'},
-    'no_product_found': {'it': 'Nessun prodotto trovato.', 'en': 'No products found.'},
-    'cart': {'it': 'Carrello', 'en': 'Cart'},
-    'item': {'it': 'articolo', 'en': 'item'},
-    'items': {'it': 'articoli', 'en': 'items'},
-    'clear': {'it': 'Svuota', 'en': 'Clear'},
-    'no_customer': {'it': 'Nessun cliente associato · scansiona la Tessera Sanitaria', 'en': 'No customer linked · scan the health card / tax code'},
-    'search_customer': {'it': 'Cerca cliente', 'en': 'Find customer'},
-    'change_customer': {'it': 'Cambia cliente', 'en': 'Change customer'},
-    'remove_customer': {'it': 'Rimuovi cliente dalla vendita', 'en': 'Remove customer from sale'},
-    'empty_cart': {'it': 'Carrello vuoto.', 'en': 'Cart is empty.'},
-    'discount_percent': {'it': 'Sconto %', 'en': 'Discount %'},
-    'discount_amount': {'it': 'Sconto', 'en': 'Discount'},
-    'item_discounts': {'it': 'Sconti articoli', 'en': 'Item discounts'},
-    'fixed_discounts': {'it': 'Sconti fissi', 'en': 'Fixed discounts'},
-    'total': {'it': 'Totale', 'en': 'Total'},
-    'register_without_customer': {'it': 'Registra vendita senza cliente', 'en': 'Register sale without customer'},
-    'register_for': {'it': 'Registra vendita per', 'en': 'Register sale for'},
-    'fiscal_document': {'it': 'Emetti documento commerciale (RT non integrato)', 'en': 'Issue fiscal receipt (RT not integrated)'},
-    'remove': {'it': 'Rimuovi', 'en': 'Remove'},
-    'each': {'it': 'cad.', 'en': 'each'},
-    'ready_scanner': {'it': 'Scanner HID pronto. Scansiona barcode/SKU oppure la Tessera Sanitaria del cliente.', 'en': 'HID scanner ready. Scan a barcode/SKU or the customer tax code.'},
-    'sale_preparing': {'it': 'Vendita in preparazione: la giacenza verrà scaricata quando registri la vendita.', 'en': 'Sale in progress: stock will be deducted when you register the sale.'},
-    'new_product': {'it': 'Nuovo prodotto', 'en': 'New product'},
-    'edit_product': {'it': 'Modifica prodotto', 'en': 'Edit product'},
-    'name': {'it': 'Nome', 'en': 'Name'},
-    'brand': {'it': 'Marca', 'en': 'Brand'},
-    'notes': {'it': 'Note', 'en': 'Notes'},
-    'active': {'it': 'Attivo', 'en': 'Active'},
-    'add_variant': {'it': 'Aggiungi variante', 'en': 'Add variant'},
-    'size': {'it': 'Taglia', 'en': 'Size'},
-    'save': {'it': 'Salva', 'en': 'Save'},
-    'cancel': {'it': 'Annulla', 'en': 'Cancel'},
-  };
+  static Map<String, String> get invalidFiles =>
+      Map<String, String>.unmodifiable(_invalidFiles);
+
+  static Future<void> initialize() async {
+    await _seedBundledLanguages();
+    await reload();
+    _initialized = true;
+  }
+
+  static Future<void> reload() async {
+    final directory = Directory(AppPaths.translationsDirectory);
+    await directory.create(recursive: true);
+
+    final loaded = <String, _TranslationCatalog>{};
+    final invalid = <String, String>{};
+    final files = directory
+        .listSync()
+        .whereType<File>()
+        .where((file) => p.extension(file.path).toLowerCase() == '.json')
+        .toList()
+      ..sort((a, b) => a.path.compareTo(b.path));
+
+    for (final file in files) {
+      try {
+        final catalog = _TranslationCatalog.parse(
+          file.readAsStringSync(),
+          file.path,
+        );
+        loaded[catalog.code] = catalog;
+      } catch (error) {
+        invalid[p.basename(file.path)] = error.toString();
+      }
+    }
+
+    var fallback = loaded[fallbackLanguageCode];
+    if (fallback == null) {
+      final content = await rootBundle.loadString(
+        'assets/translations/$fallbackLanguageCode.json',
+      );
+      fallback = _TranslationCatalog.parse(
+        content,
+        'assets/translations/$fallbackLanguageCode.json',
+      );
+      loaded[fallbackLanguageCode] = fallback;
+    }
+
+    final requiredKeys = fallback.strings.keys.toSet();
+    loaded.removeWhere((code, catalog) {
+      if (code == fallbackLanguageCode) return false;
+      final missing = requiredKeys.difference(catalog.strings.keys.toSet());
+      if (missing.isEmpty) return false;
+      invalid[p.basename(catalog.filePath)] =
+          'Mancano ${missing.length} chiavi: ${missing.take(8).join(', ')}'
+          '${missing.length > 8 ? ', …' : ''}';
+      return true;
+    });
+
+    _catalogs
+      ..clear()
+      ..addAll(loaded);
+    _invalidFiles
+      ..clear()
+      ..addAll(invalid);
+  }
+
+  static bool hasLanguage(String code) =>
+      _catalogs.containsKey(normalizeLanguageCode(code));
+
+  static String normalizeLanguageCode(String value) =>
+      value.trim().replaceAll('_', '-').toLowerCase();
+
+  static String nativeNameFor(String code) {
+    final normalized = normalizeLanguageCode(code);
+    return _catalogs[normalized]?.nativeName ?? normalized;
+  }
+
+  static String t(
+    String key, [
+    Map<String, Object?> parameters = const <String, Object?>{},
+  ]) {
+    final selected = normalizeLanguageCode(AppRuntime.languageCode);
+    final value = _catalogs[selected]?.strings[key] ??
+        _catalogs[fallbackLanguageCode]?.strings[key] ??
+        key;
+    return _interpolate(value, parameters);
+  }
+
+  /// Compatibility bridge for UI strings that have not yet been converted to
+  /// stable translation keys. New code should always use [t]. Third-party
+  /// language files can override these entries through the optional `legacy`
+  /// object, using the English fallback text as the key.
+  static String pair(
+    String italian,
+    String english, [
+    Map<String, Object?> parameters = const <String, Object?>{},
+  ]) {
+    final selected = normalizeLanguageCode(AppRuntime.languageCode);
+    String value;
+    if (selected == 'it') {
+      value = italian;
+    } else if (selected == 'en') {
+      value = english;
+    } else {
+      value = _catalogs[selected]?.legacy[english] ?? italian;
+    }
+    return _interpolate(value, parameters);
+  }
+
+  static String _interpolate(
+    String value,
+    Map<String, Object?> parameters,
+  ) {
+    var result = value;
+    for (final entry in parameters.entries) {
+      result = result.replaceAll('{${entry.key}}', '${entry.value ?? ''}');
+    }
+    return result;
+  }
+
+  static Future<void> _seedBundledLanguages() async {
+    final directory = Directory(AppPaths.translationsDirectory);
+    await directory.create(recursive: true);
+    for (final asset in _bundledLanguageAssets) {
+      final content = await rootBundle.loadString(asset);
+      final destination = File(p.join(directory.path, p.basename(asset)));
+      await destination.writeAsString(content, flush: true);
+    }
+  }
+}
+
+class _TranslationCatalog {
+  const _TranslationCatalog({
+    required this.code,
+    required this.nativeName,
+    required this.filePath,
+    required this.strings,
+    required this.legacy,
+  });
+
+  final String code;
+  final String nativeName;
+  final String filePath;
+  final Map<String, String> strings;
+  final Map<String, String> legacy;
+
+  static _TranslationCatalog parse(String source, String filePath) {
+    final decoded = jsonDecode(source);
+    if (decoded is! Map<String, dynamic>) {
+      throw const FormatException('Il file di traduzione deve contenere un oggetto JSON.');
+    }
+
+    final rawSchema = decoded['schemaVersion'];
+    if (rawSchema is! num || rawSchema.toInt() != AppStrings._schemaVersion) {
+      throw FormatException(
+        'schemaVersion non supportato: ${rawSchema ?? 'assente'}.',
+      );
+    }
+
+    final rawCode = decoded['languageCode'];
+    final rawName = decoded['languageName'];
+    if (rawCode is! String || rawCode.trim().isEmpty) {
+      throw const FormatException('languageCode mancante o non valido.');
+    }
+    if (rawName is! String || rawName.trim().isEmpty) {
+      throw const FormatException('languageName mancante o non valido.');
+    }
+
+    final code = AppStrings.normalizeLanguageCode(rawCode);
+    if (!RegExp(r'^[a-z]{2,8}(?:-[a-z0-9]{2,8})*$').hasMatch(code)) {
+      throw FormatException('languageCode non valido: $rawCode.');
+    }
+
+    final rawStrings = decoded['strings'];
+    if (rawStrings is! Map) {
+      throw const FormatException('La sezione strings è obbligatoria.');
+    }
+    final strings = <String, String>{};
+    for (final entry in rawStrings.entries) {
+      final key = entry.key;
+      final value = entry.value;
+      if (key is String && key.trim().isNotEmpty && value is String) {
+        strings[key] = value;
+      }
+    }
+    if (strings.isEmpty) {
+      throw const FormatException('La sezione strings non contiene traduzioni valide.');
+    }
+
+    final legacy = <String, String>{};
+    final rawLegacy = decoded['legacy'];
+    if (rawLegacy is Map) {
+      for (final entry in rawLegacy.entries) {
+        if (entry.key is String && entry.value is String) {
+          legacy[entry.key as String] = entry.value as String;
+        }
+      }
+    }
+
+    return _TranslationCatalog(
+      code: code,
+      nativeName: rawName.trim(),
+      filePath: filePath,
+      strings: Map<String, String>.unmodifiable(strings),
+      legacy: Map<String, String>.unmodifiable(legacy),
+    );
+  }
 }
