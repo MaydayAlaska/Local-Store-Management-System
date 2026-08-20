@@ -128,6 +128,7 @@ class SalesOrderSummary {
     required this.fixedDiscountCents,
     required this.finalTotalCents,
     this.receiptFilename,
+    this.cancelledAtUtc,
     required this.createdAtUtc,
   });
 
@@ -144,11 +145,13 @@ class SalesOrderSummary {
   final int fixedDiscountCents;
   final int finalTotalCents;
   final String? receiptFilename;
+  final DateTime? cancelledAtUtc;
   final DateTime createdAtUtc;
 
   String get totalDisplay => formatMoney(finalTotalCents);
   bool get hasReceipt => receiptFilename?.trim().isNotEmpty == true;
   bool get hasCustomerSnapshot => customerDisplayName?.trim().isNotEmpty == true;
+  bool get isCancelled => cancelledAtUtc != null;
 }
 
 class SalesOrderItem {

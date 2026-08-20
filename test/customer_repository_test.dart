@@ -18,15 +18,14 @@ void main() {
     expect(FiscalCodeService.tryParse('RSSMRA85T10A562X'), isNull);
   });
 
-  test('generic sale item is stored without changing stock', () async {
+  test('generic sale item is stored without changing stock and order numbers stay unique', () async {
     final temp = await Directory.systemTemp.createTemp('lsms-flutter-generic-sale-');
     final path = '${temp.path}${Platform.pathSeparator}store.db';
     final service = DatabaseService(path);
     try {
       await service.initialize();
       final repository = CustomerRepository(service);
-
-      final order = repository.recordSale(const SalesOrderDraft(
+      const draft = SalesOrderDraft(
         lines: [
           SalesOrderDraftLine(
             variantId: null,
@@ -46,7 +45,10 @@ void main() {
         orderPercentDiscountCents: 0,
         fixedDiscountCents: 0,
         finalTotalCents: 1234,
-      ));
+      );
+
+      final order = repository.recordSale(draft);
+      final secondOrder = repository.recordSale(draft);
 
       final detail = repository.getOrder(order.id)!;
       expect(detail.items, hasLength(1));
@@ -54,11 +56,104 @@ void main() {
       expect(detail.items.single.productName, 'Articolo generico');
       expect(detail.items.single.unitPriceCents, 1234);
       expect(detail.summary.finalTotalCents, 1234);
+      expect(secondOrder.orderNumber, isNot(order.orderNumber));
+      expect(
+        RegExp(r'^ORD-\d{8}-\d{6}-\d{6,}$').hasMatch(order.orderNumber),
+        isTrue,
+      );
+      expect(order.orderNumber.endsWith(order.id.toString().padLeft(6, '0')), isTrue);
+      expect(
+        secondOrder.orderNumber.endsWith(secondOrder.id.toString().padLeft(6, '0')),
+        isTrue,
+      );
 
       final movements = service.db
           .select("SELECT COUNT(*) AS count FROM stock_movements WHERE movement_type='OUT';")
           .first['count'] as int;
       expect(movements, 0);
+    } finally {
+      service.dispose();
+      await temp.delete(recursive: true);
+    }
+  });
+
+  test('cancel restores stock once while delete and age purge never restore stock', () async {
+    final temp = await Directory.systemTemp.createTemp('lsms-flutter-order-lifecycle-');
+    final path = '${temp.path}${Platform.pathSeparator}store.db';
+    final service = DatabaseService(path);
+    try {
+      await service.initialize();
+      final repository = CustomerRepository(service);
+      const now = '2026-08-19T00:00:00.000Z';
+      service.db.execute(
+        'INSERT INTO products (name, sale_price_cents, is_active, created_at_utc, updated_at_utc) VALUES (?, ?, 1, ?, ?);',
+        ['Test prodotto', 1000, now, now],
+      );
+      final productId = service.db.lastInsertRowId;
+      service.db.execute(
+        'INSERT INTO product_variants (product_id, sku, is_active, created_at_utc, updated_at_utc) VALUES (?, ?, 1, ?, ?);',
+        [productId, 'TEST-001', now, now],
+      );
+      final variantId = service.db.lastInsertRowId;
+      service.db.execute(
+        "INSERT INTO stock_movements (variant_id, movement_type, quantity_delta, note, created_at_utc) VALUES (?, 'IN', 5, 'Test', ?);",
+        [variantId, now],
+      );
+
+      SalesOrderDraft sale(int quantity) => SalesOrderDraft(
+            lines: [
+              SalesOrderDraftLine(
+                variantId: variantId,
+                sku: 'TEST-001',
+                productName: 'Test prodotto',
+                variantDisplay: '',
+                quantity: quantity,
+                unitPriceCents: 1000,
+                discountBasisPoints: 0,
+                grossTotalCents: 1000 * quantity,
+                finalTotalCents: 1000 * quantity,
+              ),
+            ],
+            grossTotalCents: 1000 * quantity,
+            itemDiscountCents: 0,
+            orderDiscountBasisPoints: 0,
+            orderPercentDiscountCents: 0,
+            fixedDiscountCents: 0,
+            finalTotalCents: 1000 * quantity,
+          );
+
+      int stock() => service.db.select(
+            'SELECT COALESCE(SUM(quantity_delta), 0) AS stock FROM stock_movements WHERE variant_id=?;',
+            [variantId],
+          ).first['stock'] as int;
+
+      final cancelledOrder = repository.recordSale(sale(2));
+      expect(stock(), 3);
+      expect(repository.cancelOrder(cancelledOrder.id), isTrue);
+      expect(stock(), 5);
+      expect(repository.getOrder(cancelledOrder.id)!.summary.isCancelled, isTrue);
+      expect(repository.cancelOrder(cancelledOrder.id), isFalse);
+      expect(stock(), 5, reason: 'Un secondo annullamento non deve ricaricare di nuovo gli articoli.');
+      expect(repository.deleteOrder(cancelledOrder.id), isTrue);
+      expect(repository.getOrder(cancelledOrder.id), isNull);
+      expect(stock(), 5);
+
+      final deletedActiveOrder = repository.recordSale(sale(1));
+      expect(stock(), 4);
+      expect(repository.deleteOrder(deletedActiveOrder.id), isTrue);
+      expect(stock(), 4, reason: 'Eliminare un ordine attivo non deve ripristinare il magazzino.');
+
+      final oldOrder = repository.recordSale(sale(1));
+      expect(stock(), 3);
+      service.db.execute(
+        'UPDATE sales_orders SET created_at_utc=? WHERE id=?;',
+        ['2020-01-01T00:00:00.000Z', oldOrder.id],
+      );
+      final cutoff = DateTime.utc(2021, 1, 1);
+      expect(repository.countOrdersOlderThan(cutoff), 1);
+      expect(repository.deleteOrdersOlderThan(cutoff), 1);
+      expect(repository.getOrder(oldOrder.id), isNull);
+      expect(stock(), 3, reason: 'La pulizia per anzianità non deve modificare il magazzino.');
     } finally {
       service.dispose();
       await temp.delete(recursive: true);
@@ -134,6 +229,7 @@ void main() {
       expect(detail.summary.customerDisplayName, 'Rossi Mario');
       expect(detail.summary.customerFiscalCode, 'RSSMRA85T10A562S');
       expect(detail.summary.finalTotalCents, 4000);
+      expect(detail.summary.isCancelled, isFalse);
       expect(detail.items.single.productName, 'Maglietta');
       expect(detail.items.single.unitPriceCents, 2500);
       expect(detail.items.single.discountBasisPoints, 1000);

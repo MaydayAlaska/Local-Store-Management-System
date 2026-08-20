@@ -92,5 +92,8 @@ SalesOrderSummary _salesOrderSummaryFromRow(dynamic row) => SalesOrderSummary(
       fixedDiscountCents: row['fixed_discount_cents'] as int,
       finalTotalCents: row['final_total_cents'] as int,
       receiptFilename: row['receipt_filename'] as String?,
+      cancelledAtUtc: row['cancelled_at_utc'] == null
+          ? null
+          : DateTime.parse(row['cancelled_at_utc'] as String).toUtc(),
       createdAtUtc: DateTime.parse(row['created_at_utc'] as String).toUtc(),
     );

@@ -72,6 +72,111 @@ class _OrderDialogState extends State<_OrderDialog> {
         ));
   }
 
+  Future<void> _cancelOrder() async {
+    final detail = _detail;
+    if (detail == null || detail.summary.isCancelled) return;
+    final order = detail.summary;
+    final confirmed = await showDialog<bool>(
+          context: context,
+          builder: (dialogContext) => AlertDialog(
+            title: Text(_itEn('Annulla ordine', 'Cancel order')),
+            content: Text(
+              _itEn(
+                'Confermi l’annullamento di ${order.orderNumber}? Gli articoli venduti verranno riaggiunti al magazzino. L’ordine resterà nello storico come ANNULLATO.',
+                'Cancel ${order.orderNumber}? Sold items will be returned to stock. The order will remain in history as CANCELLED.',
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(dialogContext).pop(false),
+                child: Text(_itEn('No', 'No')),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.of(dialogContext).pop(true),
+                child: Text(_itEn('Annulla ordine', 'Cancel order')),
+              ),
+            ],
+          ),
+        ) ??
+        false;
+    if (!confirmed || !mounted) return;
+
+    try {
+      final cancelled = widget.services.customers.cancelOrder(widget.orderId);
+      if (!mounted) return;
+      setState(() => _status = cancelled
+          ? _itEn(
+              'Ordine annullato. Gli articoli sono stati riaggiunti al magazzino.',
+              'Order cancelled. Items were returned to stock.',
+            )
+          : _itEn(
+              'L’ordine era già annullato oppure non esiste più.',
+              'The order was already cancelled or no longer exists.',
+            ));
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _status = _itEn(
+            'Impossibile annullare l’ordine: $error',
+            'Unable to cancel the order: $error',
+          ));
+    }
+  }
+
+  Future<void> _deleteOrder() async {
+    final detail = _detail;
+    if (detail == null) return;
+    final order = detail.summary;
+    final warning = order.isCancelled
+        ? _itEn(
+            'L’ordine è già ANNULLATO: le quantità sono già state ripristinate. Eliminandolo, il magazzino non verrà modificato ulteriormente.',
+            'The order is already CANCELLED: quantities have already been restored. Deleting it will not change stock again.',
+          )
+        : _itEn(
+            'ATTENZIONE: eliminando un ordine attivo, gli articoli NON verranno riaggiunti al magazzino. Solo “Annulla ordine” ripristina le quantità.',
+            'WARNING: deleting an active order will NOT return items to stock. Only “Cancel order” restores quantities.',
+          );
+    final confirmed = await showDialog<bool>(
+          context: context,
+          builder: (dialogContext) => AlertDialog(
+            title: Text(_itEn('Elimina ordine', 'Delete order')),
+            content: Text(
+              '${_itEn('Vuoi eliminare definitivamente', 'Permanently delete')} ${order.orderNumber}?\n\n$warning',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(dialogContext).pop(false),
+                child: Text(_itEn('Annulla', 'Cancel')),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.of(dialogContext).pop(true),
+                child: Text(_itEn('Elimina definitivamente', 'Delete permanently')),
+              ),
+            ],
+          ),
+        ) ??
+        false;
+    if (!confirmed || !mounted) return;
+
+    try {
+      final deleted = widget.services.customers.deleteOrder(widget.orderId);
+      if (!mounted) return;
+      if (deleted) {
+        Navigator.of(context).pop();
+      } else {
+        setState(() => _status = _itEn(
+              'Ordine non trovato.',
+              'Order not found.',
+            ));
+      }
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _status = _itEn(
+            'Impossibile eliminare l’ordine: $error',
+            'Unable to delete the order: $error',
+          ));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final detail = _detail;
@@ -85,13 +190,45 @@ class _OrderDialogState extends State<_OrderDialog> {
     final date = formatLocalDateTime(order.createdAtUtc);
     final customer = order.customerDisplayName?.trim();
     final fiscalCode = order.customerFiscalCode?.trim();
+    final colors = Theme.of(context).colorScheme;
 
     return AlertDialog(
-      title: Text(order.orderNumber),
+      title: Row(children: [
+        Expanded(child: Text(order.orderNumber)),
+        if (order.isCancelled)
+          Text(
+            _itEn('ANNULLATO', 'CANCELLED'),
+            style: TextStyle(
+              color: colors.error,
+              fontWeight: FontWeight.w800,
+              fontSize: 16,
+            ),
+          ),
+      ]),
       content: SizedBox(
         width: 780,
-        height: 590,
+        height: 620,
         child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          if (order.isCancelled) ...[
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: colors.errorContainer,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                _itEn(
+                  'Ordine annullato: gli articoli venduti sono stati riaggiunti al magazzino.',
+                  'Cancelled order: sold items were returned to stock.',
+                ),
+                style: TextStyle(
+                  color: colors.onErrorContainer,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+            const SizedBox(height: 10),
+          ],
           Wrap(spacing: 20, runSpacing: 6, children: [
             Text('${_itEn('Data', 'Date')}: $date'),
             Text(
@@ -182,6 +319,18 @@ class _OrderDialogState extends State<_OrderDialog> {
         ]),
       ),
       actions: [
+        TextButton.icon(
+          onPressed: _deleteOrder,
+          icon: const Icon(Icons.delete_outline),
+          style: TextButton.styleFrom(foregroundColor: colors.error),
+          label: Text(_itEn('Elimina ordine', 'Delete order')),
+        ),
+        if (!order.isCancelled)
+          OutlinedButton.icon(
+            onPressed: _cancelOrder,
+            icon: const Icon(Icons.cancel_outlined),
+            label: Text(_itEn('Annulla ordine', 'Cancel order')),
+          ),
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
           child: Text(AppStrings.t('close')),

@@ -63,6 +63,11 @@ class CustomerRepository {
 
     _ensureColumn('sales_orders', 'customer_display_name', 'TEXT');
     _ensureColumn('sales_orders', 'customer_fiscal_code', 'TEXT');
+    _ensureColumn('sales_orders', 'cancelled_at_utc', 'TEXT');
+    database.db.execute('''
+      CREATE INDEX IF NOT EXISTS ix_sales_orders_cancelled_date
+      ON sales_orders(cancelled_at_utc, created_at_utc DESC, id DESC);
+    ''');
     _backfillCustomerSnapshots();
   }
 
@@ -271,6 +276,78 @@ class CustomerRepository {
     );
   }
 
+  bool cancelOrder(int orderId) {
+    final db = database.db;
+    db.execute('BEGIN IMMEDIATE;');
+    try {
+      final rows = db.select(
+        'SELECT order_number, cancelled_at_utc FROM sales_orders WHERE id=? LIMIT 1;',
+        [orderId],
+      );
+      if (rows.isEmpty) {
+        db.execute('ROLLBACK;');
+        return false;
+      }
+      final row = rows.first;
+      if (row['cancelled_at_utc'] != null) {
+        db.execute('ROLLBACK;');
+        return false;
+      }
+
+      final orderNumber = row['order_number'] as String;
+      final now = DateTime.now().toUtc().toIso8601String();
+      final items = db.select(
+        'SELECT variant_id, quantity FROM sales_order_items WHERE order_id=? ORDER BY id;',
+        [orderId],
+      );
+      for (final item in items) {
+        final variantId = item['variant_id'] as int?;
+        if (variantId == null) continue;
+        final quantity = item['quantity'] as int;
+        if (quantity <= 0) continue;
+        db.execute('''
+          INSERT INTO stock_movements (variant_id, movement_type, quantity_delta, note, created_at_utc)
+          VALUES (?, 'IN', ?, ?, ?);
+        ''', [variantId, quantity, 'Annullamento vendita $orderNumber', now]);
+      }
+
+      db.execute(
+        'UPDATE sales_orders SET cancelled_at_utc=? WHERE id=? AND cancelled_at_utc IS NULL;',
+        [now, orderId],
+      );
+      if (db.updatedRows != 1) {
+        throw StateError('Impossibile contrassegnare l’ordine come annullato.');
+      }
+      db.execute('COMMIT;');
+      return true;
+    } catch (_) {
+      db.execute('ROLLBACK;');
+      rethrow;
+    }
+  }
+
+  bool deleteOrder(int orderId) {
+    database.db.execute('DELETE FROM sales_orders WHERE id=?;', [orderId]);
+    return database.db.updatedRows > 0;
+  }
+
+  int countOrdersOlderThan(DateTime cutoffUtc) {
+    final cutoff = cutoffUtc.toUtc().toIso8601String();
+    return database.db.select(
+      'SELECT COUNT(*) AS count FROM sales_orders WHERE created_at_utc < ?;',
+      [cutoff],
+    ).first['count'] as int;
+  }
+
+  int deleteOrdersOlderThan(DateTime cutoffUtc) {
+    final cutoff = cutoffUtc.toUtc().toIso8601String();
+    database.db.execute(
+      'DELETE FROM sales_orders WHERE created_at_utc < ?;',
+      [cutoff],
+    );
+    return database.db.updatedRows;
+  }
+
   SalesOrderSummary recordSale(SalesOrderDraft draft) {
     if (draft.lines.isEmpty) throw ArgumentError('La vendita non contiene articoli.');
     final db = database.db;
@@ -303,7 +380,7 @@ class CustomerRepository {
       }
 
       final now = DateTime.now().toUtc();
-      final orderNumber = _newOrderNumber(now);
+      final orderNumber = _newUniqueOrderNumber(now);
       db.execute('''
         INSERT INTO sales_orders (
           order_number, customer_id, customer_display_name, customer_fiscal_code,
@@ -417,6 +494,9 @@ class CustomerRepository {
         fixedDiscountCents: row['fixed_discount_cents'] as int,
         finalTotalCents: row['final_total_cents'] as int,
         receiptFilename: row['receipt_filename'] as String?,
+        cancelledAtUtc: row['cancelled_at_utc'] == null
+            ? null
+            : DateTime.parse(row['cancelled_at_utc'] as String).toUtc(),
         createdAtUtc: DateTime.parse(row['created_at_utc'] as String).toUtc(),
       );
 
@@ -444,14 +524,34 @@ class CustomerRepository {
       .select('PRAGMA table_info($table);')
       .any((row) => (row['name'] as String).toLowerCase() == column.toLowerCase());
 
+  int _nextOrderSerial() {
+    final rows = database.db.select(
+      "SELECT seq FROM sqlite_sequence WHERE name='sales_orders' LIMIT 1;",
+    );
+    return rows.isEmpty ? 1 : (rows.first['seq'] as int) + 1;
+  }
+
+  String _newUniqueOrderNumber(DateTime utc) {
+    var serial = _nextOrderSerial();
+    while (true) {
+      final candidate = _newOrderNumber(utc, serial);
+      final exists = database.db.select(
+        'SELECT 1 FROM sales_orders WHERE order_number=? LIMIT 1;',
+        [candidate],
+      ).isNotEmpty;
+      if (!exists) return candidate;
+      serial++;
+    }
+  }
+
   static String _dateOnly(DateTime value) =>
       '${value.year.toString().padLeft(4, '0')}-${value.month.toString().padLeft(2, '0')}-${value.day.toString().padLeft(2, '0')}';
 
-  static String _newOrderNumber(DateTime utc) {
+  static String _newOrderNumber(DateTime utc, int serial) {
     final local = utc.toLocal();
     String two(int value) => value.toString().padLeft(2, '0');
-    final micros = local.microsecond.toString().padLeft(6, '0');
-    return 'ORD-${local.year}${two(local.month)}${two(local.day)}-${two(local.hour)}${two(local.minute)}${two(local.second)}-$micros';
+    final suffix = serial.toString().padLeft(6, '0');
+    return 'ORD-${local.year}${two(local.month)}${two(local.day)}-${two(local.hour)}${two(local.minute)}${two(local.second)}-$suffix';
   }
 
   static String? _optional(String? value) => value?.trim().isNotEmpty == true ? value!.trim() : null;

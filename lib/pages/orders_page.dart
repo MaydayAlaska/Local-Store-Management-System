@@ -16,6 +16,13 @@ class OrdersPage extends StatefulWidget {
   State<OrdersPage> createState() => _OrdersPageState();
 }
 
+class _OrderAgeSelection {
+  const _OrderAgeSelection(this.amount, this.unit);
+
+  final int amount;
+  final String unit;
+}
+
 class _OrdersPageState extends State<OrdersPage> {
   final _search = TextEditingController();
 
@@ -39,10 +46,159 @@ class _OrdersPageState extends State<OrdersPage> {
     if (mounted) setState(() {});
   }
 
+  Future<void> _deleteOldOrders() async {
+    final amountController = TextEditingController(text: '30');
+    var unit = 'days';
+    String? validationError;
+
+    final selection = await showDialog<_OrderAgeSelection>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: Text(_itEn('Elimina ordini vecchi', 'Delete old orders')),
+          content: SizedBox(
+            width: 430,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  _itEn(
+                    'Elimina definitivamente gli ordini più vecchi dell’intervallo indicato. Questa operazione non modifica il magazzino.',
+                    'Permanently delete orders older than the selected interval. This operation does not change stock.',
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Row(children: [
+                  Expanded(
+                    child: TextField(
+                      controller: amountController,
+                      keyboardType: TextInputType.number,
+                      decoration: InputDecoration(
+                        border: const OutlineInputBorder(),
+                        labelText: _itEn('Quantità', 'Amount'),
+                        errorText: validationError,
+                      ),
+                      onChanged: (_) {
+                        if (validationError != null) {
+                          setDialogState(() => validationError = null);
+                        }
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: DropdownButtonFormField<String>(
+                      value: unit,
+                      decoration: InputDecoration(
+                        border: const OutlineInputBorder(),
+                        labelText: _itEn('Unità', 'Unit'),
+                      ),
+                      items: [
+                        DropdownMenuItem(
+                          value: 'days',
+                          child: Text(_itEn('Giorni', 'Days')),
+                        ),
+                        DropdownMenuItem(
+                          value: 'months',
+                          child: Text(_itEn('Mesi', 'Months')),
+                        ),
+                        DropdownMenuItem(
+                          value: 'years',
+                          child: Text(_itEn('Anni', 'Years')),
+                        ),
+                      ],
+                      onChanged: (value) {
+                        if (value != null) setDialogState(() => unit = value);
+                      },
+                    ),
+                  ),
+                ]),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: Text(_itEn('Annulla', 'Cancel')),
+            ),
+            FilledButton.icon(
+              onPressed: () {
+                final amount = int.tryParse(amountController.text.trim());
+                if (amount == null || amount <= 0) {
+                  setDialogState(() => validationError = _itEn(
+                        'Inserisci un numero maggiore di zero.',
+                        'Enter a number greater than zero.',
+                      ));
+                  return;
+                }
+                Navigator.of(dialogContext).pop(_OrderAgeSelection(amount, unit));
+              },
+              icon: const Icon(Icons.delete_sweep_outlined),
+              label: Text(_itEn('Continua', 'Continue')),
+            ),
+          ],
+        ),
+      ),
+    );
+    amountController.dispose();
+    if (selection == null || !mounted) return;
+
+    final cutoffLocal = _subtractAge(DateTime.now(), selection.amount, selection.unit);
+    final cutoffUtc = cutoffLocal.toUtc();
+    final count = widget.services.customers.countOrdersOlderThan(cutoffUtc);
+    if (count == 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(_itEn(
+          'Nessun ordine rientra nell’intervallo selezionato.',
+          'No orders match the selected age.',
+        ))),
+      );
+      return;
+    }
+
+    final confirmed = await showDialog<bool>(
+          context: context,
+          builder: (dialogContext) => AlertDialog(
+            title: Text(_itEn('Conferma eliminazione', 'Confirm deletion')),
+            content: Text(
+              _itEn(
+                'Verranno eliminati definitivamente $count ordini creati prima del ${formatLocalDateTime(cutoffUtc)}. Gli articoli NON verranno riaggiunti al magazzino.',
+                '$count orders created before ${formatLocalDateTime(cutoffUtc)} will be permanently deleted. Items will NOT be returned to stock.',
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(dialogContext).pop(false),
+                child: Text(_itEn('Annulla', 'Cancel')),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.of(dialogContext).pop(true),
+                child: Text(_itEn('Elimina definitivamente', 'Delete permanently')),
+              ),
+            ],
+          ),
+        ) ??
+        false;
+    if (!confirmed || !mounted) return;
+
+    final deleted = widget.services.customers.deleteOrdersOlderThan(cutoffUtc);
+    if (!mounted) return;
+    setState(() {});
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(_itEn(
+        '$deleted ordini eliminati. Il magazzino non è stato modificato.',
+        '$deleted orders deleted. Stock was not changed.',
+      ))),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final orders = _orders;
-    final total = orders.fold<int>(0, (sum, order) => sum + order.finalTotalCents);
+    final total = orders
+        .where((order) => !order.isCancelled)
+        .fold<int>(0, (sum, order) => sum + order.finalTotalCents);
     return Padding(
       padding: const EdgeInsets.all(24),
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
@@ -53,6 +209,12 @@ class _OrdersPageState extends State<OrdersPage> {
               style: Theme.of(context).textTheme.headlineMedium,
             ),
           ),
+          OutlinedButton.icon(
+            onPressed: _deleteOldOrders,
+            icon: const Icon(Icons.delete_sweep_outlined),
+            label: Text(_itEn('Elimina ordini vecchi', 'Delete old orders')),
+          ),
+          const SizedBox(width: 14),
           Text(
             '${orders.length} ${_itEn(orders.length == 1 ? 'vendita' : 'vendite', orders.length == 1 ? 'sale' : 'sales')}',
           ),
@@ -74,7 +236,7 @@ class _OrdersPageState extends State<OrdersPage> {
         const SizedBox(height: 10),
         Row(children: [
           Text(
-            '${_itEn('Totale risultati', 'Results total')}: ${formatMoney(total)}',
+            '${_itEn('Totale vendite attive nei risultati', 'Active sales total in results')}: ${formatMoney(total)}',
           ),
           const Spacer(),
           if (_search.text.trim().isNotEmpty)
@@ -108,14 +270,28 @@ class _OrdersPageState extends State<OrdersPage> {
                       final customerText = customer?.isNotEmpty == true
                           ? '$customer${fiscal?.isNotEmpty == true ? ' · $fiscal' : ''}'
                           : _itEn('Vendita senza cliente', 'Sale without customer');
+                      final errorColor = Theme.of(context).colorScheme.error;
                       return ListTile(
                         leading: Icon(
-                          order.hasReceipt
-                              ? Icons.receipt_long
-                              : Icons.shopping_bag_outlined,
+                          order.isCancelled
+                              ? Icons.cancel_outlined
+                              : order.hasReceipt
+                                  ? Icons.receipt_long
+                                  : Icons.shopping_bag_outlined,
+                          color: order.isCancelled ? errorColor : null,
                         ),
                         title: Row(children: [
                           Expanded(child: Text(order.orderNumber)),
+                          if (order.isCancelled) ...[
+                            Text(
+                              _itEn('ANNULLATO', 'CANCELLED'),
+                              style: TextStyle(
+                                color: errorColor,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                            const SizedBox(width: 14),
+                          ],
                           Text(
                             order.totalDisplay,
                             style: const TextStyle(fontWeight: FontWeight.w700),
@@ -135,4 +311,40 @@ class _OrdersPageState extends State<OrdersPage> {
       ]),
     );
   }
+}
+
+DateTime _subtractAge(DateTime value, int amount, String unit) {
+  if (unit == 'days') return value.subtract(Duration(days: amount));
+
+  if (unit == 'years') {
+    final year = value.year - amount;
+    final maxDay = DateTime(year, value.month + 1, 0).day;
+    final day = value.day > maxDay ? maxDay : value.day;
+    return DateTime(
+      year,
+      value.month,
+      day,
+      value.hour,
+      value.minute,
+      value.second,
+      value.millisecond,
+      value.microsecond,
+    );
+  }
+
+  final totalMonths = value.year * 12 + (value.month - 1) - amount;
+  final year = totalMonths ~/ 12;
+  final month = totalMonths % 12 + 1;
+  final maxDay = DateTime(year, month + 1, 0).day;
+  final day = value.day > maxDay ? maxDay : value.day;
+  return DateTime(
+    year,
+    month,
+    day,
+    value.hour,
+    value.minute,
+    value.second,
+    value.millisecond,
+    value.microsecond,
+  );
 }
