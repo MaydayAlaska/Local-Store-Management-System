@@ -1033,85 +1033,94 @@ class _CashPageState extends State<CashPage> {
                             style: Theme.of(context).textTheme.bodySmall,
                           ),
                           const SizedBox(height: 8),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              SizedBox.square(
-                                dimension: 128,
-                                child: FilledButton(
-                                  onPressed: _cart.isEmpty ? null : _registerSale,
-                                  child: Column(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      const Icon(Icons.shopping_bag_outlined, size: 28),
-                                      const SizedBox(height: 8),
-                                      Text(
-                                        _customer == null
-                                            ? AppStrings.t('register_without_customer')
-                                            : '${AppStrings.t('register_for')} ${_customer!.displayName}',
-                                        textAlign: TextAlign.center,
-                                        maxLines: 3,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    ],
+                          SizedBox(
+                            height: 108,
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                Expanded(
+                                  child: FilledButton(
+                                    onPressed:
+                                        _cart.isEmpty ? null : _registerSale,
+                                    child: Column(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        const Icon(
+                                          Icons.shopping_bag_outlined,
+                                          size: 26,
+                                        ),
+                                        const SizedBox(height: 6),
+                                        Text(
+                                          _itEn(
+                                            'Registra vendita',
+                                            'Register sale',
+                                          ),
+                                          textAlign: TextAlign.center,
+                                          maxLines: 2,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ],
+                                    ),
                                   ),
                                 ),
-                              ),
-                              SizedBox.square(
-                                dimension: 128,
-                                child: OutlinedButton(
-                                  onPressed: null,
-                                  child: Column(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      const Icon(Icons.receipt_long, size: 28),
-                                      const SizedBox(height: 8),
-                                      Text(
-                                        AppStrings.t('fiscal_document'),
-                                        textAlign: TextAlign.center,
-                                        maxLines: 3,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    ],
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: OutlinedButton(
+                                    onPressed: null,
+                                    child: Column(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        const Icon(Icons.receipt_long, size: 26),
+                                        const SizedBox(height: 6),
+                                        Text(
+                                          _itEn(
+                                            'Emetti scontrino',
+                                            'Issue receipt',
+                                          ),
+                                          textAlign: TextAlign.center,
+                                          maxLines: 2,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ],
+                                    ),
                                   ),
                                 ),
-                              ),
-                              SizedBox.square(
-                                dimension: 128,
-                                child: OutlinedButton(
-                                  onPressed: () => setState(
-                                    () => _showKeypad = !_showKeypad,
-                                  ),
-                                  child: Column(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Icon(
-                                        _showKeypad
-                                            ? Icons.keyboard_hide_outlined
-                                            : Icons.keyboard_alt_outlined,
-                                        size: 28,
-                                      ),
-                                      const SizedBox(height: 8),
-                                      Text(
-                                        _showKeypad
-                                            ? _itEn(
-                                                'Nascondi tastierino',
-                                                'Hide keypad',
-                                              )
-                                            : _itEn(
-                                                'Mostra tastierino',
-                                                'Show keypad',
-                                              ),
-                                        textAlign: TextAlign.center,
-                                        maxLines: 3,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    ],
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: OutlinedButton(
+                                    onPressed: () => setState(
+                                      () => _showKeypad = !_showKeypad,
+                                    ),
+                                    child: Column(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        Icon(
+                                          _showKeypad
+                                              ? Icons.keyboard_hide_outlined
+                                              : Icons.keyboard_alt_outlined,
+                                          size: 26,
+                                        ),
+                                        const SizedBox(height: 6),
+                                        Text(
+                                          _showKeypad
+                                              ? _itEn(
+                                                  'Nascondi tastierino',
+                                                  'Hide keypad',
+                                                )
+                                              : _itEn(
+                                                  'Mostra tastierino',
+                                                  'Show keypad',
+                                                ),
+                                          textAlign: TextAlign.center,
+                                          maxLines: 2,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ],
+                                    ),
                                   ),
                                 ),
-                              ),
-                            ],
+                              ],
+                            ),
                           ),
                         ],
                       ),
