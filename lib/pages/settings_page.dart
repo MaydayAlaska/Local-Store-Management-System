@@ -45,7 +45,7 @@ class _SettingsPageState extends State<SettingsPage> {
   bool _checking = false;
   bool _saving = false;
 
-  String _itEn(String it, String en) => AppStrings.isEnglish ? en : it;
+  String _itEn(String it, String en) => AppStrings.pair(it, en);
 
   String _formatPercent(double value) =>
       value.toStringAsFixed(2).replaceFirst(RegExp(r'\.?0+$'), '');
@@ -61,7 +61,9 @@ class _SettingsPageState extends State<SettingsPage> {
     _showLogo = widget.current.showLogoInMenu;
     _currencyCode = widget.current.currencyCode;
     _themeMode = widget.current.themeMode;
-    _languageCode = widget.current.languageCode;
+    _languageCode = AppStrings.hasLanguage(widget.current.languageCode)
+        ? AppStrings.normalizeLanguageCode(widget.current.languageCode)
+        : AppStrings.fallbackLanguageCode;
     _labelPrinters = List<LabelPrinterProfile>.of(
       widget.current.labelPrinterProfiles,
     );
@@ -852,17 +854,16 @@ class _SettingsPageState extends State<SettingsPage> {
                           value: _languageCode,
                           labelText: AppStrings.t('language'),
                           items: [
-                            GlassDropdownItem(
-                              value: 'it',
-                              label: AppStrings.t('italian'),
-                            ),
-                            GlassDropdownItem(
-                              value: 'en',
-                              label: AppStrings.t('english'),
-                            ),
+                            for (final language in AppStrings.languages)
+                              GlassDropdownItem(
+                                value: language.code,
+                                label: language.nativeName,
+                              ),
                           ],
-                          onChanged: (value) =>
-                              setState(() => _languageCode = value ?? 'it'),
+                          onChanged: (value) => setState(
+                            () => _languageCode =
+                                value ?? AppStrings.fallbackLanguageCode,
+                          ),
                         ),
                       ),
                       const SizedBox(width: 10),
@@ -881,6 +882,16 @@ class _SettingsPageState extends State<SettingsPage> {
                         ),
                       ),
                     ],
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    '${AppStrings.t('translation_folder')}: ${AppPaths.translationsDirectory}',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    AppStrings.t('translation_help'),
+                    style: Theme.of(context).textTheme.bodySmall,
                   ),
                   const SizedBox(height: 12),
                   Align(
@@ -1102,7 +1113,8 @@ class _SettingsPageState extends State<SettingsPage> {
                   Text(
                     '${AppStrings.t('version')} v${UpdateService.currentVersion}${UpdateService.isBetaBuild ? ' BETA' : ''}',
                   ),
-                  if (UpdateService.currentCommit.isNotEmpty)
+                  if (UpdateService.isBetaBuild &&
+                      UpdateService.currentCommit.isNotEmpty)
                     Text(
                       '${AppStrings.t('commit')}: ${UpdateService.currentCommit.substring(0, 7)}',
                     ),
