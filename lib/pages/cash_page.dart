@@ -33,6 +33,7 @@ class _CashPageState extends State<CashPage> {
   int _nextDiscountId = 1;
   int _nextGenericLineId = 1;
   int _keypadPriceCents = 0;
+  bool _showKeypad = true;
   late String _searchStatus;
   late String _cartStatus;
 
@@ -1006,20 +1007,22 @@ class _CashPageState extends State<CashPage> {
                         ],
                       ),
                     ),
-                    const SizedBox(height: 12),
-                    SizedBox(
-                      width: double.infinity,
-                      height: (MediaQuery.sizeOf(context).height * 0.32)
-                          .clamp(300.0, 460.0)
-                          .toDouble(),
-                      child: _CashKeypad(
-                        priceText: formatMoney(_keypadPriceCents),
-                        onKey: _keypadInsert,
-                        onBackspace: _keypadBackspace,
-                        onClear: _keypadClear,
-                        onSubmit: _keypadSubmit,
+                    if (_showKeypad) ...[
+                      const SizedBox(height: 12),
+                      SizedBox(
+                        width: double.infinity,
+                        height: (MediaQuery.sizeOf(context).height * 0.32)
+                            .clamp(300.0, 460.0)
+                            .toDouble(),
+                        child: _CashKeypad(
+                          priceText: formatMoney(_keypadPriceCents),
+                          onKey: _keypadInsert,
+                          onBackspace: _keypadBackspace,
+                          onClear: _keypadClear,
+                          onSubmit: _keypadSubmit,
+                        ),
                       ),
-                    ),
+                    ],
                     Padding(
                       padding: const EdgeInsets.fromLTRB(14, 8, 14, 14),
                       child: Column(
@@ -1030,20 +1033,85 @@ class _CashPageState extends State<CashPage> {
                             style: Theme.of(context).textTheme.bodySmall,
                           ),
                           const SizedBox(height: 8),
-                          FilledButton.icon(
-                            onPressed: _cart.isEmpty ? null : _registerSale,
-                            icon: const Icon(Icons.shopping_bag_outlined),
-                            label: Text(
-                              _customer == null
-                                  ? AppStrings.t('register_without_customer')
-                                  : '${AppStrings.t('register_for')} ${_customer!.displayName}',
-                            ),
-                          ),
-                          const SizedBox(height: 6),
-                          OutlinedButton.icon(
-                            onPressed: null,
-                            icon: const Icon(Icons.receipt_long),
-                            label: Text(AppStrings.t('fiscal_document')),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              SizedBox.square(
+                                dimension: 128,
+                                child: FilledButton(
+                                  onPressed: _cart.isEmpty ? null : _registerSale,
+                                  child: Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      const Icon(Icons.shopping_bag_outlined, size: 28),
+                                      const SizedBox(height: 8),
+                                      Text(
+                                        _customer == null
+                                            ? AppStrings.t('register_without_customer')
+                                            : '${AppStrings.t('register_for')} ${_customer!.displayName}',
+                                        textAlign: TextAlign.center,
+                                        maxLines: 3,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                              SizedBox.square(
+                                dimension: 128,
+                                child: OutlinedButton(
+                                  onPressed: null,
+                                  child: Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      const Icon(Icons.receipt_long, size: 28),
+                                      const SizedBox(height: 8),
+                                      Text(
+                                        AppStrings.t('fiscal_document'),
+                                        textAlign: TextAlign.center,
+                                        maxLines: 3,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                              SizedBox.square(
+                                dimension: 128,
+                                child: OutlinedButton(
+                                  onPressed: () => setState(
+                                    () => _showKeypad = !_showKeypad,
+                                  ),
+                                  child: Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(
+                                        _showKeypad
+                                            ? Icons.keyboard_hide_outlined
+                                            : Icons.keyboard_alt_outlined,
+                                        size: 28,
+                                      ),
+                                      const SizedBox(height: 8),
+                                      Text(
+                                        _showKeypad
+                                            ? _itEn(
+                                                'Nascondi tastierino',
+                                                'Hide keypad',
+                                              )
+                                            : _itEn(
+                                                'Mostra tastierino',
+                                                'Show keypad',
+                                              ),
+                                        textAlign: TextAlign.center,
+                                        maxLines: 3,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
                         ],
                       ),
