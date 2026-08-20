@@ -7,6 +7,7 @@ import 'app.dart';
 import 'core/app_log.dart';
 import 'core/app_paths.dart';
 import 'core/database_service.dart';
+import 'l10n/app_strings.dart';
 import 'pages/startup_error_page.dart';
 import 'services/app_services.dart';
 import 'services/birth_place_service.dart';
@@ -29,6 +30,7 @@ Future<void> _bootstrap() async {
   try {
     await windowManager.ensureInitialized();
     await AppPaths.initialize();
+    await AppStrings.initialize();
     await BirthPlaceService.initialize();
 
     database = DatabaseService(AppPaths.databasePath);
