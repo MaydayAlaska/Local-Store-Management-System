@@ -4,11 +4,18 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:local_store_management/services/update_service.dart';
 
 void main() {
-  test('current beta OTA version belongs to beta channel', () {
-    expect(
-      versionBelongsToUpdateChannel(UpdateService.currentVersion, beta: true),
-      isTrue,
+  test('current OTA version belongs to exactly one update channel', () {
+    final beta = versionBelongsToUpdateChannel(
+      UpdateService.currentVersion,
+      beta: true,
     );
+    final stable = versionBelongsToUpdateChannel(
+      UpdateService.currentVersion,
+      beta: false,
+    );
+
+    expect(beta || stable, isTrue);
+    expect(beta && stable, isFalse);
   });
 
   test('OTA selects Windows x64 asset', () {
