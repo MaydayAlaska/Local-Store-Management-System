@@ -19,6 +19,8 @@ extension SalesOrderSearchExtension on CustomerRepository {
       WHERE instr(lower(so.order_number), lower(?)) > 0
          OR instr(lower(COALESCE(so.customer_display_name, '')), lower(?)) > 0
          OR instr(lower(COALESCE(so.customer_fiscal_code, '')), lower(?)) > 0
+         OR instr(lower(printf('CLI-%06d', COALESCE(so.customer_code, 0))), lower(?)) > 0
+         OR instr(lower(COALESCE(so.gift_card_code, '')), lower(?)) > 0
          OR instr(lower(so.created_at_utc), lower(?)) > 0
          OR EXISTS (
            SELECT 1 FROM sales_order_items soi
@@ -28,6 +30,8 @@ extension SalesOrderSearchExtension on CustomerRepository {
       ORDER BY so.created_at_utc DESC, so.id DESC
       LIMIT ?;
     ''', [
+      q,
+      q,
       q,
       q,
       q,
@@ -82,6 +86,7 @@ SalesOrderSummary _salesOrderSummaryFromRow(dynamic row) => SalesOrderSummary(
       id: row['id'] as int,
       orderNumber: row['order_number'] as String,
       customerId: row['customer_id'] as int?,
+      customerCode: row['customer_code'] as int?,
       customerDisplayName: row['customer_display_name'] as String?,
       customerFiscalCode: row['customer_fiscal_code'] as String?,
       itemCount: row['item_count'] as int,
@@ -91,6 +96,9 @@ SalesOrderSummary _salesOrderSummaryFromRow(dynamic row) => SalesOrderSummary(
       orderPercentDiscountCents: row['order_percent_discount_cents'] as int,
       fixedDiscountCents: row['fixed_discount_cents'] as int,
       finalTotalCents: row['final_total_cents'] as int,
+      giftCardId: row['gift_card_id'] as int?,
+      giftCardCode: row['gift_card_code'] as String?,
+      giftCardAppliedCents: (row['gift_card_applied_cents'] as int?) ?? 0,
       receiptFilename: row['receipt_filename'] as String?,
       cancelledAtUtc: row['cancelled_at_utc'] == null
           ? null
