@@ -5,6 +5,7 @@ import '../l10n/app_strings.dart';
 import '../models/customer.dart';
 import '../repositories/sales_order_search.dart';
 import '../services/app_services.dart';
+import '../widgets/glass_dropdown.dart';
 import 'order_dialog.dart';
 
 class OrdersPage extends StatefulWidget {
@@ -54,101 +55,94 @@ class _OrdersPageState extends State<OrdersPage> {
     final selection = await showDialog<_OrderAgeSelection>(
       context: context,
       builder: (dialogContext) => StatefulBuilder(
-        builder: (context, setDialogState) {
-          final theme = Theme.of(context);
-          return AlertDialog(
-            title: Text(_itEn('Elimina ordini vecchi', 'Delete old orders')),
-            content: SizedBox(
-              width: 430,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Text(
-                    _itEn(
-                      'Elimina definitivamente gli ordini più vecchi dell’intervallo indicato. Questa operazione non modifica né il magazzino né il credito dei buoni regalo.',
-                      'Permanently delete orders older than the selected interval. This operation changes neither stock nor gift-card credit.',
+        builder: (context, setDialogState) => AlertDialog(
+          title: Text(_itEn('Elimina ordini vecchi', 'Delete old orders')),
+          content: SizedBox(
+            width: 430,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  _itEn(
+                    'Elimina definitivamente gli ordini più vecchi dell’intervallo indicato. Questa operazione non modifica né il magazzino né il credito dei buoni regalo.',
+                    'Permanently delete orders older than the selected interval. This operation changes neither stock nor gift-card credit.',
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Row(children: [
+                  Expanded(
+                    child: TextField(
+                      controller: amountController,
+                      keyboardType: TextInputType.number,
+                      decoration: InputDecoration(
+                        border: const OutlineInputBorder(),
+                        labelText: _itEn('Quantità', 'Amount'),
+                        errorText: validationError,
+                      ),
+                      onChanged: (_) {
+                        if (validationError != null) {
+                          setDialogState(() => validationError = null);
+                        }
+                      },
                     ),
                   ),
-                  const SizedBox(height: 16),
-                  Row(children: [
-                    Expanded(
-                      child: TextField(
-                        controller: amountController,
-                        keyboardType: TextInputType.number,
-                        decoration: InputDecoration(
-                          border: const OutlineInputBorder(),
-                          labelText: _itEn('Quantità', 'Amount'),
-                          errorText: validationError,
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: GlassDropdown<String>(
+                      value: unit,
+                      labelText: _itEn('Unità', 'Unit'),
+                      items: [
+                        GlassDropdownItem(
+                          value: 'days',
+                          label: _itEn('Giorni', 'Days'),
+                          icon: Icons.calendar_view_day_outlined,
                         ),
-                        onChanged: (_) {
-                          if (validationError != null) {
-                            setDialogState(() => validationError = null);
-                          }
-                        },
-                      ),
+                        GlassDropdownItem(
+                          value: 'months',
+                          label: _itEn('Mesi', 'Months'),
+                          icon: Icons.calendar_view_month_outlined,
+                        ),
+                        GlassDropdownItem(
+                          value: 'years',
+                          label: _itEn('Anni', 'Years'),
+                          icon: Icons.calendar_today_outlined,
+                        ),
+                      ],
+                      onChanged: (value) {
+                        if (value != null) {
+                          setDialogState(() => unit = value);
+                        }
+                      },
                     ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: DropdownButtonFormField<String>(
-                        value: unit,
-                        dropdownColor: theme.canvasColor,
-                        borderRadius: BorderRadius.circular(16),
-                        iconEnabledColor: theme.colorScheme.onSurfaceVariant,
-                        style: theme.textTheme.bodyLarge?.copyWith(
-                          color: theme.colorScheme.onSurface,
-                        ),
-                        decoration: InputDecoration(
-                          border: const OutlineInputBorder(),
-                          labelText: _itEn('Unità', 'Unit'),
-                        ),
-                        items: [
-                          DropdownMenuItem(
-                            value: 'days',
-                            child: Text(_itEn('Giorni', 'Days')),
-                          ),
-                          DropdownMenuItem(
-                            value: 'months',
-                            child: Text(_itEn('Mesi', 'Months')),
-                          ),
-                          DropdownMenuItem(
-                            value: 'years',
-                            child: Text(_itEn('Anni', 'Years')),
-                          ),
-                        ],
-                        onChanged: (value) {
-                          if (value != null) setDialogState(() => unit = value);
-                        },
-                      ),
-                    ),
-                  ]),
-                ],
-              ),
+                  ),
+                ]),
+              ],
             ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(dialogContext).pop(),
-                child: Text(_itEn('Annulla', 'Cancel')),
-              ),
-              FilledButton.icon(
-                onPressed: () {
-                  final amount = int.tryParse(amountController.text.trim());
-                  if (amount == null || amount <= 0) {
-                    setDialogState(() => validationError = _itEn(
-                          'Inserisci un numero maggiore di zero.',
-                          'Enter a number greater than zero.',
-                        ));
-                    return;
-                  }
-                  Navigator.of(dialogContext)
-                      .pop(_OrderAgeSelection(amount, unit));
-                },
-                icon: const Icon(Icons.delete_sweep_outlined),
-                label: Text(_itEn('Continua', 'Continue')),
-              ),
-            ],
-          );
-        },
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: Text(_itEn('Annulla', 'Cancel')),
+            ),
+            FilledButton.icon(
+              onPressed: () {
+                final amount = int.tryParse(amountController.text.trim());
+                if (amount == null || amount <= 0) {
+                  setDialogState(() => validationError = _itEn(
+                        'Inserisci un numero maggiore di zero.',
+                        'Enter a number greater than zero.',
+                      ));
+                  return;
+                }
+                Navigator.of(dialogContext)
+                    .pop(_OrderAgeSelection(amount, unit));
+              },
+              icon: const Icon(Icons.delete_sweep_outlined),
+              label: Text(_itEn('Continua', 'Continue')),
+            ),
+          ],
+        ),
       ),
     );
     amountController.dispose();
