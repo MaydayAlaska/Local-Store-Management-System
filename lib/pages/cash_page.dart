@@ -211,7 +211,7 @@ class _CashPageState extends State<CashPage> {
         title: Text(_itEn('Seleziona buono regalo', 'Select gift card')),
         content: SizedBox(
           width: 520,
-          height: (cards.length * 76.0).clamp(150.0, 430.0),
+          height: (cards.length * 76.0).clamp(150.0, 430.0).toDouble(),
           child: ListView.separated(
             itemCount: cards.length,
             separatorBuilder: (_, _) => const Divider(height: 1),
@@ -1085,7 +1085,6 @@ class _CashKeypad extends StatelessWidget {
                 fontSize: 20,
                 fontWeight: FontWeight.w600,
               ),
-            ),
           ),
         ),
       );
