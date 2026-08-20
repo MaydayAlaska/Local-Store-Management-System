@@ -36,6 +36,8 @@ Future<void> _bootstrap() async {
 
     final databaseLocation = DatabaseLocationService();
     final activeDatabasePath = databaseLocation.load();
+    AppPaths.databasePath = activeDatabasePath;
+
     database = DatabaseService(activeDatabasePath);
     await database.initialize();
     final services = AppServices(
