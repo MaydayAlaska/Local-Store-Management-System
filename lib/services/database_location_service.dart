@@ -12,7 +12,7 @@ class DatabaseLocationService {
   String get configurationPath =>
       p.join(AppPaths.dataDirectory, _configurationFileName);
 
-  String get defaultPath => AppPaths.databasePath;
+  String get defaultPath => AppPaths.defaultDatabasePath;
 
   String load() {
     final environmentOverride =
@@ -78,14 +78,15 @@ class DatabaseLocationService {
       );
     }
 
-    final parent = Directory(p.dirname(normalized));
-    if (!parent.existsSync()) {
-      parent.createSync(recursive: true);
-    }
-
     final file = File(configurationPath);
     file.parent.createSync(recursive: true);
     const encoder = JsonEncoder.withIndent('  ');
+
+    if (p.equals(normalized, defaultPath)) {
+      if (file.existsSync()) file.deleteSync();
+      return defaultPath;
+    }
+
     file.writeAsStringSync(
       encoder.convert({_databasePathKey: normalized}),
       flush: true,
