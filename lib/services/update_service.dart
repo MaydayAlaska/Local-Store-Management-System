@@ -6,7 +6,7 @@ import 'package:path/path.dart' as p;
 
 import '../l10n/app_strings.dart';
 
-String _itEn(String it, String en) => AppStrings.isEnglish ? en : it;
+String _itEn(String it, String en) => AppStrings.pair(it, en);
 
 String updateArchitectureForAbi(Abi abi) => switch (abi) {
       Abi.windowsX64 || Abi.macosX64 || Abi.linuxX64 => 'x64',
@@ -200,7 +200,7 @@ class UpdateService {
   static const owner = 'MaydayAlaska';
   static const repository = 'Local-Store-Management-System';
   static const stableBranch = 'main';
-  static const currentVersion = '0.1.6-b15';
+  static const currentVersion = '0.1.7-b1';
   static const currentCommit = String.fromEnvironment('GIT_COMMIT');
   static const currentBranch = String.fromEnvironment('BUILD_BRANCH');
   static const tokenEnvironmentVariable = 'LOCAL_STORE_GITHUB_TOKEN';
