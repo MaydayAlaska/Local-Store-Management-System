@@ -32,9 +32,9 @@ String inventoryExportFieldLabel(InventoryExportField field) => switch (field) {
       InventoryExportField.category => AppStrings.t('category'),
       InventoryExportField.stock => AppStrings.t('quantity'),
       InventoryExportField.purchase =>
-        AppStrings.isEnglish ? 'Purchase Price' : 'Prezzo di Acquisto',
+        AppStrings.pair('Prezzo di Acquisto', 'Purchase Price'),
       InventoryExportField.sale =>
-        AppStrings.isEnglish ? 'Sale Price' : 'Prezzo di Vendita',
+        AppStrings.pair('Prezzo di Vendita', 'Sale Price'),
     };
 
 class ExportService {
@@ -58,7 +58,14 @@ class ExportService {
     required Set<InventoryExportField> fields,
     required AppSettings settings,
   }) async {
-    if (fields.isEmpty) throw StateError('Seleziona almeno un campo da esportare.');
+    if (fields.isEmpty) {
+      throw StateError(
+        AppStrings.pair(
+          'Seleziona almeno un campo da esportare.',
+          'Select at least one field to export.',
+        ),
+      );
+    }
     final inventory = filteredInventory(brandIds, categoryIds);
     final workbook = Excel.createExcel();
     final sheet = workbook[AppStrings.t('inventory')];
@@ -88,7 +95,14 @@ class ExportService {
     }
 
     final bytes = workbook.save();
-    if (bytes == null) throw StateError('Impossibile generare il file Excel.');
+    if (bytes == null) {
+      throw StateError(
+        AppStrings.pair(
+          'Impossibile generare il file Excel.',
+          'Unable to generate the Excel file.',
+        ),
+      );
+    }
     final location = await getSaveLocation(
       suggestedName: 'Inventario - ${exportTimestamp()}.xlsx',
       acceptedTypeGroups: const [
@@ -106,7 +120,14 @@ class ExportService {
     required Set<InventoryExportField> fields,
     required AppSettings settings,
   }) async {
-    if (fields.isEmpty) throw StateError('Seleziona almeno un campo da esportare.');
+    if (fields.isEmpty) {
+      throw StateError(
+        AppStrings.pair(
+          'Seleziona almeno un campo da esportare.',
+          'Select at least one field to export.',
+        ),
+      );
+    }
     final inventory = filteredInventory(brandIds, categoryIds);
     final document = pw.Document(theme: _loadPdfTheme());
     final logoPath = settingsService.resolveLogoPath(settings);
