@@ -1,8 +1,12 @@
+import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/services.dart';
+import 'package:image/image.dart' as img;
 import 'package:path/path.dart' as p;
 import 'package:window_manager/window_manager.dart';
 
+import '../core/app_paths.dart';
 import '../models/app_settings.dart';
 import 'settings_service.dart';
 
@@ -18,16 +22,35 @@ class ApplicationIconService {
     }
 
     if (!Platform.isWindows) return;
-    final iconPath = settings.resolveWindowsShellIconPath(appSettings);
+    final customIconPath = settings.resolveWindowsShellIconPath(appSettings);
+    final iconPath = customIconPath ?? await _defaultWindowsIconPath();
     if (iconPath == null) return;
 
     try {
       await windowManager.setIcon(iconPath);
     } catch (_) {
-      // L'icona personalizzata non deve impedire il funzionamento dell'app.
+      // L'icona non deve impedire il funzionamento dell'app.
     }
 
     await _updateWindowsShortcuts(iconPath);
+  }
+
+  Future<String?> _defaultWindowsIconPath() async {
+    try {
+      final encoded = await rootBundle.loadString('assets/app-icon.base64');
+      final decoded = img.decodeImage(base64Decode(encoded.trim()));
+      if (decoded == null) return null;
+      final directory = Directory(AppPaths.assetsDirectory)
+        ..createSync(recursive: true);
+      final iconPath = p.join(directory.path, 'app-default.ico');
+      File(iconPath).writeAsBytesSync(
+        img.encodeIco(decoded),
+        flush: true,
+      );
+      return iconPath;
+    } catch (_) {
+      return null;
+    }
   }
 
   Future<void> _updateWindowsShortcuts(String iconPath) async {

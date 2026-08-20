@@ -20,6 +20,8 @@
     "show_logo": "Show logo in menu",
     "change_app_icon": "Change application icon",
     "app_icon_selected": "Icon selected",
+    "reset_app_icon": "Restore default icon",
+    "app_icon_default_selected": "Default icon selected",
     "change_shop_logo": "Change shop logo",
     "shop_logo_selected": "Logo selected",
     "save_settings": "Save settings",

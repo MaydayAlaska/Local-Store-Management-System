@@ -5,6 +5,7 @@ import '../core/app_paths.dart';
 import '../l10n/app_strings.dart';
 import '../models/app_settings.dart';
 import '../services/app_services.dart';
+import '../services/settings_service.dart';
 import '../services/update_service.dart';
 import '../widgets/glass_dropdown.dart';
 
@@ -798,9 +799,27 @@ class _SettingsPageState extends State<SettingsPage> {
                         icon: const Icon(Icons.app_shortcut),
                         label: Text(
                           AppStrings.t(
-                            _iconSource == null
+                            _iconSource == null ||
+                                    _iconSource ==
+                                        SettingsService.defaultIconSourceToken
                                 ? 'change_app_icon'
                                 : 'app_icon_selected',
+                          ),
+                        ),
+                      ),
+                      OutlinedButton.icon(
+                        onPressed: _saving
+                            ? null
+                            : () => setState(
+                                  () => _iconSource =
+                                      SettingsService.defaultIconSourceToken,
+                                ),
+                        icon: const Icon(Icons.restore),
+                        label: Text(
+                          AppStrings.t(
+                            _iconSource == SettingsService.defaultIconSourceToken
+                                ? 'app_icon_default_selected'
+                                : 'reset_app_icon',
                           ),
                         ),
                       ),

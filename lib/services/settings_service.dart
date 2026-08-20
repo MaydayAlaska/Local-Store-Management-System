@@ -9,6 +9,8 @@ import '../l10n/app_strings.dart';
 import '../models/app_settings.dart';
 
 class SettingsService {
+  static const defaultIconSourceToken = ':default-app-icon:';
+
   AppSettings load() {
     final file = File(AppPaths.settingsPath);
     if (!file.existsSync()) return AppSettings.defaults;
@@ -39,9 +41,12 @@ class SettingsService {
     final name = shopName.trim().isEmpty
         ? AppSettings.defaults.shopName
         : shopName.trim();
-    final icon = iconSourcePath == null
-        ? current.iconFileName
-        : _saveAsset(iconSourcePath, 'app-icon');
+    final resetIcon = iconSourcePath == defaultIconSourceToken;
+    final icon = resetIcon
+        ? null
+        : iconSourcePath == null
+            ? current.iconFileName
+            : _saveAsset(iconSourcePath, 'app-icon');
     final logo = logoSourcePath == null
         ? current.logoFileName
         : _saveAsset(logoSourcePath, 'shop-logo');
@@ -78,7 +83,11 @@ class SettingsService {
       languageCode: normalizedLanguage,
     );
     _writeSettings(settings);
-    if (icon != null) _ensureDerivedIconFiles(settings);
+    if (resetIcon) {
+      _removeApplicationIconAssets();
+    } else if (icon != null) {
+      _ensureDerivedIconFiles(settings);
+    }
     return settings;
   }
 
@@ -197,6 +206,22 @@ class SettingsService {
       }
     } catch (_) {
       // Pulizia best effort.
+    }
+  }
+
+  void _removeApplicationIconAssets() {
+    try {
+      final directory = Directory(AppPaths.assetsDirectory);
+      if (!directory.existsSync()) return;
+      for (final entity in directory.listSync()) {
+        if (entity is! File) continue;
+        final name = p.basename(entity.path).toLowerCase();
+        if (name.startsWith('app-icon-') || name.startsWith('app-shell-')) {
+          entity.deleteSync();
+        }
+      }
+    } catch (_) {
+      // Pulizia best effort: le impostazioni sono già tornate al default.
     }
   }
 
