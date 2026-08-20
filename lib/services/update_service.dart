@@ -46,6 +46,35 @@ String betaUpdateAssetSuffixFor({
   };
 }
 
+bool updateAssetMatchesFor({
+  required String assetName,
+  required String operatingSystem,
+  required Abi abi,
+  required bool beta,
+}) {
+  final normalized = assetName.trim();
+  if (!beta) {
+    return normalized == updateAssetNameFor(
+      operatingSystem: operatingSystem,
+      abi: abi,
+    );
+  }
+
+  final suffix = betaUpdateAssetSuffixFor(
+    operatingSystem: operatingSystem,
+    abi: abi,
+  );
+  const prefix = 'LocalStoreManagement-';
+  if (!normalized.startsWith(prefix) || !normalized.endsWith(suffix)) {
+    return false;
+  }
+  final version = normalized.substring(
+    prefix.length,
+    normalized.length - suffix.length,
+  );
+  return versionBelongsToUpdateChannel(version, beta: true);
+}
+
 bool isBetaBranch(String branch) => branch.trim().toLowerCase() == 'flutter';
 
 String betaReleaseTagFor(String branch) =>
@@ -171,7 +200,7 @@ class UpdateService {
   static const owner = 'MaydayAlaska';
   static const repository = 'Local-Store-Management-System';
   static const stableBranch = 'main';
-  static const currentVersion = '0.1.6-b10';
+  static const currentVersion = '0.1.6-b11';
   static const currentCommit = String.fromEnvironment('GIT_COMMIT');
   static const currentBranch = String.fromEnvironment('BUILD_BRANCH');
   static const tokenEnvironmentVariable = 'LOCAL_STORE_GITHUB_TOKEN';
@@ -473,11 +502,6 @@ exec ${_shell(current)}
         abi: Abi.current(),
       );
 
-  String _expectedBetaAssetSuffix() => betaUpdateAssetSuffixFor(
-        operatingSystem: Platform.operatingSystem,
-        abi: Abi.current(),
-      );
-
   Future<String> _readCommit(String ref) async {
     final encodedRef = Uri.encodeComponent(ref);
     final json = await _getJson(
@@ -526,13 +550,15 @@ exec ${_shell(current)}
     Map<String, dynamic> release, {
     bool beta = false,
   }) {
-    final expected = _expectedAssetName();
-    final betaSuffix = beta ? _expectedBetaAssetSuffix() : null;
-
     for (final raw in (release['assets'] as List<dynamic>? ?? const [])) {
       final asset = raw as Map<String, dynamic>;
       final name = asset['name'] as String? ?? '';
-      final matches = beta ? name.endsWith(betaSuffix!) : name == expected;
+      final matches = updateAssetMatchesFor(
+        assetName: name,
+        operatingSystem: Platform.operatingSystem,
+        abi: Abi.current(),
+        beta: beta,
+      );
       if (matches) return asset['url'] as String?;
     }
     return null;
