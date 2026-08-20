@@ -118,21 +118,19 @@ double _evaluateArithmeticExpression(String expression) {
     if (operand == null) {
       throw const FormatException('Importo o formula non validi.');
     }
-    switch (op) {
-      case '*':
-        current *= operand;
-      case '/':
-        if (operand == 0) {
-          throw const FormatException('Divisione per zero non valida.');
-        }
-        current /= operand;
-      case '+':
-      case '-':
-        values.add(current);
-        lowOps.add(op);
-        current = operand;
-      default:
-        throw const FormatException('Operatore non valido.');
+    if (op == '*') {
+      current *= operand;
+    } else if (op == '/') {
+      if (operand == 0) {
+        throw const FormatException('Divisione per zero non valida.');
+      }
+      current /= operand;
+    } else if (op == '+' || op == '-') {
+      values.add(current);
+      lowOps.add(op);
+      current = operand;
+    } else {
+      throw const FormatException('Operatore non valido.');
     }
   }
   values.add(current);
