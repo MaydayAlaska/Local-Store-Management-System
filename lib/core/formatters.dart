@@ -59,3 +59,89 @@ int? parseEuroCents(String value) {
   if (parsed == null) throw const FormatException('Importo non valido.');
   return (parsed * 100).round();
 }
+
+int? parsePriceFormulaCents(String value) {
+  final normalized = value
+      .trim()
+      .replaceAll('€', '')
+      .replaceAll(r'$', '')
+      .replaceAll('£', '')
+      .replaceAll('CHF', '')
+      .replaceAll(' ', '')
+      .replaceAll(',', '.');
+  if (normalized.isEmpty) return null;
+
+  final result = _evaluatePriceExpression(normalized);
+  if (!result.isFinite || result < 0) {
+    throw const FormatException('Importo o formula non validi.');
+  }
+  return (result * 100).round();
+}
+
+double _evaluatePriceExpression(String expression) {
+  final percentSuffix =
+      RegExp(r'^(.+)([+-])(\d+(?:\.\d+)?)%$').firstMatch(expression);
+  if (percentSuffix != null) {
+    final base = _evaluatePriceExpression(percentSuffix.group(1)!);
+    final percent = double.parse(percentSuffix.group(3)!);
+    final factor = percent / 100;
+    return percentSuffix.group(2) == '-'
+        ? base * (1 - factor)
+        : base * (1 + factor);
+  }
+
+  if (expression.contains('%')) {
+    throw const FormatException('Percentuale non valida nella formula.');
+  }
+  return _evaluateArithmeticExpression(expression);
+}
+
+double _evaluateArithmeticExpression(String expression) {
+  final tokens = RegExp(r'\d+(?:\.\d+)?|[+\-*/]')
+      .allMatches(expression)
+      .map((match) => match.group(0)!)
+      .toList();
+  if (tokens.isEmpty || tokens.join() != expression || tokens.length.isEven) {
+    throw const FormatException('Importo o formula non validi.');
+  }
+
+  final values = <double>[];
+  final lowOps = <String>[];
+  var current = double.tryParse(tokens.first);
+  if (current == null) {
+    throw const FormatException('Importo o formula non validi.');
+  }
+
+  for (var i = 1; i < tokens.length; i += 2) {
+    final op = tokens[i];
+    final operand = double.tryParse(tokens[i + 1]);
+    if (operand == null) {
+      throw const FormatException('Importo o formula non validi.');
+    }
+    switch (op) {
+      case '*':
+        current *= operand;
+      case '/':
+        if (operand == 0) {
+          throw const FormatException('Divisione per zero non valida.');
+        }
+        current /= operand;
+      case '+':
+      case '-':
+        values.add(current);
+        lowOps.add(op);
+        current = operand;
+      default:
+        throw const FormatException('Operatore non valido.');
+    }
+  }
+  values.add(current);
+
+  var result = values.first;
+  for (var i = 0; i < lowOps.length; i++) {
+    result = lowOps[i] == '+'
+        ? result + values[i + 1]
+        : result - values[i + 1];
+  }
+  return result;
+}
