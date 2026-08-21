@@ -100,6 +100,7 @@ class SingleInstanceGuard {
           timeout: _connectTimeout,
         );
         final response = socket
+            .map<List<int>>((chunk) => chunk)
             .transform(utf8.decoder)
             .transform(const LineSplitter())
             .first
@@ -133,6 +134,7 @@ class SingleInstanceGuard {
   Future<void> _handleClientAsync(Socket socket) async {
     try {
       final request = await socket
+          .map<List<int>>((chunk) => chunk)
           .transform(utf8.decoder)
           .transform(const LineSplitter())
           .first
