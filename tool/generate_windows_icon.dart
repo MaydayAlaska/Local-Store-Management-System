@@ -34,6 +34,69 @@ param(
 $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName System.Drawing
 
+function New-IcoDibBytes {
+  param(
+    [Parameter(Mandatory=$true)][Drawing.Bitmap]$Bitmap
+  )
+
+  $width = $Bitmap.Width
+  $height = $Bitmap.Height
+  $xorStride = $width * 4
+  $andStride = [int](([Math]::Ceiling($width / 32.0)) * 4)
+  $xorSize = $xorStride * $height
+  $andSize = $andStride * $height
+
+  $stream = [IO.MemoryStream]::new()
+  $writer = [IO.BinaryWriter]::new($stream)
+  try {
+    # BITMAPINFOHEADER. ICO stores XOR + AND masks in one DIB, therefore
+    # biHeight is twice the visible image height.
+    $writer.Write([UInt32]40)
+    $writer.Write([Int32]$width)
+    $writer.Write([Int32]($height * 2))
+    $writer.Write([UInt16]1)
+    $writer.Write([UInt16]32)
+    $writer.Write([UInt32]0)
+    $writer.Write([UInt32]$xorSize)
+    $writer.Write([Int32]0)
+    $writer.Write([Int32]0)
+    $writer.Write([UInt32]0)
+    $writer.Write([UInt32]0)
+
+    # 32-bit BGRA pixels, bottom-up as required by the ICO DIB format.
+    for ($y = $height - 1; $y -ge 0; $y--) {
+      for ($x = 0; $x -lt $width; $x++) {
+        $pixel = $Bitmap.GetPixel($x, $y)
+        $writer.Write([Byte]$pixel.B)
+        $writer.Write([Byte]$pixel.G)
+        $writer.Write([Byte]$pixel.R)
+        $writer.Write([Byte]$pixel.A)
+      }
+    }
+
+    # Legacy 1-bit AND mask. Transparent pixels are marked as transparent;
+    # opaque/semitransparent pixels rely on the alpha channel above.
+    for ($y = $height - 1; $y -ge 0; $y--) {
+      $row = New-Object byte[] $andStride
+      for ($x = 0; $x -lt $width; $x++) {
+        $pixel = $Bitmap.GetPixel($x, $y)
+        if ($pixel.A -eq 0) {
+          $byteIndex = [int]($x / 8)
+          $bitIndex = 7 - ($x % 8)
+          $row[$byteIndex] = $row[$byteIndex] -bor (1 -shl $bitIndex)
+        }
+      }
+      $writer.Write($row)
+    }
+
+    $writer.Flush()
+    return $stream.ToArray()
+  } finally {
+    $writer.Dispose()
+    $stream.Dispose()
+  }
+}
+
 $encoded = (Get-Content -Raw -LiteralPath $SourceBase64).Trim()
 $sourceBytes = [Convert]::FromBase64String($encoded)
 $sourceStream = [IO.MemoryStream]::new($sourceBytes, $false)
@@ -58,18 +121,25 @@ try {
       $graphics.SmoothingMode = [Drawing.Drawing2D.SmoothingMode]::HighQuality
       $graphics.PixelOffsetMode = [Drawing.Drawing2D.PixelOffsetMode]::HighQuality
       $graphics.Clear([Drawing.Color]::Transparent)
+
+      # Preserve the complete source image without cropping or stretching.
+      $scale = [Math]::Min(
+        $size / [double]$sourceImage.Width,
+        $size / [double]$sourceImage.Height
+      )
+      $drawWidth = [Math]::Max(1, [int][Math]::Round($sourceImage.Width * $scale))
+      $drawHeight = [Math]::Max(1, [int][Math]::Round($sourceImage.Height * $scale))
+      $left = [int](($size - $drawWidth) / 2)
+      $top = [int](($size - $drawHeight) / 2)
+
       $graphics.DrawImage(
         $sourceImage,
-        [Drawing.Rectangle]::new(0, 0, $size, $size)
+        [Drawing.Rectangle]::new($left, $top, $drawWidth, $drawHeight)
       )
 
-      $pngStream = [IO.MemoryStream]::new()
-      try {
-        $bitmap.Save($pngStream, [Drawing.Imaging.ImageFormat]::Png)
-        $images.Add($pngStream.ToArray())
-      } finally {
-        $pngStream.Dispose()
-      }
+      # Use classic DIB-backed ICO entries instead of PNG-compressed entries.
+      # Inno Setup and Windows Explorer handle these consistently at small sizes.
+      $images.Add((New-IcoDibBytes -Bitmap $bitmap))
     } finally {
       $graphics.Dispose()
       $bitmap.Dispose()
@@ -114,8 +184,8 @@ try {
   }
 
   Write-Host (
-    "Generated $OutputIco with $($sizes.Count) icon sizes from " +
-    "$($sourceImage.Width)x$($sourceImage.Height) source."
+    "Generated Windows-compatible DIB ICO $OutputIco with $($sizes.Count) sizes " +
+    "from $($sourceImage.Width)x$($sourceImage.Height) source."
   )
 } finally {
   if ($null -ne $sourceImage) { $sourceImage.Dispose() }
