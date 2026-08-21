@@ -13,10 +13,10 @@ void main() {
     SingleInstanceGuard? reacquired;
     addTearDown(() async {
       if (reacquired != null) {
-        await reacquired!.close();
+        await reacquired.close();
       }
       if (primary != null) {
-        await primary!.close();
+        await primary.close();
       }
       if (await directory.exists()) {
         await directory.delete(recursive: true);
