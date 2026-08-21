@@ -827,7 +827,6 @@ class _CashPageState extends State<CashPage> {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     Row(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         Expanded(
                           child: TextField(
@@ -843,31 +842,34 @@ class _CashPageState extends State<CashPage> {
                           ),
                         ),
                         const SizedBox(width: 8),
-                        Center(
-                          child: SegmentedButton<_ProductViewMode>(
-                            segments: [
-                              ButtonSegment<_ProductViewMode>(
-                                value: _ProductViewMode.list,
-                                icon: const Icon(Icons.view_list_rounded),
-                                tooltip: _itEn(
-                                  'Visualizzazione elenco',
-                                  'List view',
-                                ),
+                        SegmentedButton<_ProductViewMode>(
+                          segments: [
+                            ButtonSegment<_ProductViewMode>(
+                              value: _ProductViewMode.list,
+                              icon: const Icon(Icons.view_list_rounded),
+                              tooltip: _itEn(
+                                'Visualizzazione elenco',
+                                'List view',
                               ),
-                              ButtonSegment<_ProductViewMode>(
-                                value: _ProductViewMode.grid,
-                                icon: const Icon(Icons.grid_view_rounded),
-                                tooltip: _itEn(
-                                  'Visualizzazione anteprima',
-                                  'Preview grid view',
-                                ),
-                              ),
-                            ],
-                            selected: {_productViewMode},
-                            showSelectedIcon: false,
-                            onSelectionChanged: (value) => setState(
-                              () => _productViewMode = value.first,
                             ),
+                            ButtonSegment<_ProductViewMode>(
+                              value: _ProductViewMode.grid,
+                              icon: const Icon(Icons.grid_view_rounded),
+                              tooltip: _itEn(
+                                'Visualizzazione anteprima',
+                                'Preview grid view',
+                              ),
+                            ),
+                          ],
+                          selected: {_productViewMode},
+                          showSelectedIcon: false,
+                          style: SegmentedButton.styleFrom(
+                            minimumSize: const Size(44, 48),
+                            padding: const EdgeInsets.symmetric(horizontal: 12),
+                            visualDensity: VisualDensity.compact,
+                          ),
+                          onSelectionChanged: (value) => setState(
+                            () => _productViewMode = value.first,
                           ),
                         ),
                       ],
