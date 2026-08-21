@@ -7,6 +7,7 @@ import 'application_icon_service.dart';
 import 'backup_service.dart';
 import 'database_location_service.dart';
 import 'export_service.dart';
+import 'gift_card_code_service.dart';
 import 'label_service.dart';
 import 'settings_service.dart';
 import 'update_service.dart';
@@ -21,6 +22,7 @@ class AppServices {
         stock = StockRepository(database),
         customers = CustomerRepository(database),
         settings = SettingsService() {
+    GiftCardCodeService.ensureTimestampCodes(database);
     applicationIcon = ApplicationIconService(settings);
     backup = BackupService(database);
     labels = LabelService(settings);
