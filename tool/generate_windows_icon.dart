@@ -44,7 +44,6 @@ function New-IcoDibBytes {
   $xorStride = $width * 4
   $andStride = [int](([Math]::Ceiling($width / 32.0)) * 4)
   $xorSize = $xorStride * $height
-  $andSize = $andStride * $height
 
   $stream = [IO.MemoryStream]::new()
   $writer = [IO.BinaryWriter]::new($stream)
@@ -81,8 +80,10 @@ function New-IcoDibBytes {
       for ($x = 0; $x -lt $width; $x++) {
         $pixel = $Bitmap.GetPixel($x, $y)
         if ($pixel.A -eq 0) {
-          $byteIndex = [int]($x / 8)
-          $bitIndex = 7 - ($x % 8)
+          # Do not cast x / 8 to [int]: PowerShell rounds instead of truncating,
+          # which can produce an out-of-range index at widths such as 32 px.
+          $byteIndex = $x -shr 3
+          $bitIndex = 7 - ($x -band 7)
           $row[$byteIndex] = $row[$byteIndex] -bor (1 -shl $bitIndex)
         }
       }
