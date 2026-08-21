@@ -52,7 +52,7 @@ La sezione Etichette supporta stampante persistente, dimensioni fisiche, antepri
 
 - l'icona predefinita dell'applicazione e dell'installer Windows viene ora generata come **ICO multi-risoluzione valido**, evitando icone corrotte o ritagliate in Esplora file, sul desktop e nei collegamenti;
 - l'applicazione accetta **una sola istanza alla volta**: se è già aperta, un secondo avvio viene ignorato prima di aprire database o nuove finestre;
-- il calcolo IVA/VAT in Cassa usa ora direttamente la percentuale configurata sul totale imponibile visualizzato: con aliquota 22% su 100,00 il valore mostrato è 22,00;
+- il calcolo IVA/VAT in Cassa scorpora l'imposta dal totale già comprensivo di IVA con la formula `IVA = totale × aliquota / (100 + aliquota)`; con aliquota 22% su 100,00 il valore mostrato è 18,03;
 - l'IVA/VAT del carrello include anche i **buoni regalo in acquisto**;
 - l'indicazione IVA/VAT è stata rimossa dal popup di creazione del buono regalo, dove non era utile.
 
