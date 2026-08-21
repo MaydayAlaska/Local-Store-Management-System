@@ -124,7 +124,7 @@
     "gift_card_purchase_help": "The gift card will be added to the cart and linked to {customerName} when the sale is registered. The price paid is the gift card value.",
     "gift_card_value_price": "Value / price",
     "value_greater_than_zero": "Enter a value greater than zero.",
-    "vat_included": "VAT included",
+    "vat_included": "VAT",
     "expiration_date_optional": "Expiration date (optional)",
     "no_expiration": "No expiration",
     "remove_expiration": "Remove expiration",
