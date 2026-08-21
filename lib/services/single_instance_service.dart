@@ -5,6 +5,8 @@ import 'package:path/path.dart' as p;
 class SingleInstanceGuard {
   SingleInstanceGuard._(this._file);
 
+  static final Set<SingleInstanceGuard> _activeGuards = <SingleInstanceGuard>{};
+
   final RandomAccessFile _file;
   bool _closed = false;
 
@@ -18,7 +20,9 @@ class SingleInstanceGuard {
     final handle = await file.open(mode: FileMode.append);
     try {
       await handle.lock(FileLock.exclusive);
-      return SingleInstanceGuard._(handle);
+      final guard = SingleInstanceGuard._(handle);
+      _activeGuards.add(guard);
+      return guard;
     } on FileSystemException {
       await handle.close();
       return null;
@@ -28,6 +32,7 @@ class SingleInstanceGuard {
   Future<void> close() async {
     if (_closed) return;
     _closed = true;
+    _activeGuards.remove(this);
     try {
       await _file.unlock();
     } finally {
