@@ -1173,7 +1173,7 @@ class _CashPageState extends State<CashPage> {
                             _cartStatus,
                             style: Theme.of(context).textTheme.bodySmall,
                           ),
-                          const SizedBox(height: 8),
+                          const SizedBox(height: 16),
                           SizedBox(
                             height: 108,
                             child: Row(
