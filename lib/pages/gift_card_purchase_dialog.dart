@@ -22,7 +22,6 @@ Future<GiftCardPurchaseDraft?> showGiftCardPurchaseDialog(
   DateTime? expirationDate;
   String? error;
 
-  String itEn(String it, String en) => AppStrings.pair(it, en);
   String dateText(DateTime value) =>
       '${value.day.toString().padLeft(2, '0')}/${value.month.toString().padLeft(2, '0')}/${value.year}';
   String percentText(double value) => value == value.roundToDouble()
@@ -61,10 +60,7 @@ Future<GiftCardPurchaseDraft?> showGiftCardPurchaseDialog(
           final cents = valueCents();
           if (cents <= 0) {
             setDialogState(() {
-              error = itEn(
-                'Inserisci un valore maggiore di zero.',
-                'Enter a value greater than zero.',
-              );
+              error = AppStrings.t('value_greater_than_zero');
             });
             return;
           }
@@ -95,7 +91,7 @@ Future<GiftCardPurchaseDraft?> showGiftCardPurchaseDialog(
         final vatCents = vatIncludedCents(valueCents(), vatPercent);
 
         return AlertDialog(
-          title: Text(itEn('Aggiungi buono regalo', 'Add gift card')),
+          title: Text(AppStrings.t('gift_card_add')),
           content: SizedBox(
             width: 440,
             child: Column(
@@ -103,9 +99,9 @@ Future<GiftCardPurchaseDraft?> showGiftCardPurchaseDialog(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Text(
-                  itEn(
-                    'Il buono verrà aggiunto al carrello e associato a $customerName quando registri la vendita. Il prezzo pagato corrisponde al valore del buono.',
-                    'The gift card will be added to the cart and linked to $customerName when the sale is registered. The price paid is the gift card value.',
+                  AppStrings.t(
+                    'gift_card_purchase_help',
+                    {'customerName': customerName},
                   ),
                 ),
                 const SizedBox(height: 14),
@@ -122,7 +118,7 @@ Future<GiftCardPurchaseDraft?> showGiftCardPurchaseDialog(
                   onSubmitted: (_) => submit(),
                   decoration: InputDecoration(
                     border: const OutlineInputBorder(),
-                    labelText: itEn('Valore / prezzo', 'Value / price'),
+                    labelText: AppStrings.t('gift_card_value_price'),
                     prefixText: '${AppRuntime.currencySymbol} ',
                     errorText: error,
                   ),
@@ -143,7 +139,7 @@ Future<GiftCardPurchaseDraft?> showGiftCardPurchaseDialog(
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
-                          '${itEn('VAT inclusa', 'VAT included')} (${percentText(vatPercent)}%)',
+                          '${AppStrings.t('vat_included')} (${percentText(vatPercent)}%)',
                         ),
                       ),
                       Text(
@@ -155,10 +151,7 @@ Future<GiftCardPurchaseDraft?> showGiftCardPurchaseDialog(
                 ),
                 const SizedBox(height: 14),
                 Text(
-                  itEn(
-                    'Data di scadenza (facoltativa)',
-                    'Expiration date (optional)',
-                  ),
+                  AppStrings.t('expiration_date_optional'),
                   style: Theme.of(context).textTheme.labelLarge,
                 ),
                 const SizedBox(height: 6),
@@ -170,7 +163,7 @@ Future<GiftCardPurchaseDraft?> showGiftCardPurchaseDialog(
                         icon: const Icon(Icons.event_outlined),
                         label: Text(
                           expirationDate == null
-                              ? itEn('Nessuna scadenza', 'No expiration')
+                              ? AppStrings.t('no_expiration')
                               : dateText(expirationDate!),
                         ),
                       ),
@@ -178,7 +171,7 @@ Future<GiftCardPurchaseDraft?> showGiftCardPurchaseDialog(
                     if (expirationDate != null) ...[
                       const SizedBox(width: 6),
                       IconButton(
-                        tooltip: itEn('Rimuovi scadenza', 'Clear expiration'),
+                        tooltip: AppStrings.t('remove_expiration'),
                         onPressed: () =>
                             setDialogState(() => expirationDate = null),
                         icon: const Icon(Icons.close),
@@ -197,7 +190,7 @@ Future<GiftCardPurchaseDraft?> showGiftCardPurchaseDialog(
             FilledButton.icon(
               onPressed: submit,
               icon: const Icon(Icons.card_giftcard_outlined),
-              label: Text(itEn('Aggiungi al carrello', 'Add to cart')),
+              label: Text(AppStrings.t('add_to_cart')),
             ),
           ],
         );
