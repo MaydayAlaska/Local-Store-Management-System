@@ -627,12 +627,8 @@ class _CashPageState extends State<CashPage> {
   int get _discountableSubtotalCents => _cart
       .where((line) => !line.isGiftCardPurchase)
       .fold(0, (sum, line) => sum + line.lineTotalCents);
-  int get _subtotalCents =>
-      _discountableSubtotalCents + _giftCardPurchaseCents;
   int get _afterPercentDiscountableCents =>
       _applyPercent(_discountableSubtotalCents, _totalDiscountPercent);
-  int get _afterPercentCents =>
-      _afterPercentDiscountableCents + _giftCardPurchaseCents;
   int get _fixedCents {
     final requested =
         _fixedDiscounts.fold<int>(0, (sum, line) => sum + line.amountCents);
@@ -736,7 +732,7 @@ class _CashPageState extends State<CashPage> {
         for (final line in pendingGiftCards) {
           createdGiftCards.add(
             widget.services.customers.createGiftCard(
-              customer!.id,
+              customer.id,
               line.unitPriceCents,
               expiresAtUtc: line.giftCardExpiresAtUtc,
             ),
