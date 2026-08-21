@@ -482,14 +482,15 @@ class CustomerRepository {
       ).isNotEmpty;
       if (!customerExists) throw StateError('Il cliente selezionato non esiste più.');
 
-      final now = DateTime.now().toUtc().toIso8601String();
+      final nowUtc = DateTime.now().toUtc();
+      final now = nowUtc.toIso8601String();
       final expiration = expiresAtUtc?.toUtc().toIso8601String();
       final purchaseOrderId = _findAvailableGiftCardPurchaseOrder(
         customerId: customerId,
         totalValueCents: totalValueCents,
         giftCardCreatedAtUtc: now,
       );
-      final code = _newUniqueGiftCardCode();
+      final code = _newUniqueGiftCardCode(nowUtc);
       db.execute('''
         INSERT INTO gift_cards (
           code, customer_id, total_value_cents, spent_value_cents,
@@ -1047,10 +1048,10 @@ class CustomerRepository {
     }
   }
 
-  String _newUniqueGiftCardCode() {
+  String _newUniqueGiftCardCode(DateTime utc) {
     var serial = _nextGiftCardSerial();
     while (true) {
-      final candidate = 'GIFT-${serial.toString().padLeft(8, '0')}';
+      final candidate = _newGiftCardCode(utc, serial);
       final exists = database.db.select(
         'SELECT 1 FROM gift_cards WHERE code=? COLLATE NOCASE LIMIT 1;',
         [candidate],
@@ -1068,6 +1069,13 @@ class CustomerRepository {
     String two(int value) => value.toString().padLeft(2, '0');
     final suffix = serial.toString().padLeft(6, '0');
     return 'ORD-${local.year}${two(local.month)}${two(local.day)}-${two(local.hour)}${two(local.minute)}${two(local.second)}-$suffix';
+  }
+
+  static String _newGiftCardCode(DateTime utc, int serial) {
+    final local = utc.toLocal();
+    String two(int value) => value.toString().padLeft(2, '0');
+    final suffix = serial.toString().padLeft(6, '0');
+    return 'GIFT-${local.year}${two(local.month)}${two(local.day)}-${two(local.hour)}${two(local.minute)}${two(local.second)}-$suffix';
   }
 
   static String? _optional(String? value) =>
