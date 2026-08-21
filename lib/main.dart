@@ -30,20 +30,42 @@ void main() {
 
 Future<void> _bootstrap() async {
   DatabaseService? database;
+  var primaryWindowReady = false;
+
+  Future<void> activatePrimaryWindow() async {
+    if (!primaryWindowReady) return;
+    try {
+      if (await windowManager.isMinimized()) {
+        await windowManager.restore();
+      }
+      await windowManager.show();
+      await windowManager.focus();
+    } catch (error, stackTrace) {
+      AppLog.error(
+        'Unable to activate primary application window',
+        error,
+        stackTrace,
+      );
+    }
+  }
+
   try {
-    await windowManager.ensureInitialized();
     await AppPaths.initialize();
 
-    final instanceGuard =
-        await SingleInstanceGuard.tryAcquire(AppPaths.dataDirectory);
+    final instanceGuard = await SingleInstanceGuard.tryAcquire(
+      AppPaths.dataDirectory,
+      onActivate: activatePrimaryWindow,
+    );
     if (instanceGuard == null) {
       AppLog.info(
         'Startup',
-        'Avvio ignorato: Local Store Management System è già in esecuzione.',
+        'Avvio ignorato: Local Store Management System è già in esecuzione. '
+            'La finestra esistente è stata richiamata in primo piano.',
       );
       exit(0);
     }
 
+    await windowManager.ensureInitialized();
     await AppStrings.initialize();
     await BirthPlaceService.initialize();
 
@@ -69,6 +91,7 @@ Future<void> _bootstrap() async {
 
     await windowManager.waitUntilReadyToShow(windowOptions, () async {
       await services.applicationIcon.apply(settings);
+      primaryWindowReady = true;
       await windowManager.show();
       await windowManager.focus();
     });
@@ -94,6 +117,7 @@ Future<void> _bootstrap() async {
         titleBarStyle: TitleBarStyle.normal,
       );
       await windowManager.waitUntilReadyToShow(errorOptions, () async {
+        primaryWindowReady = true;
         await windowManager.show();
         await windowManager.focus();
       });
