@@ -77,7 +77,6 @@ class GiftCard {
     required this.customerId,
     required this.totalValueCents,
     required this.spentValueCents,
-    this.purchaseOrderId,
     this.expiresAtUtc,
     required this.createdAtUtc,
     required this.updatedAtUtc,
@@ -88,13 +87,10 @@ class GiftCard {
   final int customerId;
   final int totalValueCents;
   final int spentValueCents;
-  final int? purchaseOrderId;
   final DateTime? expiresAtUtc;
   final DateTime createdAtUtc;
   final DateTime updatedAtUtc;
 
-  /// Purchase timestamp. Gift cards sold through Checkout use the same
-  /// timestamp as the order that issued them.
   DateTime get purchasedAtUtc => createdAtUtc;
 
   int get remainingValueCents {
@@ -115,16 +111,6 @@ class GiftCard {
 
   static String _dateDisplay(DateTime value) =>
       '${value.day.toString().padLeft(2, '0')}/${value.month.toString().padLeft(2, '0')}/${value.year}';
-}
-
-class GiftCardIssueDraft {
-  const GiftCardIssueDraft({
-    required this.valueCents,
-    this.expiresAtUtc,
-  });
-
-  final int valueCents;
-  final DateTime? expiresAtUtc;
 }
 
 class SalesOrderDraftLine {
@@ -158,7 +144,6 @@ class SalesOrderDraft {
     this.customerId,
     this.giftCardId,
     this.giftCardAppliedCents = 0,
-    this.giftCardsToIssue = const [],
     required this.lines,
     required this.grossTotalCents,
     required this.itemDiscountCents,
@@ -171,7 +156,6 @@ class SalesOrderDraft {
   final int? customerId;
   final int? giftCardId;
   final int giftCardAppliedCents;
-  final List<GiftCardIssueDraft> giftCardsToIssue;
   final List<SalesOrderDraftLine> lines;
   final int grossTotalCents;
   final int itemDiscountCents;
