@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import '../l10n/app_strings.dart';
 import '../models/app_settings.dart';
 import '../services/app_services.dart';
+import '../services/birth_place_service.dart';
 import '../services/update_service.dart';
 import '../widgets/app_title_bar.dart';
 import '../widgets/glass.dart';
@@ -43,11 +44,13 @@ class _ShellPageState extends State<ShellPage> {
   UpdateCheckResult? _startupUpdate;
   OverlayEntry? _updateNotification;
   Timer? _updateNotificationTimer;
+  OverlayEntry? _birthPlaceNotification;
+  Timer? _birthPlaceNotificationTimer;
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _checkUpdatesOnStartup());
+    WidgetsBinding.instance.addPostFrameCallback((_) => _runStartupChecks());
   }
 
   @override
@@ -55,7 +58,46 @@ class _ShellPageState extends State<ShellPage> {
     _updateNotificationTimer?.cancel();
     _updateNotification?.remove();
     _updateNotification = null;
+    _birthPlaceNotificationTimer?.cancel();
+    _birthPlaceNotification?.remove();
+    _birthPlaceNotification = null;
     super.dispose();
+  }
+
+  Future<void> _runStartupChecks() async {
+    await _checkBirthPlaceUpdatesOnStartup();
+    if (mounted) await _checkUpdatesOnStartup();
+  }
+
+  Future<void> _checkBirthPlaceUpdatesOnStartup() async {
+    var updateStarted = false;
+    try {
+      final result = await BirthPlaceService.checkForUpdates(
+        onUpdateStarted: () {
+          updateStarted = true;
+          if (mounted) {
+            _showBirthPlaceNotification(
+              title: AppStrings.t('anpr_update_in_progress_title'),
+              message: AppStrings.t('anpr_update_in_progress'),
+              loading: true,
+            );
+          }
+        },
+      );
+      if (!mounted || !result.updated) return;
+      _showBirthPlaceNotification(
+        title: AppStrings.t('anpr_update_completed_title'),
+        message: AppStrings.t('anpr_update_completed'),
+      );
+    } catch (error) {
+      debugPrint('Controllo aggiornamento ANPR non riuscito: $error');
+      if (!mounted || !updateStarted) return;
+      _showBirthPlaceNotification(
+        title: AppStrings.t('anpr_update_failed_title'),
+        message: AppStrings.t('anpr_update_failed'),
+        error: true,
+      );
+    }
   }
 
   Future<void> _checkUpdatesOnStartup() async {
@@ -70,8 +112,13 @@ class _ShellPageState extends State<ShellPage> {
     }
   }
 
-  void _showUpdateNotification(UpdateCheckResult update) {
-    _dismissUpdateNotification();
+  void _showBirthPlaceNotification({
+    required String title,
+    required String message,
+    bool loading = false,
+    bool error = false,
+  }) {
+    _dismissBirthPlaceNotification();
 
     final overlay = Overlay.of(context, rootOverlay: true);
     final entry = OverlayEntry(
@@ -81,6 +128,105 @@ class _ShellPageState extends State<ShellPage> {
         return Positioned(
           right: 24,
           bottom: 24,
+          child: Material(
+            type: MaterialType.transparency,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 360),
+              child: GlassSurface(
+                blur: 30,
+                opacity: isDark ? 0.18 : 0.58,
+                borderRadius: BorderRadius.circular(18),
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 14, 10, 14),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (loading)
+                        SizedBox(
+                          width: 22,
+                          height: 22,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2.4,
+                            color: theme.colorScheme.primary,
+                          ),
+                        )
+                      else
+                        Icon(
+                          error
+                              ? Icons.error_outline_rounded
+                              : Icons.cloud_done_outlined,
+                          color: error
+                              ? theme.colorScheme.error
+                              : theme.colorScheme.primary,
+                        ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              title,
+                              style: theme.textTheme.titleSmall?.copyWith(
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              message,
+                              maxLines: 3,
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.textTheme.bodySmall,
+                            ),
+                          ],
+                        ),
+                      ),
+                      if (!loading)
+                        IconButton(
+                          tooltip: AppStrings.t('close'),
+                          visualDensity: VisualDensity.compact,
+                          onPressed: _dismissBirthPlaceNotification,
+                          icon: const Icon(Icons.close_rounded, size: 18),
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+
+    _birthPlaceNotification = entry;
+    overlay.insert(entry);
+    if (!loading) {
+      _birthPlaceNotificationTimer = Timer(
+        const Duration(seconds: 6),
+        _dismissBirthPlaceNotification,
+      );
+    }
+  }
+
+  void _dismissBirthPlaceNotification() {
+    _birthPlaceNotificationTimer?.cancel();
+    _birthPlaceNotificationTimer = null;
+    _birthPlaceNotification?.remove();
+    _birthPlaceNotification = null;
+  }
+
+  void _showUpdateNotification(UpdateCheckResult update) {
+    _dismissUpdateNotification();
+
+    final overlay = Overlay.of(context, rootOverlay: true);
+    final bottomOffset = _birthPlaceNotification == null ? 24.0 : 150.0;
+    final entry = OverlayEntry(
+      builder: (context) {
+        final theme = Theme.of(context);
+        final isDark = theme.brightness == Brightness.dark;
+        return Positioned(
+          right: 24,
+          bottom: bottomOffset,
           child: Material(
             type: MaterialType.transparency,
             child: ConstrainedBox(
