@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../core/app_runtime.dart';
+import '../core/formatters.dart';
 import '../l10n/app_strings.dart';
 
 class GiftCardPurchaseDraft {
@@ -24,6 +25,21 @@ Future<GiftCardPurchaseDraft?> showGiftCardPurchaseDialog(
   String itEn(String it, String en) => AppStrings.pair(it, en);
   String dateText(DateTime value) =>
       '${value.day.toString().padLeft(2, '0')}/${value.month.toString().padLeft(2, '0')}/${value.year}';
+  String percentText(double value) => value == value.roundToDouble()
+      ? value.toStringAsFixed(0)
+      : value.toStringAsFixed(2).replaceAll('.', ',');
+  int valueCents() {
+    final parsed = double.tryParse(
+      valueController.text.trim().replaceAll(',', '.'),
+    );
+    return parsed == null ? 0 : (parsed * 100).round();
+  }
+
+  int vatIncludedCents(int totalCents, double percent) {
+    final rate = percent.clamp(0, 100).toDouble();
+    if (totalCents <= 0 || rate <= 0) return 0;
+    return (totalCents * rate / (100 + rate)).round();
+  }
 
   final result = await showDialog<GiftCardPurchaseDraft>(
     context: context,
@@ -42,10 +58,7 @@ Future<GiftCardPurchaseDraft?> showGiftCardPurchaseDialog(
         }
 
         void submit() {
-          final parsed = double.tryParse(
-            valueController.text.trim().replaceAll(',', '.'),
-          );
-          final cents = parsed == null ? 0 : (parsed * 100).round();
+          final cents = valueCents();
           if (cents <= 0) {
             setDialogState(() {
               error = itEn(
@@ -78,6 +91,9 @@ Future<GiftCardPurchaseDraft?> showGiftCardPurchaseDialog(
           );
         }
 
+        final vatPercent = AppRuntime.vatPercent.clamp(0, 100).toDouble();
+        final vatCents = vatIncludedCents(valueCents(), vatPercent);
+
         return AlertDialog(
           title: Text(itEn('Aggiungi buono regalo', 'Add gift card')),
           content: SizedBox(
@@ -99,7 +115,9 @@ Future<GiftCardPurchaseDraft?> showGiftCardPurchaseDialog(
                   keyboardType:
                       const TextInputType.numberWithOptions(decimal: true),
                   onChanged: (_) {
-                    if (error != null) setDialogState(() => error = null);
+                    setDialogState(() {
+                      if (error != null) error = null;
+                    });
                   },
                   onSubmitted: (_) => submit(),
                   decoration: InputDecoration(
@@ -107,6 +125,32 @@ Future<GiftCardPurchaseDraft?> showGiftCardPurchaseDialog(
                     labelText: itEn('Valore / prezzo', 'Value / price'),
                     prefixText: '${AppRuntime.currencySymbol} ',
                     errorText: error,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 10,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.receipt_long_outlined, size: 20),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          '${itEn('VAT inclusa', 'VAT included')} (${percentText(vatPercent)}%)',
+                        ),
+                      ),
+                      Text(
+                        formatMoney(vatCents),
+                        style: const TextStyle(fontWeight: FontWeight.w700),
+                      ),
+                    ],
                   ),
                 ),
                 const SizedBox(height: 14),
