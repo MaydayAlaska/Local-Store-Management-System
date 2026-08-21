@@ -41,8 +41,9 @@ class DatabaseService {
       }
     }
 
+    _createVariantImageSchema();
     _createIndexes();
-    _database.execute('PRAGMA user_version = 3;');
+    _database.execute('PRAGMA user_version = 4;');
   }
 
   void dispose() => _database.close();
@@ -104,6 +105,17 @@ class DatabaseService {
         note TEXT,
         created_at_utc TEXT NOT NULL,
         FOREIGN KEY (variant_id) REFERENCES product_variants(id) ON DELETE RESTRICT
+      );
+    ''');
+  }
+
+  void _createVariantImageSchema() {
+    _database.execute('''
+      CREATE TABLE IF NOT EXISTS variant_images (
+        variant_id INTEGER PRIMARY KEY,
+        image_bytes BLOB NOT NULL,
+        updated_at_utc TEXT NOT NULL,
+        FOREIGN KEY (variant_id) REFERENCES product_variants(id) ON DELETE CASCADE
       );
     ''');
   }
