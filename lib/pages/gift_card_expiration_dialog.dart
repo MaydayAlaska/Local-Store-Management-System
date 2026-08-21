@@ -16,8 +16,6 @@ Future<void> showGiftCardExpirationManagerDialog(
   required Customer customer,
   required CustomerRepository repository,
 }) async {
-  String itEn(String it, String en) => AppStrings.pair(it, en);
-
   String dateText(DateTime value) {
     final local = value.toLocal();
     return '${local.day.toString().padLeft(2, '0')}/${local.month.toString().padLeft(2, '0')}/${local.year}';
@@ -69,7 +67,7 @@ Future<void> showGiftCardExpirationManagerDialog(
 
                 return AlertDialog(
                   title: Text(
-                    '${itEn('Scadenza buono', 'Gift card expiration')} ${card.code}',
+                    '${AppStrings.t('gift_card_expiration')} ${card.code}',
                   ),
                   content: SizedBox(
                     width: 430,
@@ -77,19 +75,14 @@ Future<void> showGiftCardExpirationManagerDialog(
                       mainAxisSize: MainAxisSize.min,
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        Text(
-                          itEn(
-                            'Imposta una data di scadenza oppure lascia il buono senza scadenza.',
-                            'Set an expiration date or leave the gift card without expiration.',
-                          ),
-                        ),
+                        Text(AppStrings.t('gift_card_expiration_help')),
                         const SizedBox(height: 14),
                         OutlinedButton.icon(
                           onPressed: pickDate,
                           icon: const Icon(Icons.event_outlined),
                           label: Text(
                             selectedDate == null
-                                ? itEn('Nessuna scadenza', 'No expiration')
+                                ? AppStrings.t('no_expiration')
                                 : dateText(selectedDate!),
                           ),
                         ),
@@ -99,9 +92,7 @@ Future<void> showGiftCardExpirationManagerDialog(
                             onPressed: () =>
                                 setEditState(() => selectedDate = null),
                             icon: const Icon(Icons.event_busy_outlined),
-                            label: Text(
-                              itEn('Rimuovi scadenza', 'Remove expiration'),
-                            ),
+                            label: Text(AppStrings.t('remove_expiration')),
                           ),
                         ],
                       ],
@@ -121,7 +112,7 @@ Future<void> showGiftCardExpirationManagerDialog(
                         ),
                       ),
                       icon: const Icon(Icons.save_outlined),
-                      label: Text(itEn('Salva scadenza', 'Save expiration')),
+                      label: Text(AppStrings.t('save_expiration')),
                     ),
                   ],
                 );
@@ -138,18 +129,13 @@ Future<void> showGiftCardExpirationManagerDialog(
         }
 
         return AlertDialog(
-          title: Text(itEn('Scadenze buoni regalo', 'Gift card expirations')),
+          title: Text(AppStrings.t('gift_card_expirations')),
           content: SizedBox(
             width: 620,
             height: (cards.length * 82.0).clamp(180.0, 460.0).toDouble(),
             child: cards.isEmpty
                 ? Center(
-                    child: Text(
-                      itEn(
-                        'Nessun buono regalo associato a questo cliente.',
-                        'No gift cards are linked to this customer.',
-                      ),
-                    ),
+                    child: Text(AppStrings.t('no_gift_cards_customer')),
                   )
                 : ListView.separated(
                     itemCount: cards.length,
@@ -168,14 +154,11 @@ Future<void> showGiftCardExpirationManagerDialog(
                         ),
                         subtitle: Text(
                           card.expiresAtUtc == null
-                              ? itEn('Nessuna scadenza', 'No expiration')
-                              : '${itEn('Scadenza', 'Expires')}: ${dateText(card.expiresAtUtc!)}',
+                              ? AppStrings.t('no_expiration')
+                              : '${AppStrings.t('expiration')}: ${dateText(card.expiresAtUtc!)}',
                         ),
                         trailing: IconButton(
-                          tooltip: itEn(
-                            'Modifica scadenza',
-                            'Edit expiration',
-                          ),
+                          tooltip: AppStrings.t('edit_expiration'),
                           onPressed: () => editExpiration(card),
                           icon: const Icon(Icons.edit_calendar_outlined),
                         ),
@@ -187,7 +170,7 @@ Future<void> showGiftCardExpirationManagerDialog(
           actions: [
             FilledButton(
               onPressed: () => Navigator.of(dialogContext).pop(),
-              child: Text(itEn('Chiudi', 'Close')),
+              child: Text(AppStrings.t('close')),
             ),
           ],
         );
