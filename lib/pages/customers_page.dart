@@ -601,33 +601,83 @@ class _CustomerDetailState extends State<_CustomerDetail> {
           )
         else
           ConstrainedBox(
-            constraints: const BoxConstraints(maxHeight: 190),
+            constraints: const BoxConstraints(maxHeight: 230),
             child: ListView.separated(
               shrinkWrap: true,
               itemCount: giftCards.length,
               separatorBuilder: (_, _) => const Divider(height: 1),
               itemBuilder: (context, index) {
                 final card = giftCards[index];
+                final purchaseOrder =
+                    widget.repository.purchaseOrderForGiftCard(card.id);
+                final expiration = card.expirationDateDisplay;
+                final status = card.isExpired
+                    ? _itEn('SCADUTO', 'EXPIRED')
+                    : card.isExhausted
+                        ? _itEn('ESAURITO', 'USED UP')
+                        : _itEn('ATTIVO', 'ACTIVE');
+                final receiptText = purchaseOrder?.hasReceipt == true
+                    ? '${_itEn('Scontrino', 'Receipt')}: ${purchaseOrder!.receiptFilename}'
+                    : purchaseOrder != null
+                        ? _itEn(
+                            'Ordine d’acquisto collegato · nessuno scontrino allegato',
+                            'Purchase order linked · no receipt attached',
+                          )
+                        : _itEn(
+                            'Nessun ordine d’acquisto collegato',
+                            'No purchase order linked',
+                          );
                 return ListTile(
                   leading: Icon(
-                    card.isExhausted
-                        ? Icons.redeem_outlined
-                        : Icons.card_giftcard_outlined,
+                    card.isExpired
+                        ? Icons.event_busy_outlined
+                        : card.isExhausted
+                            ? Icons.redeem_outlined
+                            : Icons.card_giftcard_outlined,
                   ),
                   title: Text(
-                    '${card.code} · ${_itEn(card.isExhausted ? 'ESAURITO' : 'ATTIVO', card.isExhausted ? 'USED UP' : 'ACTIVE')}',
+                    '${card.code} · $status',
                     style: const TextStyle(fontWeight: FontWeight.w700),
                   ),
                   subtitle: Text(
                     '${_itEn('Totale', 'Total')}: ${card.totalDisplay} · '
                     '${_itEn('Speso', 'Spent')}: ${card.spentDisplay} · '
-                    '${_itEn('Residuo', 'Remaining')}: ${card.remainingDisplay}',
+                    '${_itEn('Residuo', 'Remaining')}: ${card.remainingDisplay}\n'
+                    '${_itEn('Acquistato', 'Purchased')}: ${card.purchasedDateDisplay} · '
+                    '${expiration == null ? _itEn('Nessuna scadenza', 'No expiration') : '${_itEn('Scadenza', 'Expires')}: $expiration'}\n'
+                    '$receiptText',
                   ),
-                  trailing: IconButton(
-                    tooltip: _itEn('Elimina buono', 'Delete gift card'),
-                    onPressed: () => _deleteGiftCard(card),
-                    icon: const Icon(Icons.delete_outline),
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (purchaseOrder != null)
+                        IconButton(
+                          tooltip: purchaseOrder.hasReceipt
+                              ? _itEn(
+                                  'Apri scontrino d’acquisto',
+                                  'Open purchase receipt',
+                                )
+                              : _itEn(
+                                  'Apri ordine d’acquisto',
+                                  'Open purchase order',
+                                ),
+                          onPressed: () => widget.onOpenOrder(purchaseOrder.id),
+                          icon: Icon(
+                            purchaseOrder.hasReceipt
+                                ? Icons.receipt_long
+                                : Icons.shopping_bag_outlined,
+                          ),
+                        ),
+                      IconButton(
+                        tooltip: _itEn('Elimina buono', 'Delete gift card'),
+                        onPressed: () => _deleteGiftCard(card),
+                        icon: const Icon(Icons.delete_outline),
+                      ),
+                    ],
                   ),
+                  onTap: purchaseOrder == null
+                      ? null
+                      : () => widget.onOpenOrder(purchaseOrder.id),
                 );
               },
             ),
