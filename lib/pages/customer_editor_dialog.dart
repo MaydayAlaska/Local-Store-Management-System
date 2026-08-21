@@ -177,12 +177,7 @@ class _CustomerEditorDialogState extends State<_CustomerEditorDialog> {
                 OutlinedButton.icon(
                   onPressed: _manageGiftCardExpirations,
                   icon: const Icon(Icons.edit_calendar_outlined),
-                  label: Text(
-                    _itEn(
-                      'Gestisci scadenze buoni regalo',
-                      'Manage gift card expirations',
-                    ),
-                  ),
+                  label: Text(AppStrings.t('manage_gift_card_expirations')),
                 ),
                 const SizedBox(height: 12),
               ],
