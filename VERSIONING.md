@@ -1,23 +1,21 @@
 # Versioning
 
-Il progetto usa versioni stabili nel formato semplice `X.Y.Z`, senza build metadata con `+`.
+Il progetto usa versioni stabili nel formato `X.Y.Z`, senza build metadata con `+`.
 
-Le versioni BETA usano sempre il formato `X.Y.Z-bN` (per esempio `0.1.6-b1`). Questa è l'unica forma usata nel `pubspec.yaml`, nell'interfaccia, nei nomi delle release e nei nomi dei pacchetti.
+Le versioni BETA usano sempre il formato `X.Y.Z-bN`, per esempio `0.1.8-b1`. Lo stesso formato viene utilizzato nel `pubspec.yaml`, nell'interfaccia, nelle release e nei nomi dei pacchetti.
 
 - `main` contiene le versioni stabili e pubblica tag leggibili `vX.Y.Z`.
-- `Flutter` è il branch BETA/TEST principale: tutte le nuove modifiche vengono validate qui prima della promozione su `main`.
-- Le build di `Flutter` ricevono `BUILD_BRANCH=Flutter`, mostrano `BETA` nell'app e usano esclusivamente il canale OTA BETA.
+- `Flutter` è il branch BETA/TEST principale: le nuove modifiche vengono validate qui prima della promozione su `main`.
+- Le build di `Flutter` ricevono `BUILD_BRANCH=Flutter`, mostrano `BETA` nell'applicazione e usano esclusivamente il canale OTA BETA.
 - I push su `Flutter` pubblicano la prerelease `beta-latest` con pacchetti BETA per Windows, macOS e Linux, x64 e ARM64.
 - Il canale OTA BETA accetta esclusivamente versioni `X.Y.Z-bN` e rifiuta versioni stabili `X.Y.Z`.
-- Le build stabili di `main` usano esclusivamente il canale OTA stabile e rifiutano qualunque versione con suffisso `-bN`.
-- Le release di `main` ricevono il commit tramite `GIT_COMMIT` e mantengono il bridge tecnico `ota-<sha>` necessario all'aggiornamento automatico.
+- Le build di `main` usano esclusivamente il canale OTA STABLE e rifiutano qualunque versione con suffisso `-bN`.
+- Le release stabili mantengono il tag pubblico `vX.Y.Z` e il bridge tecnico `ota-<sha>` usato dall'aggiornamento automatico.
+- `pubspec.yaml` e `UpdateService.currentVersion` devono sempre contenere la stessa versione; la CI verifica automaticamente questa coerenza.
 - L'OTA confronta le versioni in modo monotono: un aggiornamento viene proposto solo quando la versione online è realmente successiva a quella installata. Un commit differente, da solo, non è sufficiente.
-- A parità di `X.Y.Z`, una release stabile è successiva a qualunque Beta della stessa versione ai fini dell'ordinamento semantico, ma i due canali non vengono mai incrociati dall'OTA.
-- Durante il ciclo Beta si incrementa solo `bN`: `0.1.6-b1` → `0.1.6-b2` → `0.1.6-b3` → `0.1.6-b4` → `0.1.6-b5` → `0.1.6-b6` → `0.1.6-b7` → `0.1.6-b8`.
-- La `0.1.6-b8` include l'archivio ANPR dei luoghi di nascita aggiornato e il lookup storico del codice Belfiore nell'interfaccia clienti.
-- Dopo la promozione di una Beta a stabile, `main` mantiene la versione stabile e `Flutter` passa alla prima Beta della versione successiva.
+- A parità di `X.Y.Z`, una release stabile è semanticamente successiva a qualunque Beta della stessa versione, ma i canali STABLE e BETA non vengono mai incrociati dall'OTA.
+- Durante un ciclo Beta si incrementa `bN`: per esempio `0.1.8-b1` → `0.1.8-b2` → `0.1.8-b3`.
+- Quando una Beta viene promossa, `main` riceve la versione stabile senza suffisso e `Flutter` può avanzare alla prima Beta del ciclo successivo.
 - `avalonia` contiene la precedente implementazione Avalonia ed è un ramo storico/alternativo.
 
-Versione stabile corrente su `main`: `0.1.5`.
-
-Versione BETA corrente su `Flutter`: `0.1.6-b8`.
+Versione stabile promossa con questo ciclo: `0.1.7`.
