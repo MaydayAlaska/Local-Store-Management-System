@@ -2,9 +2,9 @@
 
 Gestionale desktop **offline** per negozi, sviluppato in **Flutter/Dart** con database locale **SQLite**.
 
-Il branch `Flutter` è il canale **BETA/TEST** del progetto. La versione BETA corrente è **0.1.6-b7**. Le build di questo branch vengono pubblicate come prerelease `beta-latest`, mostrano `BETA` nell'applicazione e ricevono aggiornamenti esclusivamente dal canale OTA BETA.
+Il branch `Flutter` è il canale **BETA/TEST** del progetto. La versione BETA corrente è **0.1.7-b4**. Le build di questo branch vengono pubblicate come prerelease `beta-latest`, mostrano `BETA` nell'applicazione e ricevono aggiornamenti esclusivamente dal canale OTA BETA.
 
-La versione stabile corrente su `main` è **0.1.5**.
+La versione stabile corrente su `main` è **0.1.6**.
 
 ## Download BETA
 
@@ -47,6 +47,13 @@ L'applicazione gestisce catalogo prodotti e varianti, SKU e barcode multipli, pr
 Gli scanner USB HID funzionano senza focus obbligatorio. Dashboard, Cassa, Magazzino ed Etichette possono ricevere direttamente i barcode dallo scanner.
 
 La sezione Etichette supporta stampante persistente, dimensioni fisiche, anteprima, EAN-13, Code 128 B e stampa diretta TCP/BPL-Z quando configurata.
+
+### Novità 0.1.7-b4
+
+- i buoni regalo possono avere una **data di scadenza facoltativa** impostata durante l'acquisto in Cassa;
+- dalla scheda cliente è ora possibile **modificare o rimuovere successivamente la scadenza** dei buoni regalo già creati;
+- nel popup di acquisto di un nuovo buono in Cassa viene mostrata la **VAT inclusa**, calcolata usando la percentuale VAT configurata nelle Impostazioni;
+- la visualizzazione del valore del buono usa la valuta configurata nell'applicazione.
 
 ### Novità 0.1.6-b7
 
