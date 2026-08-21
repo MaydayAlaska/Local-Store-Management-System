@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:window_manager/window_manager.dart';
@@ -12,6 +13,7 @@ import 'pages/startup_error_page.dart';
 import 'services/app_services.dart';
 import 'services/birth_place_service.dart';
 import 'services/database_location_service.dart';
+import 'services/single_instance_service.dart';
 
 void main() {
   runZonedGuarded(() async {
@@ -31,6 +33,17 @@ Future<void> _bootstrap() async {
   try {
     await windowManager.ensureInitialized();
     await AppPaths.initialize();
+
+    final instanceGuard =
+        await SingleInstanceGuard.tryAcquire(AppPaths.dataDirectory);
+    if (instanceGuard == null) {
+      AppLog.info(
+        'Startup',
+        'Avvio ignorato: Local Store Management System è già in esecuzione.',
+      );
+      exit(0);
+    }
+
     await AppStrings.initialize();
     await BirthPlaceService.initialize();
 
