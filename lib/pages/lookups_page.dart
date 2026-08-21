@@ -180,7 +180,7 @@ class _LookupsPageState extends State<LookupsPage> {
           padding: const EdgeInsets.all(24),
           child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
             Text(
-              AppStrings.pair('Marche e categorie', 'Brands and categories'),
+              AppStrings.t('lookups'),
               style: Theme.of(context).textTheme.headlineMedium,
             ),
             const SizedBox(height: 12),
