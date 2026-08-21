@@ -53,6 +53,9 @@ La sezione Etichette supporta stampante persistente, dimensioni fisiche, antepri
 - i buoni regalo possono avere una **data di scadenza facoltativa** impostata durante l'acquisto in Cassa;
 - dalla scheda cliente è ora possibile **modificare o rimuovere successivamente la scadenza** dei buoni regalo già creati;
 - nel popup di acquisto di un nuovo buono in Cassa viene mostrata la **VAT inclusa**, calcolata usando la percentuale VAT configurata nelle Impostazioni;
+- i nuovi buoni regalo ricevono un codice univoco basato sul **timestamp dell'acquisto**, nel formato `GIFT-YYYYMMDD-HHMMSS-######`, coerente con la numerazione temporale degli ordini;
+- i codici dei buoni già esistenti non vengono modificati, così i riferimenti storici restano validi;
+- i pulsanti **Registra vendita**, **Emetti scontrino** e **Mostra/Nascondi tastierino** sono stati spostati leggermente più in basso nella Cassa;
 - la visualizzazione del valore del buono usa la valuta configurata nell'applicazione.
 
 ### Novità 0.1.6-b7
