@@ -2,7 +2,7 @@
 
 Gestionale desktop **offline** per negozi, sviluppato in **Flutter/Dart** con database locale **SQLite**.
 
-Il branch `Flutter` è il canale **BETA/TEST** del progetto. La versione BETA corrente è **0.1.7-b4**. Le build di questo branch vengono pubblicate come prerelease `beta-latest`, mostrano `BETA` nell'applicazione e ricevono aggiornamenti esclusivamente dal canale OTA BETA.
+Il branch `Flutter` è il canale **BETA/TEST** del progetto. La versione BETA corrente è **0.1.7-b5**. Le build di questo branch vengono pubblicate come prerelease `beta-latest`, mostrano `BETA` nell'applicazione e ricevono aggiornamenti esclusivamente dal canale OTA BETA.
 
 La versione stabile corrente su `main` è **0.1.6**.
 
@@ -47,6 +47,14 @@ L'applicazione gestisce catalogo prodotti e varianti, SKU e barcode multipli, pr
 Gli scanner USB HID funzionano senza focus obbligatorio. Dashboard, Cassa, Magazzino ed Etichette possono ricevere direttamente i barcode dallo scanner.
 
 La sezione Etichette supporta stampante persistente, dimensioni fisiche, anteprima, EAN-13, Code 128 B e stampa diretta TCP/BPL-Z quando configurata.
+
+### Novità 0.1.7-b5
+
+- l'icona predefinita dell'applicazione e dell'installer Windows viene ora generata come **ICO multi-risoluzione valido**, evitando icone corrotte o ritagliate in Esplora file, sul desktop e nei collegamenti;
+- l'applicazione accetta **una sola istanza alla volta**: se è già aperta, un secondo avvio viene ignorato prima di aprire database o nuove finestre;
+- il calcolo IVA/VAT in Cassa usa ora direttamente la percentuale configurata sul totale imponibile visualizzato: con aliquota 22% su 100,00 il valore mostrato è 22,00;
+- l'IVA/VAT del carrello include anche i **buoni regalo in acquisto**;
+- l'indicazione IVA/VAT è stata rimossa dal popup di creazione del buono regalo, dove non era utile.
 
 ### Novità 0.1.7-b4
 
