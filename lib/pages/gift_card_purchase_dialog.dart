@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 import '../core/app_runtime.dart';
-import '../core/formatters.dart';
 import '../l10n/app_strings.dart';
 
 class GiftCardPurchaseDraft {
@@ -24,20 +23,11 @@ Future<GiftCardPurchaseDraft?> showGiftCardPurchaseDialog(
 
   String dateText(DateTime value) =>
       '${value.day.toString().padLeft(2, '0')}/${value.month.toString().padLeft(2, '0')}/${value.year}';
-  String percentText(double value) => value == value.roundToDouble()
-      ? value.toStringAsFixed(0)
-      : value.toStringAsFixed(2).replaceAll('.', ',');
   int valueCents() {
     final parsed = double.tryParse(
       valueController.text.trim().replaceAll(',', '.'),
     );
     return parsed == null ? 0 : (parsed * 100).round();
-  }
-
-  int vatIncludedCents(int totalCents, double percent) {
-    final rate = percent.clamp(0, 100).toDouble();
-    if (totalCents <= 0 || rate <= 0) return 0;
-    return (totalCents * rate / (100 + rate)).round();
   }
 
   final result = await showDialog<GiftCardPurchaseDraft>(
@@ -87,9 +77,6 @@ Future<GiftCardPurchaseDraft?> showGiftCardPurchaseDialog(
           );
         }
 
-        final vatPercent = AppRuntime.vatPercent.clamp(0, 100).toDouble();
-        final vatCents = vatIncludedCents(valueCents(), vatPercent);
-
         return AlertDialog(
           title: Text(AppStrings.t('gift_card_add')),
           content: SizedBox(
@@ -121,32 +108,6 @@ Future<GiftCardPurchaseDraft?> showGiftCardPurchaseDialog(
                     labelText: AppStrings.t('gift_card_value_price'),
                     prefixText: '${AppRuntime.currencySymbol} ',
                     errorText: error,
-                  ),
-                ),
-                const SizedBox(height: 10),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 10,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.surfaceContainerHighest,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.receipt_long_outlined, size: 20),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          '${AppStrings.t('vat_included')} (${percentText(vatPercent)}%)',
-                        ),
-                      ),
-                      Text(
-                        formatMoney(vatCents),
-                        style: const TextStyle(fontWeight: FontWeight.w700),
-                      ),
-                    ],
                   ),
                 ),
                 const SizedBox(height: 14),
