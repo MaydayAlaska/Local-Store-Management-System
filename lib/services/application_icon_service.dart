@@ -1,8 +1,11 @@
+import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/services.dart';
 import 'package:path/path.dart' as p;
 import 'package:window_manager/window_manager.dart';
 
+import '../core/app_paths.dart';
 import '../models/app_settings.dart';
 import 'settings_service.dart';
 
@@ -15,6 +18,19 @@ class ApplicationIconService {
       await windowManager.setTitle('Local Store Management System');
     } catch (_) {
       // Il titolo nativo è accessorio alla barra Flutter.
+    }
+
+    if (Platform.isLinux) {
+      final customIconPath = settings.resolveIconPreviewPath(appSettings);
+      final iconPath = customIconPath ?? await _defaultLinuxIconPath();
+      if (iconPath == null) return;
+
+      try {
+        await windowManager.setIcon(iconPath);
+      } catch (_) {
+        // L'icona non deve impedire il funzionamento dell'app.
+      }
+      return;
     }
 
     if (!Platform.isWindows) return;
@@ -30,15 +46,26 @@ class ApplicationIconService {
       return;
     }
 
-    // L'icona predefinita è già incorporata nell'eseguibile dal workflow di
-    // build. Non rigenerarla a runtime: image.encodeIco può produrre una ICO
-    // a singola risoluzione che Windows ridimensiona male nelle viste piccole,
-    // facendo apparire l'icona tagliata. Lasciando il controllo alla shell,
-    // Windows seleziona invece la dimensione corretta dalla ICO multi-size
-    // incorporata nell'EXE.
+    // L'icona predefinita è incorporata nell'eseguibile dal workflow di build.
+    // Evitiamo di rigenerarla a runtime: la shell Windows deve poter scegliere
+    // direttamente la risoluzione corretta dalla ICO multi-size dell'EXE.
     final executable = Platform.resolvedExecutable;
     if (File(executable).existsSync()) {
       await _updateWindowsShortcuts(executable);
+    }
+  }
+
+  Future<String?> _defaultLinuxIconPath() async {
+    try {
+      final encoded = await rootBundle.loadString('assets/app-icon.base64');
+      final bytes = base64Decode(encoded.trim());
+      final directory = Directory(AppPaths.assetsDirectory)
+        ..createSync(recursive: true);
+      final iconPath = p.join(directory.path, 'app-default.png');
+      File(iconPath).writeAsBytesSync(bytes, flush: true);
+      return iconPath;
+    } catch (_) {
+      return null;
     }
   }
 
