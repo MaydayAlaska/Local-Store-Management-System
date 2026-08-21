@@ -177,7 +177,7 @@ void main() {
         ));
         final card = repository.createGiftCard(customer.id, 10000);
 
-        expect(card.code, matches(RegExp(r'^GIFT-\d{8,}$')));
+        expect(card.code, matches(RegExp(r'^GIFT-\d{8}-\d{6}-\d{6}$')));
         expect(card.totalValueCents, 10000);
         expect(card.spentValueCents, 0);
         expect(card.remainingValueCents, 10000);
