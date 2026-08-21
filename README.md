@@ -2,7 +2,7 @@
 
 Gestionale desktop **offline** per negozi, sviluppato in **Flutter/Dart** con database locale **SQLite**.
 
-Il branch `Flutter` è il canale **BETA/TEST** del progetto. La versione BETA corrente è **0.1.7-b5**. Le build di questo branch vengono pubblicate come prerelease `beta-latest`, mostrano `BETA` nell'applicazione e ricevono aggiornamenti esclusivamente dal canale OTA BETA.
+Il branch `Flutter` è il canale **BETA/TEST** del progetto. La versione BETA corrente è **0.1.7-b6**. Le build di questo branch vengono pubblicate come prerelease `beta-latest`, mostrano `BETA` nell'applicazione e ricevono aggiornamenti esclusivamente dal canale OTA BETA.
 
 La versione stabile corrente su `main` è **0.1.6**.
 
@@ -47,6 +47,12 @@ L'applicazione gestisce catalogo prodotti e varianti, SKU e barcode multipli, pr
 Gli scanner USB HID funzionano senza focus obbligatorio. Dashboard, Cassa, Magazzino ed Etichette possono ricevere direttamente i barcode dallo scanner.
 
 La sezione Etichette supporta stampante persistente, dimensioni fisiche, anteprima, EAN-13, Code 128 B e stampa diretta TCP/BPL-Z quando configurata.
+
+### Novità 0.1.7-b6
+
+- la protezione **single-instance** non usa più un lock su file: la prima istanza riserva un canale IPC locale esclusivo, impedendo che più processi dell'applicazione restino attivi contemporaneamente;
+- un secondo avvio non apre una nuova finestra: richiama invece la finestra già esistente, ripristinandola se minimizzata e portandola in primo piano, quindi termina immediatamente;
+- aggiunto un test automatico che verifica il rifiuto della seconda istanza e la corretta riacquisizione del lock dopo la chiusura della prima.
 
 ### Novità 0.1.7-b5
 
