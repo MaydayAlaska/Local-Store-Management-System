@@ -4,7 +4,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:local_store_management/core/database_service.dart';
 import 'package:local_store_management/models/customer.dart';
 import 'package:local_store_management/repositories/customer_repository.dart';
-import 'package:local_store_management/services/gift_card_code_service.dart';
 
 void main() {
   test('new gift cards use purchase timestamp codes', () async {
@@ -16,7 +15,6 @@ void main() {
     try {
       await service.initialize();
       final repository = CustomerRepository(service);
-      GiftCardCodeService.ensureTimestampCodes(service);
       final customer = repository.save(const CustomerDraft(
         firstName: 'Mario',
         lastName: 'Rossi',
