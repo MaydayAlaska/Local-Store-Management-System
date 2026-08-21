@@ -1,14 +1,14 @@
-# Local Store Management System — Flutter BETA
+# Local Store Management System
 
 Gestionale desktop **offline** per negozi, sviluppato in **Flutter/Dart** con database locale **SQLite**.
 
-Il branch `Flutter` è il canale **BETA/TEST** del progetto. La versione BETA corrente è **0.1.7-b6**. Le build di questo branch vengono pubblicate come prerelease `beta-latest`, mostrano `BETA` nell'applicazione e ricevono aggiornamenti esclusivamente dal canale OTA BETA.
+La versione stabile corrente è **0.1.7** sul branch `main`.
 
-La versione stabile corrente su `main` è **0.1.6**.
+Il branch `Flutter` resta il canale **BETA/TEST** per lo sviluppo delle versioni successive. I canali OTA STABLE e BETA sono separati: una build stabile riceve solo release stabili e una build Beta riceve solo prerelease Beta.
 
-## Download BETA
+## Download
 
-Le build BETA sono disponibili nella prerelease `beta-latest` per:
+Le release stabili vengono pubblicate su GitHub con tag `v<versione>` e includono:
 
 | Sistema | Architettura | Formati |
 | --- | --- | --- |
@@ -19,97 +19,103 @@ Le build BETA sono disponibili nella prerelease `beta-latest` per:
 | Linux | x86_64 | `.AppImage`, `.deb` |
 | Linux | ARM64 | `.AppImage`, `.deb` |
 
-## Aggiornamenti OTA
-
-Sono presenti due canali OTA indipendenti:
-
-- `main` → canale **STABILE**
-- `Flutter` → canale **BETA**, pubblicato come `beta-latest`
-
-La separazione è rigida anche a livello di versione: il canale BETA accetta esclusivamente versioni nel formato `X.Y.Z-bN`, mentre il canale STABILE accetta esclusivamente versioni `X.Y.Z` senza suffisso Beta. Una build BETA non propone né installa release stabili e una build stabile non propone né installa Beta, anche in presenza di tag o metadata GitHub incoerenti.
-
-All'avvio viene eseguito automaticamente un controllo aggiornamenti. Se è disponibile una versione realmente più recente, compare una notifica in basso a destra; cliccandola si apre direttamente **Impostazioni**.
-
-Il confronto OTA è monotono per versione: un aggiornamento viene proposto solo quando `versione_online > versione_installata`. Un commit differente, da solo, non è sufficiente. Per esempio:
-
-- `0.1.6-b7 > 0.1.6-b6`
-- `0.1.6-b1 > 0.1.5`
-- `0.1.5 > 0.1.5-b99`
-
-Il pulsante **Installa aggiornamento** compare solo quando esiste davvero un aggiornamento e il pacchetto è installabile sulla piattaforma corrente.
-
-L'updater seleziona automaticamente Windows, macOS o Linux e x64/ARM64. Su Linux l'installazione automatica è disponibile quando l'app viene avviata da AppImage; i pacchetti `.deb` vengono pubblicati ma non sostituiti automaticamente. Su macOS l'updater scarica e apre il nuovo `.dmg`, dal quale l'utente può sostituire l'applicazione nella cartella Applicazioni.
-
 ## Funzioni principali
 
-L'applicazione gestisce catalogo prodotti e varianti, SKU e barcode multipli, prezzi con override per variante, magazzino, cassa, vendite, clienti, etichette, anagrafiche, export, backup e impostazioni.
+- catalogo prodotti e varianti con SKU, barcode multipli, prezzi e giacenze;
+- magazzino con movimenti di carico/scarico;
+- cassa con scanner HID, ricerca prodotti, tastierino numerico, sconti, articoli generici e cliente associato;
+- clienti con codice identificativo interno, codice fiscale facoltativo e storico acquisti;
+- gestione ordini e vendite, annullamento con ripristino della merce ed eliminazione dello storico;
+- buoni regalo associati ai clienti, con utilizzo parziale o totale, valore residuo e scadenza facoltativa;
+- etichette con anteprima, EAN-13, Code 128 B e stampa diretta TCP/BPL-Z;
+- export inventario Excel/PDF, backup e scelta della posizione del database;
+- interfaccia in Italiano e English, tema chiaro/scuro/sistema e valuta configurabile;
+- traduzioni separate dal codice dell'applicazione tramite file di traduzione esterni;
+- aggiornamenti OTA separati tra canale STABLE e canale BETA;
+- una sola istanza operativa dell'applicazione alla volta.
 
-Gli scanner USB HID funzionano senza focus obbligatorio. Dashboard, Cassa, Magazzino ed Etichette possono ricevere direttamente i barcode dallo scanner.
+## Novità della 0.1.7
 
-La sezione Etichette supporta stampante persistente, dimensioni fisiche, anteprima, EAN-13, Code 128 B e stampa diretta TCP/BPL-Z quando configurata.
+La **0.1.7** promuove in stabile il ciclo di sviluppo `0.1.7-b1` → `0.1.7-b6`.
 
-### Novità 0.1.7-b6
+### Buoni regalo
 
-- la protezione **single-instance** non usa più un lock su file: la prima istanza riserva un canale IPC locale esclusivo, impedendo che più processi dell'applicazione restino attivi contemporaneamente;
-- un secondo avvio non apre una nuova finestra: richiama invece la finestra già esistente, ripristinandola se minimizzata e portandola in primo piano, quindi termina immediatamente;
-- aggiunto un test automatico che verifica il rifiuto della seconda istanza e la corretta riacquisizione del lock dopo la chiusura della prima.
+I buoni regalo possono ora avere una **data di scadenza facoltativa**. La scadenza può essere impostata durante l'acquisto e successivamente modificata o rimossa dalla scheda cliente.
 
-### Novità 0.1.7-b5
+I nuovi buoni ricevono un codice univoco basato sul timestamp dell'acquisto, nel formato `GIFT-YYYYMMDD-HHMMSS-######`. I codici dei buoni già esistenti non vengono modificati.
 
-- l'icona predefinita dell'applicazione e dell'installer Windows viene ora generata come **ICO multi-risoluzione valido**, evitando icone corrotte o ritagliate in Esplora file, sul desktop e nei collegamenti;
-- l'applicazione accetta **una sola istanza alla volta**: se è già aperta, un secondo avvio viene ignorato prima di aprire database o nuove finestre;
-- il calcolo IVA/VAT in Cassa scorpora l'imposta dal totale già comprensivo di IVA con la formula `IVA = totale × aliquota / (100 + aliquota)`; con aliquota 22% su 100,00 il valore mostrato è 18,03;
-- l'IVA/VAT del carrello include anche i **buoni regalo in acquisto**;
-- l'indicazione IVA/VAT è stata rimossa dal popup di creazione del buono regalo, dove non era utile.
+Il valore dei buoni usa la valuta configurata nell'applicazione. Il calcolo IVA/VAT della Cassa include anche i buoni regalo in acquisto.
 
-### Novità 0.1.7-b4
+### IVA / VAT in Cassa
 
-- i buoni regalo possono avere una **data di scadenza facoltativa** impostata durante l'acquisto in Cassa;
-- dalla scheda cliente è ora possibile **modificare o rimuovere successivamente la scadenza** dei buoni regalo già creati;
-- nel popup di acquisto di un nuovo buono in Cassa viene mostrata la **VAT inclusa**, calcolata usando la percentuale VAT configurata nelle Impostazioni;
-- i nuovi buoni regalo ricevono un codice univoco basato sul **timestamp dell'acquisto**, nel formato `GIFT-YYYYMMDD-HHMMSS-######`, coerente con la numerazione temporale degli ordini;
-- i codici dei buoni già esistenti non vengono modificati, così i riferimenti storici restano validi;
-- i pulsanti **Registra vendita**, **Emetti scontrino** e **Mostra/Nascondi tastierino** sono stati spostati leggermente più in basso nella Cassa;
-- la visualizzazione del valore del buono usa la valuta configurata nell'applicazione.
+L'IVA viene scorporata correttamente dal totale già comprensivo di imposta con la formula:
 
-### Novità 0.1.6-b7
+```text
+IVA = totale × aliquota / (100 + aliquota)
+```
 
-- scelta persistente della **valuta**: EUR, USD, GBP o CHF;
-- scelta del **tema**: sistema, chiaro o scuro;
-- interfaccia selezionabile in **Italiano o Inglese**;
-- menu laterale verticalmente scorrevole quando l'altezza della finestra non permette di mostrare tutte le voci, senza scrollbar visibile;
-- logo del negozio ulteriormente ingrandito nel menu laterale;
-- controlli finestra ridisegnati con icone vettoriali più pulite;
-- pulsante **Salva impostazioni** spostato nell'intestazione in alto a destra;
-- esportazione inventario con selezione delle colonne da includere;
-- nomi export nel formato `Inventario - YYYY-MM-DD_HH-MM-SS`;
-- nuovi SKU generati in formato esadecimale, mantenendo validi gli SKU già esistenti;
-- pulsante per generare un nuovo SKU univoco direttamente accanto al campo SKU nel popup prodotto/variante;
-- tastierino numerico integrato nella Cassa per ricerca articoli e inserimento degli sconti totali;
-- label dello sconto percentuale per singolo articolo abbreviata a **Sconto**, mantenendo `%` nel campo;
-- la sezione **Aggiornamenti** resta sempre l'ultima nelle Impostazioni;
-- separazione rigida tra versioni OTA BETA e STABLE;
-- corretti warning dell'analizzatore nel popup delle stampanti e sostituite API SQLite deprecate con `close()`.
+Per esempio, con aliquota 22% e totale 100,00, l'IVA inclusa è 18,03.
+
+### Istanza singola
+
+L'applicazione consente una sola istanza operativa alla volta. La prima istanza riserva un canale IPC locale esclusivo; un secondo avvio non apre un nuovo database o una seconda finestra, ma richiama la finestra già esistente, la ripristina se minimizzata, la porta in primo piano e termina subito.
+
+La protezione è coperta da un test automatico che verifica anche la possibilità di riaprire normalmente l'applicazione dopo la chiusura della prima istanza.
+
+### Icona applicazione
+
+L'icona predefinita è condivisa dalla distribuzione desktop. Su Windows viene generato un **ICO multi-risoluzione** per applicazione, collegamenti e installer; macOS e i pacchetti Linux utilizzano la stessa sorgente grafica. AppImage e pacchetti DEB installano l'icona nel formato previsto dal desktop Linux.
+
+### Traduzioni
+
+Le traduzioni sono separate dal codice dell'applicazione e vengono caricate da file dedicati. Questo rende più semplice aggiungere nuove lingue senza inserire direttamente tutte le stringhe nel programma.
+
+I nomi delle lingue vengono sempre mostrati nella loro forma nativa, per esempio **Italiano** e **English**.
+
+## Aggiornamenti OTA
+
+Sono presenti due canali indipendenti:
+
+- `main` → **STABLE**, versioni `X.Y.Z`;
+- `Flutter` → **BETA**, versioni `X.Y.Z-bN` e prerelease `beta-latest`.
+
+All'avvio l'app controlla gli aggiornamenti. Un aggiornamento viene proposto solo quando la versione online è realmente superiore a quella installata; un commit differente da solo non è sufficiente.
+
+L'updater seleziona automaticamente sistema operativo e architettura senza incrociare x64 e ARM64. Su Windows avvia il nuovo installer, su macOS scarica e apre il DMG, mentre su Linux l'aggiornamento automatico è disponibile quando l'applicazione è stata avviata da AppImage. I pacchetti `.deb` vengono comunque pubblicati per l'installazione manuale.
+
+## Etichette e stampanti
+
+La sezione Etichette supporta profili stampante persistenti, dimensioni fisiche, anteprima, EAN-13 e Code 128 B.
+
+Per le stampanti compatibili è disponibile la stampa diretta:
+
+```text
+Flutter → TCP socket → stampante:9100 → BPL-Z/ZPL
+```
+
+Le dimensioni configurate nell'app vengono utilizzate anche nella stampa diretta, senza dipendere dal driver di stampa di sistema.
 
 ## Esportazione inventario
 
-Prima dei filtri per marca e categoria è possibile scegliere quali campi esportare: prodotto, variante, SKU, barcode, categoria, giacenza, prezzo di acquisto, prezzo di vendita e stato. La selezione viene rispettata sia nell'export Excel sia nel PDF.
+È possibile scegliere i campi da esportare, tra cui prodotto, variante, SKU, barcode, categoria, giacenza, prezzo di acquisto, prezzo di vendita e stato. La selezione viene rispettata sia nell'export Excel sia nel PDF.
 
 I prezzi esportati e visualizzati usano la valuta configurata nelle Impostazioni.
 
 ## Impostazioni
 
-Le preferenze di negozio, tema, lingua, valuta, logo, icona e ultima stampante etichette vengono salvate localmente. I vecchi file di impostazioni restano compatibili: i nuovi campi mancanti assumono automaticamente i valori predefiniti `EUR`, tema di sistema e Italiano.
+Le preferenze di negozio, tema, lingua, valuta, logo, icona e stampante etichette vengono salvate localmente. I file di impostazioni delle versioni precedenti restano compatibili e i nuovi campi mancanti ricevono valori predefiniti sicuri.
 
 ## Database
 
-I dati restano in:
+I dati restano localmente in:
 
 ```text
 Documenti/Local Store Management System/
 ```
 
-Lo schema SQLite corrente usa `PRAGMA user_version = 3`. Le migrazioni vengono eseguite automaticamente con backup preventivo quando necessario.
+Lo schema SQLite corrente usa `PRAGMA user_version = 3`. Le migrazioni vengono applicate automaticamente per mantenere compatibili anche i database creati dalle versioni precedenti.
+
+Il dataset dei codici luogo utilizzato per il codice fiscale viene verificato dalla CI rispetto alla fonte aggiornata prima della compilazione delle release.
 
 ## Sviluppo e test
 
@@ -142,14 +148,16 @@ flutter analyze --no-fatal-infos
 flutter test
 ```
 
-I test dell'updater coprono selezione dell'asset per sistema/architettura, separazione dei canali Beta/Stable, normalizzazione delle versioni e confronto monotono fra Beta e release stabili.
+La CI verifica analisi statica, test automatici, coerenza della versione applicativa, dataset dei codici luogo e metadati Linux prima di compilare i pacchetti desktop.
 
 ## CI e release
 
 Strategia branch:
 
-- `Flutter` → BETA/TEST, prerelease `beta-latest`, OTA BETA
-- `main` → STABILE, tag `v<versione>`, OTA stabile
-- `avalonia` → implementazione storica/alternativa
+- `main` → STABLE, tag `v<versione>`, OTA stabile;
+- `Flutter` → BETA/TEST, prerelease `beta-latest`, OTA Beta;
+- `avalonia` → implementazione storica/alternativa.
+
+Ogni push su `main` esegue analisi e test, compila i pacchetti desktop e, se tutto termina correttamente, pubblica automaticamente la release stabile.
 
 Per le regole complete vedere `VERSIONING.md`.
