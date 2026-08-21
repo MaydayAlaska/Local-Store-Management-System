@@ -19,7 +19,15 @@ class SingleInstanceGuard {
     await file.parent.create(recursive: true);
     final handle = await file.open(mode: FileMode.append);
     try {
-      await handle.lock(FileLock.exclusive);
+      // Windows applica i lock a intervalli di byte. Se il file è vuoto,
+      // bloccare fino a EOF può equivalere a bloccare zero byte e quindi
+      // permettere a più processi di acquisire apparentemente lo stesso lock.
+      // Manteniamo almeno un byte nel file e blocchiamo esplicitamente [0, 1).
+      if (await handle.length() == 0) {
+        await handle.writeByte(0);
+        await handle.flush();
+      }
+      await handle.lock(FileLock.exclusive, 0, 1);
       final guard = SingleInstanceGuard._(handle);
       _activeGuards.add(guard);
       return guard;
@@ -34,7 +42,7 @@ class SingleInstanceGuard {
     _closed = true;
     _activeGuards.remove(this);
     try {
-      await _file.unlock();
+      await _file.unlock(0, 1);
     } finally {
       await _file.close();
     }
