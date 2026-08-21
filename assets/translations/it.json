@@ -124,7 +124,7 @@
     "gift_card_purchase_help": "Il buono verrà aggiunto al carrello e associato a {customerName} quando registri la vendita. Il prezzo pagato corrisponde al valore del buono.",
     "gift_card_value_price": "Valore / prezzo",
     "value_greater_than_zero": "Inserisci un valore maggiore di zero.",
-    "vat_included": "VAT inclusa",
+    "vat_included": "IVA",
     "expiration_date_optional": "Data di scadenza (facoltativa)",
     "no_expiration": "Nessuna scadenza",
     "remove_expiration": "Rimuovi scadenza",
