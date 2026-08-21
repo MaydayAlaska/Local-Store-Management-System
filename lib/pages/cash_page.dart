@@ -732,7 +732,7 @@ class _CashPageState extends State<CashPage> {
         for (final line in pendingGiftCards) {
           createdGiftCards.add(
             widget.services.customers.createGiftCard(
-              customer.id,
+              customer!.id,
               line.unitPriceCents,
               expiresAtUtc: line.giftCardExpiresAtUtc,
             ),
@@ -759,8 +759,8 @@ class _CashPageState extends State<CashPage> {
           ));
         }
         _cartStatus = _itEn(
-              'Vendita ${order!.orderNumber} registrata. Magazzino aggiornato dove previsto.',
-              'Sale ${order!.orderNumber} registered. Stock updated where applicable.',
+              'Vendita ${order.orderNumber} registrata. Magazzino aggiornato dove previsto.',
+              'Sale ${order.orderNumber} registered. Stock updated where applicable.',
             ) +
             (details.isEmpty ? '' : ' ${details.join(' ')}');
         _searchStatus = _itEn(
