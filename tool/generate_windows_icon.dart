@@ -1,8 +1,4 @@
-import 'dart:convert';
 import 'dart:io';
-import 'dart:typed_data';
-
-import 'package:image/image.dart' as img;
 
 void main(List<String> args) {
   if (args.length != 2) {
@@ -13,54 +9,155 @@ void main(List<String> args) {
     return;
   }
 
-  final sourceFile = File(args[0]);
-  final outputFile = File(args[1]);
-  final encoded = sourceFile.readAsStringSync().trim();
-  final sourceBytes = base64Decode(encoded);
-  final sourceImage = img.decodeImage(sourceBytes);
-  if (sourceImage == null) {
-    throw StateError('Unable to decode the application icon source image.');
+  if (!Platform.isWindows) {
+    throw UnsupportedError('Windows icon generation must run on Windows.');
   }
 
-  const sizes = <int>[16, 20, 24, 32, 40, 48, 64, 96, 128, 256];
-  final images = <Uint8List>[];
-  for (final size in sizes) {
-    final resized = img.copyResize(sourceImage, width: size, height: size);
-    images.add(Uint8List.fromList(img.encodePng(resized)));
+  final sourceFile = File(args[0]).absolute;
+  if (!sourceFile.existsSync()) {
+    throw StateError('Application icon source not found: ${sourceFile.path}');
   }
 
-  final directorySize = 6 + (16 * sizes.length);
-  final directory = ByteData(directorySize);
-  directory.setUint16(0, 0, Endian.little);
-  directory.setUint16(2, 1, Endian.little);
-  directory.setUint16(4, sizes.length, Endian.little);
-
-  var imageOffset = directorySize;
-  for (var index = 0; index < sizes.length; index++) {
-    final entryOffset = 6 + (16 * index);
-    final size = sizes[index];
-    final imageBytes = images[index];
-    directory.setUint8(entryOffset, size == 256 ? 0 : size);
-    directory.setUint8(entryOffset + 1, size == 256 ? 0 : size);
-    directory.setUint8(entryOffset + 2, 0);
-    directory.setUint8(entryOffset + 3, 0);
-    directory.setUint16(entryOffset + 4, 1, Endian.little);
-    directory.setUint16(entryOffset + 6, 32, Endian.little);
-    directory.setUint32(entryOffset + 8, imageBytes.length, Endian.little);
-    directory.setUint32(entryOffset + 12, imageOffset, Endian.little);
-    imageOffset += imageBytes.length;
-  }
-
-  final builder = BytesBuilder(copy: false)
-    ..add(directory.buffer.asUint8List());
-  for (final imageBytes in images) {
-    builder.add(imageBytes);
-  }
-
+  final outputFile = File(args[1]).absolute;
   outputFile.parent.createSync(recursive: true);
-  outputFile.writeAsBytesSync(builder.takeBytes(), flush: true);
-  stdout.writeln(
-    'Generated ${outputFile.path} with ${sizes.length} icon sizes from '
-    '${sourceImage.width}x${sourceImage.height} source.',
+
+  final script = File(
+    '${Directory.systemTemp.path}${Platform.pathSeparator}'
+    'lsms-generate-icon-$pid.ps1',
   );
+
+  script.writeAsStringSync(r'''
+param(
+  [Parameter(Mandatory=$true)][string]$SourceBase64,
+  [Parameter(Mandatory=$true)][string]$OutputIco
+)
+$ErrorActionPreference = 'Stop'
+Add-Type -AssemblyName System.Drawing
+
+$encoded = (Get-Content -Raw -LiteralPath $SourceBase64).Trim()
+$sourceBytes = [Convert]::FromBase64String($encoded)
+$sourceStream = [IO.MemoryStream]::new($sourceBytes, $false)
+$sourceImage = $null
+$images = [System.Collections.Generic.List[byte[]]]::new()
+$sizes = @(16, 20, 24, 32, 40, 48, 64, 96, 128, 256)
+
+try {
+  $sourceImage = [Drawing.Image]::FromStream($sourceStream, $true, $true)
+
+  foreach ($size in $sizes) {
+    $bitmap = [Drawing.Bitmap]::new(
+      $size,
+      $size,
+      [Drawing.Imaging.PixelFormat]::Format32bppArgb
+    )
+    $graphics = [Drawing.Graphics]::FromImage($bitmap)
+    try {
+      $graphics.CompositingMode = [Drawing.Drawing2D.CompositingMode]::SourceCopy
+      $graphics.CompositingQuality = [Drawing.Drawing2D.CompositingQuality]::HighQuality
+      $graphics.InterpolationMode = [Drawing.Drawing2D.InterpolationMode]::HighQualityBicubic
+      $graphics.SmoothingMode = [Drawing.Drawing2D.SmoothingMode]::HighQuality
+      $graphics.PixelOffsetMode = [Drawing.Drawing2D.PixelOffsetMode]::HighQuality
+      $graphics.Clear([Drawing.Color]::Transparent)
+      $graphics.DrawImage(
+        $sourceImage,
+        [Drawing.Rectangle]::new(0, 0, $size, $size)
+      )
+
+      $pngStream = [IO.MemoryStream]::new()
+      try {
+        $bitmap.Save($pngStream, [Drawing.Imaging.ImageFormat]::Png)
+        $images.Add($pngStream.ToArray())
+      } finally {
+        $pngStream.Dispose()
+      }
+    } finally {
+      $graphics.Dispose()
+      $bitmap.Dispose()
+    }
+  }
+
+  $directorySize = 6 + (16 * $sizes.Count)
+  $file = [IO.File]::Open(
+    $OutputIco,
+    [IO.FileMode]::Create,
+    [IO.FileAccess]::Write,
+    [IO.FileShare]::None
+  )
+  $writer = [IO.BinaryWriter]::new($file)
+  try {
+    $writer.Write([UInt16]0)
+    $writer.Write([UInt16]1)
+    $writer.Write([UInt16]$sizes.Count)
+
+    $imageOffset = $directorySize
+    for ($i = 0; $i -lt $sizes.Count; $i++) {
+      $size = $sizes[$i]
+      $imageBytes = $images[$i]
+      $writer.Write([Byte]$(if ($size -eq 256) { 0 } else { $size }))
+      $writer.Write([Byte]$(if ($size -eq 256) { 0 } else { $size }))
+      $writer.Write([Byte]0)
+      $writer.Write([Byte]0)
+      $writer.Write([UInt16]1)
+      $writer.Write([UInt16]32)
+      $writer.Write([UInt32]$imageBytes.Length)
+      $writer.Write([UInt32]$imageOffset)
+      $imageOffset += $imageBytes.Length
+    }
+
+    foreach ($imageBytes in $images) {
+      $writer.Write($imageBytes)
+    }
+    $writer.Flush()
+  } finally {
+    $writer.Dispose()
+    $file.Dispose()
+  }
+
+  Write-Host (
+    "Generated $OutputIco with $($sizes.Count) icon sizes from " +
+    "$($sourceImage.Width)x$($sourceImage.Height) source."
+  )
+} finally {
+  if ($null -ne $sourceImage) { $sourceImage.Dispose() }
+  $sourceStream.Dispose()
+}
+''', flush: true);
+
+  try {
+    final result = Process.runSync(
+      'powershell.exe',
+      [
+        '-NoProfile',
+        '-NonInteractive',
+        '-ExecutionPolicy',
+        'Bypass',
+        '-File',
+        script.path,
+        '-SourceBase64',
+        sourceFile.path,
+        '-OutputIco',
+        outputFile.path,
+      ],
+      stdoutEncoding: systemEncoding,
+      stderrEncoding: systemEncoding,
+    );
+
+    if (result.stdout.toString().trim().isNotEmpty) {
+      stdout.writeln(result.stdout.toString().trim());
+    }
+    if (result.exitCode != 0) {
+      final error = result.stderr.toString().trim();
+      throw StateError(
+        'Unable to generate Windows icon (exit ${result.exitCode})'
+        '${error.isEmpty ? '' : ': $error'}',
+      );
+    }
+    if (!outputFile.existsSync() || outputFile.lengthSync() <= 22) {
+      throw StateError('Windows icon generation produced an invalid output file.');
+    }
+  } finally {
+    try {
+      if (script.existsSync()) script.deleteSync();
+    } catch (_) {}
+  }
 }
