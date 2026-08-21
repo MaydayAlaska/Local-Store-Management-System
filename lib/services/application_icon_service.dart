@@ -1,12 +1,8 @@
-import 'dart:convert';
 import 'dart:io';
 
-import 'package:flutter/services.dart';
-import 'package:image/image.dart' as img;
 import 'package:path/path.dart' as p;
 import 'package:window_manager/window_manager.dart';
 
-import '../core/app_paths.dart';
 import '../models/app_settings.dart';
 import 'settings_service.dart';
 
@@ -22,34 +18,27 @@ class ApplicationIconService {
     }
 
     if (!Platform.isWindows) return;
-    final customIconPath = settings.resolveWindowsShellIconPath(appSettings);
-    final iconPath = customIconPath ?? await _defaultWindowsIconPath();
-    if (iconPath == null) return;
 
-    try {
-      await windowManager.setIcon(iconPath);
-    } catch (_) {
-      // L'icona non deve impedire il funzionamento dell'app.
+    final customIconPath = settings.resolveWindowsShellIconPath(appSettings);
+    if (customIconPath != null) {
+      try {
+        await windowManager.setIcon(customIconPath);
+      } catch (_) {
+        // L'icona non deve impedire il funzionamento dell'app.
+      }
+      await _updateWindowsShortcuts(customIconPath);
+      return;
     }
 
-    await _updateWindowsShortcuts(iconPath);
-  }
-
-  Future<String?> _defaultWindowsIconPath() async {
-    try {
-      final encoded = await rootBundle.loadString('assets/app-icon.base64');
-      final decoded = img.decodeImage(base64Decode(encoded.trim()));
-      if (decoded == null) return null;
-      final directory = Directory(AppPaths.assetsDirectory)
-        ..createSync(recursive: true);
-      final iconPath = p.join(directory.path, 'app-default.ico');
-      File(iconPath).writeAsBytesSync(
-        img.encodeIco(decoded),
-        flush: true,
-      );
-      return iconPath;
-    } catch (_) {
-      return null;
+    // L'icona predefinita è già incorporata nell'eseguibile dal workflow di
+    // build. Non rigenerarla a runtime: image.encodeIco può produrre una ICO
+    // a singola risoluzione che Windows ridimensiona male nelle viste piccole,
+    // facendo apparire l'icona tagliata. Lasciando il controllo alla shell,
+    // Windows seleziona invece la dimensione corretta dalla ICO multi-size
+    // incorporata nell'EXE.
+    final executable = Platform.resolvedExecutable;
+    if (File(executable).existsSync()) {
+      await _updateWindowsShortcuts(executable);
     }
   }
 
@@ -57,7 +46,9 @@ class ApplicationIconService {
     final target = Platform.resolvedExecutable;
     if (!File(target).existsSync()) return;
 
-    final script = File(p.join(Directory.systemTemp.path, 'lsms-update-shortcuts-$pid.ps1'));
+    final script = File(
+      p.join(Directory.systemTemp.path, 'lsms-update-shortcuts-$pid.ps1'),
+    );
     try {
       script.writeAsStringSync(r'''
 param([string]$Target, [string]$Icon)
@@ -80,7 +71,18 @@ foreach ($dir in $dirs) {
 ''', flush: true);
       await Process.run(
         'powershell.exe',
-        ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', script.path, '-Target', target, '-Icon', iconPath],
+        [
+          '-NoProfile',
+          '-NonInteractive',
+          '-ExecutionPolicy',
+          'Bypass',
+          '-File',
+          script.path,
+          '-Target',
+          target,
+          '-Icon',
+          iconPath,
+        ],
       );
       try {
         await Process.run('ie4uinit.exe', ['-show']);
