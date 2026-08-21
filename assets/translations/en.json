@@ -119,6 +119,23 @@
     "cancel": "Cancel",
     "translation_files": "Translation files",
     "translation_folder": "Translations folder",
-    "translation_help": "To add a language, copy an existing JSON file, change languageCode and languageName, and translate every value in the strings section. Press the refresh button next to the Language menu to reload the files."
+    "translation_help": "To add a language, copy an existing JSON file, change languageCode and languageName, and translate every value in the strings section. Press the refresh button next to the Language menu to reload the files.",
+    "gift_card_add": "Add gift card",
+    "gift_card_purchase_help": "The gift card will be added to the cart and linked to {customerName} when the sale is registered. The price paid is the gift card value.",
+    "gift_card_value_price": "Value / price",
+    "value_greater_than_zero": "Enter a value greater than zero.",
+    "vat_included": "VAT included",
+    "expiration_date_optional": "Expiration date (optional)",
+    "no_expiration": "No expiration",
+    "remove_expiration": "Remove expiration",
+    "add_to_cart": "Add to cart",
+    "manage_gift_card_expirations": "Manage gift card expirations",
+    "gift_card_expirations": "Gift card expirations",
+    "gift_card_expiration": "Gift card expiration",
+    "gift_card_expiration_help": "Set an expiration date or leave the gift card without expiration.",
+    "save_expiration": "Save expiration",
+    "no_gift_cards_customer": "No gift cards are linked to this customer.",
+    "expiration": "Expires",
+    "edit_expiration": "Edit expiration"
   }
 }
