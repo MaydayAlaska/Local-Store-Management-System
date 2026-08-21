@@ -25,6 +25,7 @@ class CustomerRepository {
         total_value_cents INTEGER NOT NULL CHECK(total_value_cents > 0),
         spent_value_cents INTEGER NOT NULL DEFAULT 0
           CHECK(spent_value_cents >= 0 AND spent_value_cents <= total_value_cents),
+        expires_at_utc TEXT,
         created_at_utc TEXT NOT NULL,
         updated_at_utc TEXT NOT NULL,
         FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE CASCADE
@@ -82,6 +83,7 @@ class CustomerRepository {
         ON sales_order_items(order_id, id);
     ''');
 
+    _ensureColumn('gift_cards', 'expires_at_utc', 'TEXT');
     _ensureColumn('sales_orders', 'customer_code', 'INTEGER');
     _ensureColumn('sales_orders', 'customer_display_name', 'TEXT');
     _ensureColumn('sales_orders', 'customer_fiscal_code', 'TEXT');
@@ -381,12 +383,15 @@ class CustomerRepository {
   }
 
   List<GiftCard> availableGiftCardsForCustomer(int customerId, [int limit = 500]) {
+    final now = DateTime.now().toUtc().toIso8601String();
     final rows = database.db.select('''
       SELECT * FROM gift_cards
-      WHERE customer_id=? AND spent_value_cents < total_value_cents
+      WHERE customer_id=?
+        AND spent_value_cents < total_value_cents
+        AND (expires_at_utc IS NULL OR expires_at_utc > ?)
       ORDER BY created_at_utc DESC, id DESC
       LIMIT ?;
-    ''', [customerId, limit.clamp(1, 5000)]);
+    ''', [customerId, now, limit.clamp(1, 5000)]);
     return rows.map(_giftCardFromRow).toList();
   }
 
@@ -398,7 +403,11 @@ class CustomerRepository {
     return rows.isEmpty ? null : _giftCardFromRow(rows.first);
   }
 
-  GiftCard createGiftCard(int customerId, int totalValueCents) {
+  GiftCard createGiftCard(
+    int customerId,
+    int totalValueCents, {
+    DateTime? expiresAtUtc,
+  }) {
     if (totalValueCents <= 0) {
       throw ArgumentError('Il valore del buono regalo deve essere maggiore di zero.');
     }
@@ -412,13 +421,14 @@ class CustomerRepository {
       if (!customerExists) throw StateError('Il cliente selezionato non esiste più.');
 
       final now = DateTime.now().toUtc().toIso8601String();
+      final expiration = expiresAtUtc?.toUtc().toIso8601String();
       final code = _newUniqueGiftCardCode();
       db.execute('''
         INSERT INTO gift_cards (
           code, customer_id, total_value_cents, spent_value_cents,
-          created_at_utc, updated_at_utc)
-        VALUES (?, ?, ?, 0, ?, ?);
-      ''', [code, customerId, totalValueCents, now, now]);
+          expires_at_utc, created_at_utc, updated_at_utc)
+        VALUES (?, ?, ?, 0, ?, ?, ?);
+      ''', [code, customerId, totalValueCents, expiration, now, now]);
       final id = db.lastInsertRowId;
       db.execute('COMMIT;');
       return getGiftCard(id)!;
@@ -643,6 +653,11 @@ class CustomerRepository {
         if ((card['customer_id'] as int) != draft.customerId) {
           throw StateError('Il buono regalo non appartiene al cliente selezionato.');
         }
+        final expirationText = card['expires_at_utc'] as String?;
+        if (expirationText != null &&
+            DateTime.now().toUtc().isAfter(DateTime.parse(expirationText).toUtc())) {
+          throw StateError('Il buono regalo selezionato è scaduto.');
+        }
         final remaining =
             (card['total_value_cents'] as int) - (card['spent_value_cents'] as int);
         if (remaining < draft.giftCardAppliedCents) {
@@ -795,6 +810,9 @@ class CustomerRepository {
         customerId: row['customer_id'] as int,
         totalValueCents: row['total_value_cents'] as int,
         spentValueCents: row['spent_value_cents'] as int,
+        expiresAtUtc: row['expires_at_utc'] == null
+            ? null
+            : DateTime.parse(row['expires_at_utc'] as String).toUtc(),
         createdAtUtc: DateTime.parse(row['created_at_utc'] as String).toUtc(),
         updatedAtUtc: DateTime.parse(row['updated_at_utc'] as String).toUtc(),
       );
