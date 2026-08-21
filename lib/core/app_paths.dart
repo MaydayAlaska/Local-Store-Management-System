@@ -8,11 +8,13 @@ class AppPaths {
   static const legacyApplicationFolderName = 'LocalStoreManagementSystem';
 
   static late final String dataDirectory;
-  static late final String databasePath;
+  static late final String defaultDatabasePath;
+  static late String databasePath;
   static late final String settingsPath;
   static late final String assetsDirectory;
   static late final String backupsDirectory;
   static late final String logsDirectory;
+  static late final String translationsDirectory;
 
   static Future<void> initialize() async {
     final override = Platform.environment['LSMS_DATA_DIRECTORY_OVERRIDE']?.trim();
@@ -29,15 +31,18 @@ class AppPaths {
     await directory.create(recursive: true);
 
     dataDirectory = directory.path;
-    databasePath = p.join(dataDirectory, 'store.db');
+    defaultDatabasePath = p.join(dataDirectory, 'store.db');
+    databasePath = defaultDatabasePath;
     settingsPath = p.join(dataDirectory, 'settings.json');
     assetsDirectory = p.join(dataDirectory, 'assets');
     backupsDirectory = p.join(dataDirectory, 'Backups');
     logsDirectory = p.join(dataDirectory, 'Logs');
+    translationsDirectory = p.join(dataDirectory, 'Translations');
 
     await Directory(assetsDirectory).create(recursive: true);
     await Directory(backupsDirectory).create(recursive: true);
     await Directory(logsDirectory).create(recursive: true);
+    await Directory(translationsDirectory).create(recursive: true);
 
     if (!await File(databasePath).exists()) {
       await _tryDelete('$databasePath-wal');
@@ -50,7 +55,7 @@ class AppPaths {
   }
 
   static Future<void> _migrateLegacyDatabaseIfNeeded() async {
-    final destination = File(databasePath);
+    final destination = File(defaultDatabasePath);
     if (await destination.exists()) return;
 
     final legacyRoot = _legacyDataRoot();
@@ -60,9 +65,15 @@ class AppPaths {
     final source = File(sourcePath);
     if (!await source.exists()) return;
 
-    await source.copy(databasePath);
-    await _copySidecarIfPresent('$sourcePath-wal', '$databasePath-wal');
-    await _copySidecarIfPresent('$sourcePath-shm', '$databasePath-shm');
+    await source.copy(defaultDatabasePath);
+    await _copySidecarIfPresent(
+      '$sourcePath-wal',
+      '$defaultDatabasePath-wal',
+    );
+    await _copySidecarIfPresent(
+      '$sourcePath-shm',
+      '$defaultDatabasePath-shm',
+    );
   }
 
   static String? _legacyDataRoot() {
@@ -78,7 +89,10 @@ class AppPaths {
     return null;
   }
 
-  static Future<void> _copySidecarIfPresent(String source, String destination) async {
+  static Future<void> _copySidecarIfPresent(
+    String source,
+    String destination,
+  ) async {
     final sourceFile = File(source);
     if (await sourceFile.exists() && !await File(destination).exists()) {
       await sourceFile.copy(destination);

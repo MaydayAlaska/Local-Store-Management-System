@@ -2,7 +2,7 @@ name: Update ANPR birth place dataset
 
 on:
   push:
-    branches: [Flutter]
+    branches: [Flutter, main]
     paths:
       - tool/update_birth_places.py
       - tool/ensure_anpr_build_guard.py
@@ -15,8 +15,9 @@ permissions:
   contents: write
 
 jobs:
-  update:
-    name: Refresh official ANPR dataset
+  update-flutter:
+    name: Refresh official ANPR dataset (Flutter)
+    if: github.event_name != 'push' || github.ref == 'refs/heads/Flutter'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Flutter
@@ -36,7 +37,7 @@ jobs:
         run: |
           set -euo pipefail
           if git diff --quiet -- assets/data/birth_places.json assets/data/birth_places_manifest.json .github/workflows/build.yml; then
-            echo "Archivio ANPR e controllo build invariati."
+            echo "Archivio ANPR e controllo build invariati su Flutter."
             exit 0
           fi
 
@@ -46,3 +47,36 @@ jobs:
           git commit -m "ci: refresh ANPR data and build guard"
           git pull --rebase origin Flutter
           git push origin HEAD:Flutter
+
+  update-main:
+    name: Refresh official ANPR dataset (main)
+    if: github.event_name != 'push' || github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v7
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Generate and validate dataset
+        run: python3 tool/update_birth_places.py
+
+      - name: Ensure every build verifies ANPR freshness
+        run: python3 tool/ensure_anpr_build_guard.py
+
+      - name: Commit only when ANPR data or guard changed
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git diff --quiet -- assets/data/birth_places.json assets/data/birth_places_manifest.json .github/workflows/build.yml; then
+            echo "Archivio ANPR e controllo build invariati su main."
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add assets/data/birth_places.json assets/data/birth_places_manifest.json .github/workflows/build.yml
+          git commit -m "ci: refresh ANPR data and build guard"
+          git pull --rebase origin main
+          git push origin HEAD:main

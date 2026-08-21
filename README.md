@@ -2,9 +2,9 @@
 
 Gestionale desktop **offline** per negozi, sviluppato in **Flutter/Dart** con database locale **SQLite**.
 
-La versione stabile corrente è **0.1.6** sul branch `main`.
+La versione stabile corrente è **0.1.7** sul branch `main`.
 
-Il branch `Flutter` resta il canale **BETA/TEST** e mantiene la versione **0.1.6-b15**. I due canali OTA sono separati: le build stabili ricevono solo release stabili e le build Beta ricevono solo prerelease Beta.
+Il branch `Flutter` resta il canale **BETA/TEST** per lo sviluppo delle versioni successive. I canali OTA STABLE e BETA sono separati: una build stabile riceve solo release stabili e una build Beta riceve solo prerelease Beta.
 
 ## Download
 
@@ -21,82 +21,56 @@ Le release stabili vengono pubblicate su GitHub con tag `v<versione>` e includon
 
 ## Funzioni principali
 
-- catalogo prodotti e varianti con SKU, barcode, prezzi e giacenze;
+- catalogo prodotti e varianti con SKU, barcode multipli, prezzi e giacenze;
 - magazzino con movimenti di carico/scarico;
-- cassa con scanner HID, ricerca prodotti, tastierino numerico, sconti e cliente associato;
-- clienti con codice identificativo interno univoco e riutilizzabile dopo l'eliminazione;
-- codice fiscale cliente facoltativo, ma univoco quando presente, inseribile anche successivamente;
-- storico acquisti del cliente e gestione ordini/vendite;
-- buoni regalo associati ai clienti con codice univoco, valore totale, valore speso e residuo calcolato;
-- utilizzo parziale o totale dei buoni regalo direttamente in cassa;
-- annullamento vendite con ripristino della merce e, quando previsto, del credito del buono regalo;
-- eliminazione singola degli ordini e pulizia degli ordini più vecchi di un intervallo configurabile;
+- cassa con scanner HID, ricerca prodotti, tastierino numerico, sconti, articoli generici e cliente associato;
+- clienti con codice identificativo interno, codice fiscale facoltativo e storico acquisti;
+- gestione ordini e vendite, annullamento con ripristino della merce ed eliminazione dello storico;
+- buoni regalo associati ai clienti, con utilizzo parziale o totale, valore residuo e scadenza facoltativa;
 - etichette con anteprima, EAN-13, Code 128 B e stampa diretta TCP/BPL-Z;
-- export inventario Excel/PDF, backup e impostazioni applicazione;
+- export inventario Excel/PDF, backup e scelta della posizione del database;
 - interfaccia in Italiano e English, tema chiaro/scuro/sistema e valuta configurabile;
-- aggiornamenti OTA separati tra canale stabile e canale Beta.
+- traduzioni separate dal codice dell'applicazione tramite file di traduzione esterni;
+- aggiornamenti OTA separati tra canale STABLE e canale BETA;
+- una sola istanza operativa dell'applicazione alla volta.
 
-## Novità della 0.1.6
+## Novità della 0.1.7
 
-La 0.1.6 promuove in stabile il ciclo Beta `0.1.6-b1` → `0.1.6-b15`.
+La **0.1.7** promuove in stabile il ciclo di sviluppo `0.1.7-b1` → `0.1.7-b6`.
 
-### Clienti e buoni regalo
+### Buoni regalo
 
-Ogni cliente possiede un codice identificativo `CLI-XXXXXX` indipendente dall'ID interno del database. Il codice fiscale non è più obbligatorio e può essere aggiunto o modificato successivamente; se presente rimane univoco.
+I buoni regalo possono ora avere una **data di scadenza facoltativa**. La scadenza può essere impostata durante l'acquisto e successivamente modificata o rimossa dalla scheda cliente.
 
-Quando un cliente viene eliminato, il suo codice identificativo torna disponibile e può essere riutilizzato senza ricollegare per errore gli ordini storici a un nuovo cliente.
+I nuovi buoni ricevono un codice univoco basato sul timestamp dell'acquisto, nel formato `GIFT-YYYYMMDD-HHMMSS-######`. I codici dei buoni già esistenti non vengono modificati.
 
-I buoni regalo:
+Il valore dei buoni usa la valuta configurata nell'applicazione. Il calcolo IVA/VAT della Cassa include anche i buoni regalo in acquisto.
 
-- sono associati a un cliente;
-- hanno un codice univoco;
-- memorizzano **valore totale** e **valore speso**;
-- calcolano il residuo come `totale - speso`;
-- possono essere eliminati;
-- possono essere usati in cassa solo dopo aver associato il relativo cliente;
-- possono coprire interamente o parzialmente il totale da pagare.
+### IVA / VAT in Cassa
 
-Il buono viene trattato come metodo di pagamento e non come sconto: il valore reale della vendita resta invariato nello storico e nella fiscalità, mentre diminuisce il totale ancora da pagare.
+L'IVA viene scorporata correttamente dal totale già comprensivo di imposta con la formula:
 
-### Cassa
+```text
+IVA = totale × aliquota / (100 + aliquota)
+```
 
-La Cassa include il tastierino numerico per l'inserimento di articoli generici. Il tastierino può essere mostrato o nascosto tramite un pulsante dedicato, restituendo spazio al carrello quando non serve.
+Per esempio, con aliquota 22% e totale 100,00, l'IVA inclusa è 18,03.
 
-I comandi principali sono disposti come tre pulsanti larghi e compatti:
+### Istanza singola
 
-- **Registra vendita**;
-- **Emetti scontrino**;
-- **Nascondi tastierino / Mostra tastierino**.
+L'applicazione consente una sola istanza operativa alla volta. La prima istanza riserva un canale IPC locale esclusivo; un secondo avvio non apre un nuovo database o una seconda finestra, ma richiama la finestra già esistente, la ripristina se minimizzata, la porta in primo piano e termina subito.
 
-### Vendite e ordini
+La protezione è coperta da un test automatico che verifica anche la possibilità di riaprire normalmente l'applicazione dopo la chiusura della prima istanza.
 
-Le vendite possono essere annullate: l'ordine rimane nello storico come **ANNULLATO**, la merce viene restituita alla giacenza e l'eventuale credito di un buono regalo utilizzato viene ripristinato.
+### Icona applicazione
 
-È inoltre possibile eliminare definitivamente un ordine. L'eliminazione non modifica il magazzino né il credito dei buoni: per ripristinare gli effetti di una vendita occorre prima annullarla.
+L'icona predefinita è condivisa dalla distribuzione desktop. Su Windows viene generato un **ICO multi-risoluzione** per applicazione, collegamenti e installer; macOS e i pacchetti Linux utilizzano la stessa sorgente grafica. AppImage e pacchetti DEB installano l'icona nel formato previsto dal desktop Linux.
 
-La sezione Vendite permette anche di eliminare in blocco gli ordini più vecchi di un intervallo espresso in giorni, mesi o anni.
+### Traduzioni
 
-### Interfaccia
+Le traduzioni sono separate dal codice dell'applicazione e vengono caricate da file dedicati. Questo rende più semplice aggiungere nuove lingue senza inserire direttamente tutte le stringhe nel programma.
 
-I menu a tendina seguono il tema grafico dell'applicazione. Il popup per l'eliminazione degli ordini vecchi utilizza il componente `GlassDropdown`, mentre la tematizzazione globale copre anche gli altri menu Material.
-
-Nell'elenco Clienti viene mostrato sotto al nome soltanto il codice fiscale, quando presente; il codice `CLI-XXXXXX` rimane disponibile nella scheda dettagli del cliente.
-
-I nomi delle lingue vengono sempre mostrati nella loro forma nativa: **Italiano** e **English**.
-
-### Altre modifiche del ciclo 0.1.6
-
-- valuta persistente: EUR, USD, GBP o CHF;
-- tema sistema, chiaro o scuro;
-- menu laterale scorrevole quando necessario;
-- controlli finestra e interfaccia desktop rifiniti;
-- esportazione inventario con scelta delle colonne;
-- nuovi SKU generati in formato esadecimale;
-- generazione SKU univoco dal popup prodotto/variante;
-- supporto macOS Intel e Apple Silicon con pacchetto `.dmg` contenente l'app;
-- integrazione stampa etichette diretta via TCP socket;
-- gestione del codice luogo del codice fiscale e dataset ANPR verificato in CI;
-- separazione rigida tra versioni OTA BETA e STABLE.
+I nomi delle lingue vengono sempre mostrati nella loro forma nativa, per esempio **Italiano** e **English**.
 
 ## Aggiornamenti OTA
 
@@ -105,15 +79,15 @@ Sono presenti due canali indipendenti:
 - `main` → **STABLE**, versioni `X.Y.Z`;
 - `Flutter` → **BETA**, versioni `X.Y.Z-bN` e prerelease `beta-latest`.
 
-All'avvio l'app controlla gli aggiornamenti. Un aggiornamento viene proposto solo quando la versione online è realmente superiore a quella installata.
+All'avvio l'app controlla gli aggiornamenti. Un aggiornamento viene proposto solo quando la versione online è realmente superiore a quella installata; un commit differente da solo non è sufficiente.
 
-L'updater seleziona automaticamente sistema operativo e architettura. Su Windows installa il nuovo installer, su macOS scarica e apre il DMG, mentre su Linux l'aggiornamento automatico è disponibile quando l'app è stata avviata da AppImage.
+L'updater seleziona automaticamente sistema operativo e architettura senza incrociare x64 e ARM64. Su Windows avvia il nuovo installer, su macOS scarica e apre il DMG, mentre su Linux l'aggiornamento automatico è disponibile quando l'applicazione è stata avviata da AppImage. I pacchetti `.deb` vengono comunque pubblicati per l'installazione manuale.
 
 ## Etichette e stampanti
 
 La sezione Etichette supporta profili stampante persistenti, dimensioni fisiche, anteprima, EAN-13 e Code 128 B.
 
-Per le stampanti di etichette compatibili è disponibile la stampa diretta:
+Per le stampanti compatibili è disponibile la stampa diretta:
 
 ```text
 Flutter → TCP socket → stampante:9100 → BPL-Z/ZPL
@@ -129,12 +103,7 @@ I prezzi esportati e visualizzati usano la valuta configurata nelle Impostazioni
 
 ## Impostazioni
 
-Le preferenze di negozio, tema, lingua, valuta, logo, icona e stampanti etichette vengono salvate localmente.
-
-Le lingue disponibili vengono visualizzate con il proprio nome nativo:
-
-- Italiano
-- English
+Le preferenze di negozio, tema, lingua, valuta, logo, icona e stampante etichette vengono salvate localmente. I file di impostazioni delle versioni precedenti restano compatibili e i nuovi campi mancanti ricevono valori predefiniti sicuri.
 
 ## Database
 
@@ -144,7 +113,9 @@ I dati restano localmente in:
 Documenti/Local Store Management System/
 ```
 
-Le migrazioni del database vengono applicate automaticamente per mantenere compatibili anche i database creati dalle versioni precedenti.
+Lo schema SQLite corrente usa `PRAGMA user_version = 3`. Le migrazioni vengono applicate automaticamente per mantenere compatibili anche i database creati dalle versioni precedenti.
+
+Il dataset dei codici luogo utilizzato per il codice fiscale viene verificato dalla CI rispetto alla fonte aggiornata prima della compilazione delle release.
 
 ## Sviluppo e test
 
@@ -177,7 +148,7 @@ flutter analyze --no-fatal-infos
 flutter test
 ```
 
-La CI verifica anche che il dataset ANPR incorporato per i codici luogo sia allineato alla fonte ufficiale corrente.
+La CI verifica analisi statica, test automatici, coerenza della versione applicativa, dataset dei codici luogo e metadati Linux prima di compilare i pacchetti desktop.
 
 ## CI e release
 

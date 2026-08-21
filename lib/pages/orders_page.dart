@@ -27,7 +27,7 @@ class _OrderAgeSelection {
 class _OrdersPageState extends State<OrdersPage> {
   final _search = TextEditingController();
 
-  String _itEn(String it, String en) => AppStrings.isEnglish ? en : it;
+  String _itEn(String it, String en) => AppStrings.pair(it, en);
 
   @override
   void dispose() {

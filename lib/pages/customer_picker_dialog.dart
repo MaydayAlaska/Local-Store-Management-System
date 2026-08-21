@@ -47,9 +47,10 @@ class _CustomerPickerDialogState extends State<_CustomerPickerDialog> {
             decoration: InputDecoration(
               border: const OutlineInputBorder(),
               prefixIcon: const Icon(Icons.search),
-              labelText: AppStrings.isEnglish
-                  ? 'Name, customer code or tax code'
-                  : 'Nome, codice cliente o codice fiscale',
+              labelText: AppStrings.pair(
+                'Nome, codice cliente o codice fiscale',
+                'Name, customer code or tax code',
+              ),
             ),
           ),
           const SizedBox(height: 10),
@@ -57,9 +58,10 @@ class _CustomerPickerDialogState extends State<_CustomerPickerDialog> {
             child: customers.isEmpty
                 ? Center(
                     child: Text(
-                      AppStrings.isEnglish
-                          ? 'No customers found.'
-                          : 'Nessun cliente trovato.',
+                      AppStrings.pair(
+                        'Nessun cliente trovato.',
+                        'No customers found.',
+                      ),
                     ),
                   )
                 : ListView.separated(

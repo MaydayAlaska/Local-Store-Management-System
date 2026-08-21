@@ -5,16 +5,21 @@ import 'package:image/image.dart' as img;
 import 'package:path/path.dart' as p;
 
 import '../core/app_paths.dart';
+import '../l10n/app_strings.dart';
 import '../models/app_settings.dart';
 
 class SettingsService {
+  static const defaultIconSourceToken = ':default-app-icon:';
+
   AppSettings load() {
     final file = File(AppPaths.settingsPath);
     if (!file.existsSync()) return AppSettings.defaults;
     try {
       final decoded = jsonDecode(file.readAsStringSync());
       if (decoded is! Map<String, dynamic>) return AppSettings.defaults;
-      return AppSettings.fromJson(decoded);
+      final settings = AppSettings.fromJson(decoded);
+      if (AppStrings.hasLanguage(settings.languageCode)) return settings;
+      return settings.copyWith(languageCode: AppStrings.fallbackLanguageCode);
     } catch (_) {
       return AppSettings.defaults;
     }
@@ -36,9 +41,12 @@ class SettingsService {
     final name = shopName.trim().isEmpty
         ? AppSettings.defaults.shopName
         : shopName.trim();
-    final icon = iconSourcePath == null
-        ? current.iconFileName
-        : _saveAsset(iconSourcePath, 'app-icon');
+    final resetIcon = iconSourcePath == defaultIconSourceToken;
+    final icon = resetIcon
+        ? null
+        : iconSourcePath == null
+            ? current.iconFileName
+            : _saveAsset(iconSourcePath, 'app-icon');
     final logo = logoSourcePath == null
         ? current.logoFileName
         : _saveAsset(logoSourcePath, 'shop-logo');
@@ -53,10 +61,10 @@ class SettingsService {
         AppSettings.supportedThemeModes.contains(themeMode.toLowerCase())
             ? themeMode.toLowerCase()
             : AppSettings.defaults.themeMode;
-    final normalizedLanguage =
-        AppSettings.supportedLanguages.contains(languageCode.toLowerCase())
-            ? languageCode.toLowerCase()
-            : AppSettings.defaults.languageCode;
+    final requestedLanguage = AppStrings.normalizeLanguageCode(languageCode);
+    final normalizedLanguage = AppStrings.hasLanguage(requestedLanguage)
+        ? requestedLanguage
+        : AppStrings.fallbackLanguageCode;
     final settings = AppSettings(
       shopName: name,
       iconFileName: icon,
@@ -75,7 +83,11 @@ class SettingsService {
       languageCode: normalizedLanguage,
     );
     _writeSettings(settings);
-    if (icon != null) _ensureDerivedIconFiles(settings);
+    if (resetIcon) {
+      _removeApplicationIconAssets();
+    } else if (icon != null) {
+      _ensureDerivedIconFiles(settings);
+    }
     return settings;
   }
 
@@ -194,6 +206,22 @@ class SettingsService {
       }
     } catch (_) {
       // Pulizia best effort.
+    }
+  }
+
+  void _removeApplicationIconAssets() {
+    try {
+      final directory = Directory(AppPaths.assetsDirectory);
+      if (!directory.existsSync()) return;
+      for (final entity in directory.listSync()) {
+        if (entity is! File) continue;
+        final name = p.basename(entity.path).toLowerCase();
+        if (name.startsWith('app-icon-') || name.startsWith('app-shell-')) {
+          entity.deleteSync();
+        }
+      }
+    } catch (_) {
+      // Pulizia best effort: le impostazioni sono già tornate al default.
     }
   }
 

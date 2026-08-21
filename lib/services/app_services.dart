@@ -5,14 +5,18 @@ import '../repositories/product_repository.dart';
 import '../repositories/stock_repository.dart';
 import 'application_icon_service.dart';
 import 'backup_service.dart';
+import 'database_location_service.dart';
 import 'export_service.dart';
 import 'label_service.dart';
 import 'settings_service.dart';
 import 'update_service.dart';
 
 class AppServices {
-  AppServices(this.database)
-      : products = ProductRepository(database),
+  AppServices(
+    this.database, {
+    DatabaseLocationService? databaseLocation,
+  })  : databaseLocation = databaseLocation ?? DatabaseLocationService(),
+        products = ProductRepository(database),
         lookups = LookupRepository(database),
         stock = StockRepository(database),
         customers = CustomerRepository(database),
@@ -25,6 +29,7 @@ class AppServices {
   }
 
   final DatabaseService database;
+  final DatabaseLocationService databaseLocation;
   final ProductRepository products;
   final LookupRepository lookups;
   final StockRepository stock;

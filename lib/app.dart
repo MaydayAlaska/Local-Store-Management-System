@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 
 import 'core/app_runtime.dart';
+import 'l10n/app_strings.dart';
 import 'models/app_settings.dart';
 import 'pages/shell_page.dart';
 import 'services/app_services.dart';
@@ -30,17 +31,29 @@ class _StoreAppState extends State<StoreApp> {
         _ => ThemeMode.system,
       };
 
+  Locale _localeForLanguage(String value) {
+    final normalized = AppStrings.normalizeLanguageCode(value);
+    final parts = normalized.split('-');
+    final requested = parts.length > 1
+        ? Locale(parts.first, parts[1].toUpperCase())
+        : Locale(parts.first);
+    return GlobalMaterialLocalizations.delegate.isSupported(requested)
+        ? requested
+        : const Locale('en');
+  }
+
   @override
   Widget build(BuildContext context) {
     AppRuntime.apply(_settings);
+    final materialLocale = _localeForLanguage(_settings.languageCode);
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'Local Store Management System',
       themeMode: _themeMode,
       theme: GlassTheme.light(),
       darkTheme: GlassTheme.dark(),
-      locale: Locale(_settings.languageCode),
-      supportedLocales: const [Locale('it'), Locale('en')],
+      locale: materialLocale,
+      supportedLocales: [materialLocale],
       localizationsDelegates: GlobalMaterialLocalizations.delegates,
       home: ShellPage(
         services: widget.services,

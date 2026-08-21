@@ -5,6 +5,7 @@ import '../models/customer.dart';
 import '../repositories/customer_repository.dart';
 import '../services/birth_place_service.dart';
 import '../services/fiscal_code_service.dart';
+import 'gift_card_expiration_dialog.dart';
 
 Future<Customer?> showCustomerEditorDialog(
   BuildContext context, {
@@ -43,8 +44,9 @@ class _CustomerEditorDialogState extends State<_CustomerEditorDialog> {
   late final TextEditingController _lastName;
   late final TextEditingController _notes;
   String? _error;
+  bool _giftCardsChanged = false;
 
-  String _itEn(String it, String en) => AppStrings.isEnglish ? en : it;
+  String _itEn(String it, String en) => AppStrings.pair(it, en);
 
   @override
   void initState() {
@@ -70,6 +72,24 @@ class _CustomerEditorDialogState extends State<_CustomerEditorDialog> {
     final value = _fiscalCode.text.trim();
     if (value.isEmpty) return null;
     return FiscalCodeService.tryParse(value);
+  }
+
+  Future<void> _manageGiftCardExpirations() async {
+    final customer = widget.customer;
+    if (customer == null) return;
+    await showGiftCardExpirationManagerDialog(
+      context,
+      customer: customer,
+      repository: widget.repository,
+    );
+    if (!mounted) return;
+    setState(() => _giftCardsChanged = true);
+  }
+
+  void _cancel() {
+    Navigator.of(context).pop(
+      _giftCardsChanged && widget.customer != null ? widget.customer : null,
+    );
   }
 
   void _save() {
@@ -152,6 +172,12 @@ class _CustomerEditorDialogState extends State<_CustomerEditorDialog> {
                       ),
                     ),
                   ]),
+                ),
+                const SizedBox(height: 10),
+                OutlinedButton.icon(
+                  onPressed: _manageGiftCardExpirations,
+                  icon: const Icon(Icons.edit_calendar_outlined),
+                  label: Text(AppStrings.t('manage_gift_card_expirations')),
                 ),
                 const SizedBox(height: 12),
               ],
@@ -249,7 +275,7 @@ class _CustomerEditorDialogState extends State<_CustomerEditorDialog> {
       ),
       actions: [
         TextButton(
-          onPressed: () => Navigator.of(context).pop(),
+          onPressed: _cancel,
           child: Text(AppStrings.t('cancel')),
         ),
         FilledButton.icon(

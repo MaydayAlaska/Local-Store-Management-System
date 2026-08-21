@@ -77,6 +77,7 @@ class GiftCard {
     required this.customerId,
     required this.totalValueCents,
     required this.spentValueCents,
+    this.expiresAtUtc,
     required this.createdAtUtc,
     required this.updatedAtUtc,
   });
@@ -86,8 +87,11 @@ class GiftCard {
   final int customerId;
   final int totalValueCents;
   final int spentValueCents;
+  final DateTime? expiresAtUtc;
   final DateTime createdAtUtc;
   final DateTime updatedAtUtc;
+
+  DateTime get purchasedAtUtc => createdAtUtc;
 
   int get remainingValueCents {
     final remaining = totalValueCents - spentValueCents;
@@ -95,9 +99,18 @@ class GiftCard {
   }
 
   bool get isExhausted => remainingValueCents == 0;
+  bool get isExpired =>
+      expiresAtUtc != null && DateTime.now().toUtc().isAfter(expiresAtUtc!);
+  bool get isUsable => !isExhausted && !isExpired;
   String get totalDisplay => formatMoney(totalValueCents);
   String get spentDisplay => formatMoney(spentValueCents);
   String get remainingDisplay => formatMoney(remainingValueCents);
+  String get purchasedDateDisplay => _dateDisplay(purchasedAtUtc.toLocal());
+  String? get expirationDateDisplay =>
+      expiresAtUtc == null ? null : _dateDisplay(expiresAtUtc!.toLocal());
+
+  static String _dateDisplay(DateTime value) =>
+      '${value.day.toString().padLeft(2, '0')}/${value.month.toString().padLeft(2, '0')}/${value.year}';
 }
 
 class SalesOrderDraftLine {

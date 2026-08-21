@@ -57,9 +57,10 @@ class _ProductsPageState extends State<ProductsPage> {
           decoration: InputDecoration(
             border: const OutlineInputBorder(),
             prefixIcon: const Icon(Icons.search),
-            labelText: AppStrings.isEnglish
-                ? 'Search name, SKU, barcode, brand or category'
-                : 'Cerca nome, SKU, barcode, marca o categoria',
+            labelText: AppStrings.pair(
+              'Cerca nome, SKU, barcode, marca o categoria',
+              'Search name, SKU, barcode, brand or category',
+            ),
           ),
         ),
         const SizedBox(height: 12),
@@ -69,7 +70,7 @@ class _ProductsPageState extends State<ProductsPage> {
             child: products.isEmpty
                 ? Center(
                     child: Text(
-                      AppStrings.isEnglish ? 'No products.' : 'Nessun prodotto.',
+                      AppStrings.pair('Nessun prodotto.', 'No products.'),
                     ),
                   )
                 : ListView.separated(
@@ -77,9 +78,9 @@ class _ProductsPageState extends State<ProductsPage> {
                     separatorBuilder: (_, _) => const Divider(height: 1),
                     itemBuilder: (context, index) {
                       final product = products[index];
-                      final noBrand = AppStrings.isEnglish ? 'No brand' : 'Senza marca';
+                      final noBrand = AppStrings.pair('Senza marca', 'No brand');
                       final noCategory =
-                          AppStrings.isEnglish ? 'No category' : 'Senza categoria';
+                          AppStrings.pair('Senza categoria', 'No category');
                       return ListTile(
                         title: Text(product.name),
                         subtitle: Text(

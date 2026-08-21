@@ -32,6 +32,15 @@ jobs:
             exit 1
           fi
 
+      - name: Verify Linux AppStream metadata
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import xml.etree.ElementTree as ET
+          ET.parse('packaging/linux/io.github.MaydayAlaska.LocalStoreManagementSystem.metainfo.xml')
+          PY
+
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
@@ -80,16 +89,8 @@ jobs:
       - name: Prepare Windows application icon
         shell: pwsh
         run: |
-          $png = [Convert]::FromBase64String((Get-Content -Raw "${{ env.ICON_BASE64 }}").Trim())
-          $iconPath = "windows/runner/resources/app_icon.ico"
-          $stream = [IO.File]::Open($iconPath, [IO.FileMode]::Create, [IO.FileAccess]::Write)
-          try {
-            $writer = [IO.BinaryWriter]::new($stream)
-            $writer.Write([UInt16]0); $writer.Write([UInt16]1); $writer.Write([UInt16]1)
-            $writer.Write([Byte]64); $writer.Write([Byte]64); $writer.Write([Byte]0); $writer.Write([Byte]0)
-            $writer.Write([UInt16]1); $writer.Write([UInt16]32)
-            $writer.Write([UInt32]$png.Length); $writer.Write([UInt32]22); $writer.Write($png); $writer.Flush()
-          } finally { $stream.Dispose() }
+          flutter pub get
+          dart run tool/generate_windows_icon.dart "${{ env.ICON_BASE64 }}" "windows/runner/resources/app_icon.ico"
 
       - name: Resolve packages
         run: flutter pub get
@@ -119,7 +120,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Upload Windows x64 installer immediately
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: package-win-x64
           path: dist/LocalStoreManagement-Setup-win-x64.exe
@@ -174,16 +175,8 @@ jobs:
       - name: Prepare Windows application icon
         shell: pwsh
         run: |
-          $png = [Convert]::FromBase64String((Get-Content -Raw "${{ env.ICON_BASE64 }}").Trim())
-          $iconPath = "windows/runner/resources/app_icon.ico"
-          $stream = [IO.File]::Open($iconPath, [IO.FileMode]::Create, [IO.FileAccess]::Write)
-          try {
-            $writer = [IO.BinaryWriter]::new($stream)
-            $writer.Write([UInt16]0); $writer.Write([UInt16]1); $writer.Write([UInt16]1)
-            $writer.Write([Byte]64); $writer.Write([Byte]64); $writer.Write([Byte]0); $writer.Write([Byte]0)
-            $writer.Write([UInt16]1); $writer.Write([UInt16]32)
-            $writer.Write([UInt32]$png.Length); $writer.Write([UInt32]22); $writer.Write($png); $writer.Flush()
-          } finally { $stream.Dispose() }
+          flutter pub get
+          dart run tool/generate_windows_icon.dart "${{ env.ICON_BASE64 }}" "windows/runner/resources/app_icon.ico"
 
       - name: Resolve packages
         run: flutter pub get
@@ -213,7 +206,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Upload Windows ARM64 installer for release jobs
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: package-win-arm64
           path: dist/LocalStoreManagement-Setup-win-arm64.exe
@@ -232,9 +225,9 @@ jobs:
             flutter_arch: arm64
             macho_arch: arm64
             excluded_arch: x86_64
-          - runner: macos-15-intel
+          - runner: macos-15
             arch: x64
-            flutter_arch: x64
+            flutter_arch: arm64
             macho_arch: x86_64
             excluded_arch: arm64
     runs-on: ${{ matrix.runner }}
@@ -257,6 +250,10 @@ jobs:
           uname -m
           flutter --version
           xcodebuild -version
+          if [ "$(uname -m)" != "arm64" ]; then
+            echo '::error::La build macOS deve usare esclusivamente un host Apple Silicon.'
+            exit 1
+          fi
 
       - name: Generate macOS runner
         shell: bash
@@ -302,6 +299,28 @@ jobs:
           )
           with info_path.open('wb') as handle:
               plistlib.dump(info, handle, sort_keys=False)
+
+          pbxproj_path = Path('macos/Runner.xcodeproj/project.pbxproj')
+          project = pbxproj_path.read_text()
+          tripwire_index = project.find('touch Flutter/ephemeral/tripwire')
+          if tripwire_index < 0:
+              raise RuntimeError('Build phase Flutter Assemble non trovata.')
+          phase_start = project.rfind('/* ShellScript */ = {', 0, tripwire_index)
+          phase_end = project.find('\n\t\t};', tripwire_index)
+          if phase_start < 0 or phase_end < 0:
+              raise RuntimeError('Impossibile delimitare la build phase Flutter Assemble.')
+          phase = project[phase_start:phase_end]
+          if 'alwaysOutOfDate = 1;' not in phase:
+              isa_line = '\t\t\tisa = PBXShellScriptBuildPhase;\n'
+              if isa_line not in phase:
+                  raise RuntimeError('Formato PBXShellScriptBuildPhase inatteso.')
+              phase = phase.replace(
+                  isa_line,
+                  isa_line + '\t\t\talwaysOutOfDate = 1;\n',
+                  1,
+              )
+              project = project[:phase_start] + phase + project[phase_end:]
+              pbxproj_path.write_text(project)
 
           entitlement_keys = {
               'com.apple.security.app-sandbox': True,
@@ -393,7 +412,7 @@ jobs:
           hdiutil imageinfo "dist/LocalStoreManagement-macos-${{ matrix.arch }}.dmg" >/dev/null
 
       - name: Upload macOS DMG for release jobs
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: package-macos-${{ matrix.arch }}
           path: dist/LocalStoreManagement-macos-${{ matrix.arch }}.dmg
@@ -489,10 +508,16 @@ jobs:
         run: |
           set -euo pipefail
           rm -rf AppDir dist
-          mkdir -p AppDir/usr/bin AppDir/usr/share/icons/hicolor/64x64/apps dist
+          mkdir -p AppDir/usr/bin \
+                   AppDir/usr/share/applications \
+                   AppDir/usr/share/icons/hicolor/64x64/apps \
+                   AppDir/usr/share/metainfo \
+                   dist
           cp -a build/linux/${{ matrix.build_arch }}/release/bundle/. AppDir/usr/bin/
           cp packaging/linux/AppRun AppDir/AppRun
           cp packaging/linux/local-store-management.desktop AppDir/local-store-management.desktop
+          cp packaging/linux/local-store-management.desktop AppDir/usr/share/applications/local-store-management.desktop
+          cp packaging/linux/io.github.MaydayAlaska.LocalStoreManagementSystem.metainfo.xml AppDir/usr/share/metainfo/io.github.MaydayAlaska.LocalStoreManagementSystem.metainfo.xml
           base64 --decode "${ICON_BASE64}" > AppDir/local-store-management.png
           cp AppDir/local-store-management.png AppDir/usr/share/icons/hicolor/64x64/apps/local-store-management.png
           ln -s local-store-management.png AppDir/.DirIcon
@@ -520,9 +545,11 @@ jobs:
                    DebRoot/usr/bin \
                    DebRoot/usr/lib/local-store-management \
                    DebRoot/usr/share/applications \
-                   DebRoot/usr/share/icons/hicolor/64x64/apps
+                   DebRoot/usr/share/icons/hicolor/64x64/apps \
+                   DebRoot/usr/share/metainfo
           cp -a build/linux/${{ matrix.build_arch }}/release/bundle/. DebRoot/usr/lib/local-store-management/
           cp packaging/linux/local-store-management.desktop DebRoot/usr/share/applications/local-store-management.desktop
+          cp packaging/linux/io.github.MaydayAlaska.LocalStoreManagementSystem.metainfo.xml DebRoot/usr/share/metainfo/io.github.MaydayAlaska.LocalStoreManagementSystem.metainfo.xml
           base64 --decode "${ICON_BASE64}" > DebRoot/usr/share/icons/hicolor/64x64/apps/local-store-management.png
           cat > DebRoot/usr/bin/local_store_management <<'EOF'
           #!/bin/sh
@@ -545,7 +572,7 @@ jobs:
           dpkg-deb --build --root-owner-group DebRoot dist/LocalStoreManagement-linux-${{ matrix.arch }}.deb
 
       - name: Upload Linux packages for release jobs
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: package-linux-${{ matrix.arch }}
           path: |
@@ -563,7 +590,7 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v7
         with:
           pattern: package-*
           path: dist
@@ -601,7 +628,7 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v7
         with:
           pattern: package-*
           path: dist

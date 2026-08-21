@@ -31,7 +31,7 @@ class _OrderDialog extends StatefulWidget {
 class _OrderDialogState extends State<_OrderDialog> {
   String? _status;
 
-  String _itEn(String it, String en) => AppStrings.isEnglish ? en : it;
+  String _itEn(String it, String en) => AppStrings.pair(it, en);
 
   SalesOrderDetail? get _detail =>
       widget.services.customers.getOrder(widget.orderId);

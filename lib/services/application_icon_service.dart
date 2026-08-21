@@ -1,8 +1,11 @@
+import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/services.dart';
 import 'package:path/path.dart' as p;
 import 'package:window_manager/window_manager.dart';
 
+import '../core/app_paths.dart';
 import '../models/app_settings.dart';
 import 'settings_service.dart';
 
@@ -17,24 +20,62 @@ class ApplicationIconService {
       // Il titolo nativo è accessorio alla barra Flutter.
     }
 
-    if (!Platform.isWindows) return;
-    final iconPath = settings.resolveWindowsShellIconPath(appSettings);
-    if (iconPath == null) return;
+    if (Platform.isLinux) {
+      final customIconPath = settings.resolveIconPreviewPath(appSettings);
+      final iconPath = customIconPath ?? await _defaultLinuxIconPath();
+      if (iconPath == null) return;
 
-    try {
-      await windowManager.setIcon(iconPath);
-    } catch (_) {
-      // L'icona personalizzata non deve impedire il funzionamento dell'app.
+      try {
+        await windowManager.setIcon(iconPath);
+      } catch (_) {
+        // L'icona non deve impedire il funzionamento dell'app.
+      }
+      return;
     }
 
-    await _updateWindowsShortcuts(iconPath);
+    if (!Platform.isWindows) return;
+
+    final customIconPath = settings.resolveWindowsShellIconPath(appSettings);
+    if (customIconPath != null) {
+      try {
+        await windowManager.setIcon(customIconPath);
+      } catch (_) {
+        // L'icona non deve impedire il funzionamento dell'app.
+      }
+      await _updateWindowsShortcuts(customIconPath);
+      return;
+    }
+
+    // L'icona predefinita è incorporata nell'eseguibile dal workflow di build.
+    // Evitiamo di rigenerarla a runtime: la shell Windows deve poter scegliere
+    // direttamente la risoluzione corretta dalla ICO multi-size dell'EXE.
+    final executable = Platform.resolvedExecutable;
+    if (File(executable).existsSync()) {
+      await _updateWindowsShortcuts(executable);
+    }
+  }
+
+  Future<String?> _defaultLinuxIconPath() async {
+    try {
+      final encoded = await rootBundle.loadString('assets/app-icon.base64');
+      final bytes = base64Decode(encoded.trim());
+      final directory = Directory(AppPaths.assetsDirectory)
+        ..createSync(recursive: true);
+      final iconPath = p.join(directory.path, 'app-default.png');
+      File(iconPath).writeAsBytesSync(bytes, flush: true);
+      return iconPath;
+    } catch (_) {
+      return null;
+    }
   }
 
   Future<void> _updateWindowsShortcuts(String iconPath) async {
     final target = Platform.resolvedExecutable;
     if (!File(target).existsSync()) return;
 
-    final script = File(p.join(Directory.systemTemp.path, 'lsms-update-shortcuts-$pid.ps1'));
+    final script = File(
+      p.join(Directory.systemTemp.path, 'lsms-update-shortcuts-$pid.ps1'),
+    );
     try {
       script.writeAsStringSync(r'''
 param([string]$Target, [string]$Icon)
@@ -57,7 +98,18 @@ foreach ($dir in $dirs) {
 ''', flush: true);
       await Process.run(
         'powershell.exe',
-        ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', script.path, '-Target', target, '-Icon', iconPath],
+        [
+          '-NoProfile',
+          '-NonInteractive',
+          '-ExecutionPolicy',
+          'Bypass',
+          '-File',
+          script.path,
+          '-Target',
+          target,
+          '-Icon',
+          iconPath,
+        ],
       );
       try {
         await Process.run('ie4uinit.exe', ['-show']);

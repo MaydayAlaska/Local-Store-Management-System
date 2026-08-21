@@ -33,12 +33,9 @@ class StockMovement {
   final int stockAfter;
 
   String get typeDisplay => switch (kind) {
-        StockMovementKind.incoming =>
-          AppStrings.isEnglish ? 'Incoming' : 'Carico',
-        StockMovementKind.outgoing =>
-          AppStrings.isEnglish ? 'Outgoing' : 'Scarico',
-        StockMovementKind.adjustment =>
-          AppStrings.isEnglish ? 'Adjustment' : 'Rettifica',
+        StockMovementKind.incoming => AppStrings.pair('Carico', 'Incoming'),
+        StockMovementKind.outgoing => AppStrings.pair('Scarico', 'Outgoing'),
+        StockMovementKind.adjustment => AppStrings.pair('Rettifica', 'Adjustment'),
       };
   String get quantityDisplay => quantityDelta > 0 ? '+$quantityDelta' : '$quantityDelta';
   String get createdAtDisplay => formatLocalDateTime(createdAtUtc);

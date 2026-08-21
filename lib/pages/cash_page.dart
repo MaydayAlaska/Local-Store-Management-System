@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../core/app_runtime.dart';
 import '../core/formatters.dart';
+import '../core/vat_calculator.dart';
 import '../l10n/app_strings.dart';
 import '../models/catalog.dart';
 import '../models/customer.dart';
@@ -10,6 +11,7 @@ import '../services/fiscal_code_service.dart';
 import '../widgets/hid_barcode_listener.dart';
 import 'customer_editor_dialog.dart';
 import 'customer_picker_dialog.dart';
+import 'gift_card_purchase_dialog.dart';
 
 class CashPage extends StatefulWidget {
   const CashPage({super.key, required this.services, required this.isActive});
@@ -32,6 +34,7 @@ class _CashPageState extends State<CashPage> {
   GiftCard? _giftCard;
   int _nextDiscountId = 1;
   int _nextGenericLineId = 1;
+  int _nextGiftCardLineId = 1;
   int _keypadPriceCents = 0;
   bool _showKeypad = true;
   late String _searchStatus;
@@ -56,6 +59,11 @@ class _CashPageState extends State<CashPage> {
       widget.services.products.search(_search.text, 50);
 
   String _itEn(String it, String en) => AppStrings.isEnglish ? en : it;
+
+  String _dateText(DateTime value) {
+    final local = value.toLocal();
+    return '${local.day.toString().padLeft(2, '0')}/${local.month.toString().padLeft(2, '0')}/${local.year}';
+  }
 
   void _keypadInsert(String value) {
     var next = _keypadPriceCents;
@@ -188,6 +196,40 @@ class _CashPageState extends State<CashPage> {
     });
   }
 
+  Future<void> _addGiftCardPurchase() async {
+    final customer = _customer;
+    if (customer == null) {
+      return _cartMessage(_itEn(
+        'Associa prima un cliente per acquistare un buono regalo.',
+        'Link a customer before purchasing a gift card.',
+      ));
+    }
+
+    final draft = await showGiftCardPurchaseDialog(
+      context,
+      customerName: customer.displayName,
+    );
+    if (!mounted || draft == null) return;
+
+    final line = _CashLine.giftCard(
+      giftCardLineId: _nextGiftCardLineId++,
+      unitPriceCents: draft.valueCents,
+      expiresAtUtc: draft.expiresAtUtc,
+    );
+    setState(() {
+      _cart.add(line);
+      _cartStatus = draft.expiresAtUtc == null
+          ? _itEn(
+              'Buono regalo da ${formatMoney(draft.valueCents)} aggiunto al carrello senza scadenza.',
+              'Gift card for ${formatMoney(draft.valueCents)} added to the cart with no expiration.',
+            )
+          : _itEn(
+              'Buono regalo da ${formatMoney(draft.valueCents)} aggiunto al carrello. Scadenza: ${_dateText(draft.expiresAtUtc!)}.',
+              'Gift card for ${formatMoney(draft.valueCents)} added to the cart. Expires: ${_dateText(draft.expiresAtUtc!)}.',
+            );
+    });
+  }
+
   Future<void> _pickGiftCard() async {
     final customer = _customer;
     if (customer == null) {
@@ -201,8 +243,8 @@ class _CashPageState extends State<CashPage> {
         widget.services.customers.availableGiftCardsForCustomer(customer.id);
     if (cards.isEmpty) {
       return _cartMessage(_itEn(
-        'Il cliente non ha buoni regalo con credito residuo.',
-        'The customer has no gift cards with remaining credit.',
+        'Il cliente non ha buoni regalo validi con credito residuo.',
+        'The customer has no valid gift cards with remaining credit.',
       ));
     }
 
@@ -211,13 +253,14 @@ class _CashPageState extends State<CashPage> {
       builder: (dialogContext) => AlertDialog(
         title: Text(_itEn('Seleziona buono regalo', 'Select gift card')),
         content: SizedBox(
-          width: 520,
-          height: (cards.length * 76.0).clamp(150.0, 430.0).toDouble(),
+          width: 560,
+          height: (cards.length * 88.0).clamp(170.0, 440.0).toDouble(),
           child: ListView.separated(
             itemCount: cards.length,
             separatorBuilder: (_, _) => const Divider(height: 1),
             itemBuilder: (context, index) {
               final card = cards[index];
+              final expiration = card.expirationDateDisplay;
               return ListTile(
                 leading: const Icon(Icons.card_giftcard_outlined),
                 title: Text(
@@ -226,7 +269,9 @@ class _CashPageState extends State<CashPage> {
                 ),
                 subtitle: Text(
                   '${_itEn('Valore totale', 'Total value')}: ${card.totalDisplay} · '
-                  '${_itEn('Speso', 'Spent')}: ${card.spentDisplay}',
+                  '${_itEn('Speso', 'Spent')}: ${card.spentDisplay}\n'
+                  '${_itEn('Acquistato', 'Purchased')}: ${card.purchasedDateDisplay} · '
+                  '${expiration == null ? _itEn('Nessuna scadenza', 'No expiration') : '${_itEn('Scadenza', 'Expires')}: $expiration'}',
                 ),
                 trailing: Text(
                   '${_itEn('Residuo', 'Remaining')}\n${card.remainingDisplay}',
@@ -257,13 +302,22 @@ class _CashPageState extends State<CashPage> {
   }
 
   void _removeCustomer() {
+    final pendingGiftCards =
+        _cart.where((line) => line.isGiftCardPurchase).length;
     setState(() {
       _customer = null;
       _giftCard = null;
-      _cartStatus = _itEn(
-        'Cliente rimosso dal carrello. L’eventuale buono regalo è stato rimosso.',
-        'Customer removed from the cart. Any selected gift card was removed too.',
-      );
+      _cart.removeWhere((line) => line.isGiftCardPurchase);
+      _normalizeDiscounts();
+      _cartStatus = pendingGiftCards > 0
+          ? _itEn(
+              'Cliente rimosso. Sono stati rimossi anche $pendingGiftCards buoni regalo in acquisto e l’eventuale buono usato come pagamento.',
+              'Customer removed. $pendingGiftCards gift-card purchases and any gift card used as payment were removed too.',
+            )
+          : _itEn(
+              'Cliente rimosso dal carrello. L’eventuale buono regalo è stato rimosso.',
+              'Customer removed from the cart. Any selected gift card was removed too.',
+            );
     });
   }
 
@@ -308,7 +362,9 @@ class _CashPageState extends State<CashPage> {
     }
 
     final index = _cart.indexWhere(
-      (line) => !line.isGeneric && line.variantId == latest.id,
+      (line) => !line.isGeneric &&
+          !line.isGiftCardPurchase &&
+          line.variantId == latest.id,
     );
     final current = index < 0 ? null : _cart[index];
     final quantity = current?.quantity ?? 0;
@@ -341,6 +397,13 @@ class _CashPageState extends State<CashPage> {
   void _message(String value) => setState(() => _searchStatus = value);
 
   void _changeQuantity(_CashLine line, int delta) {
+    if (line.isGiftCardPurchase) {
+      return _cartMessage(_itEn(
+        'Ogni buono regalo è una riga singola. Aggiungi un altro buono per crearne più di uno.',
+        'Each gift card is a single cart line. Add another gift card to create more than one.',
+      ));
+    }
+
     final index = _cart.indexWhere((item) => item.key == line.key);
     if (index < 0) return;
     final next = line.quantity + delta;
@@ -396,6 +459,12 @@ class _CashPageState extends State<CashPage> {
   void _cartMessage(String value) => setState(() => _cartStatus = value);
 
   void _setLineDiscount(_CashLine line, String value) {
+    if (line.isGiftCardPurchase) {
+      return _cartMessage(_itEn(
+        'Il prezzo di un buono regalo deve coincidere con il suo valore e non può essere scontato.',
+        'A gift card price must match its value and cannot be discounted.',
+      ));
+    }
     final percent =
         _clampPercent(double.tryParse(value.replaceAll(',', '.')) ?? 0);
     final index = _cart.indexWhere((item) => item.key == line.key);
@@ -413,10 +482,10 @@ class _CashPageState extends State<CashPage> {
   }
 
   void _addPercentDiscount() {
-    if (_cart.isEmpty) {
+    if (!_hasDiscountableItems) {
       return _cartMessage(_itEn(
-        'Aggiungi almeno un articolo prima di inserire uno sconto percentuale.',
-        'Add at least one item before entering a percentage discount.',
+        'Aggiungi almeno un articolo scontabile prima di inserire uno sconto percentuale.',
+        'Add at least one discountable item before entering a percentage discount.',
       ));
     }
     final parsed =
@@ -429,15 +498,16 @@ class _CashPageState extends State<CashPage> {
       ));
     }
 
-    final requestedCents = (_subtotalCents * percent / 100).round();
+    final requestedCents =
+        (_discountableSubtotalCents * percent / 100).round();
     final alreadyDiscounted =
         _fixedDiscounts.fold<int>(0, (sum, line) => sum + line.amountCents);
-    final rawRemaining = _subtotalCents - alreadyDiscounted;
+    final rawRemaining = _discountableSubtotalCents - alreadyDiscounted;
     final remaining = rawRemaining < 0 ? 0 : rawRemaining;
     if (remaining <= 0) {
       return _cartMessage(_itEn(
-        'Il totale è già interamente coperto dagli sconti inseriti.',
-        'The total is already fully covered by the entered discounts.',
+        'Il totale scontabile è già interamente coperto dagli sconti inseriti.',
+        'The discountable total is already fully covered by the entered discounts.',
       ));
     }
 
@@ -464,10 +534,10 @@ class _CashPageState extends State<CashPage> {
   }
 
   void _addFixedDiscount() {
-    if (_cart.isEmpty) {
+    if (!_hasDiscountableItems) {
       return _cartMessage(_itEn(
-        'Aggiungi almeno un articolo prima di inserire uno sconto in valuta.',
-        'Add at least one item before entering a fixed discount.',
+        'Aggiungi almeno un articolo scontabile prima di inserire uno sconto in valuta.',
+        'Add at least one discountable item before entering a fixed discount.',
       ));
     }
     final parsed =
@@ -479,13 +549,13 @@ class _CashPageState extends State<CashPage> {
         'Enter a discount greater than 0 and press Enter.',
       ));
     }
-    final rawRemaining = _afterPercentCents -
+    final rawRemaining = _afterPercentDiscountableCents -
         _fixedDiscounts.fold<int>(0, (sum, line) => sum + line.amountCents);
     final remaining = rawRemaining < 0 ? 0 : rawRemaining;
     if (cents > remaining) {
       return _cartMessage(_itEn(
-        'Lo sconto supera il totale residuo di ${formatMoney(remaining)}.',
-        'The discount exceeds the remaining total of ${formatMoney(remaining)}.',
+        'Lo sconto supera il totale scontabile residuo di ${formatMoney(remaining)}.',
+        'The discount exceeds the remaining discountable total of ${formatMoney(remaining)}.',
       ));
     }
     _fixedDiscounts.add(
@@ -536,39 +606,51 @@ class _CashPageState extends State<CashPage> {
   }
 
   void _normalizeDiscounts() {
-    if (_cart.isEmpty) {
+    if (!_hasDiscountableItems) {
       _fixedDiscounts.clear();
       _totalPercent.clear();
       _fixedDiscount.clear();
     }
   }
 
+  bool get _hasDiscountableItems =>
+      _cart.any((line) => !line.isGiftCardPurchase);
   double get _totalDiscountPercent => _clampPercent(
         double.tryParse(_totalPercent.text.replaceAll(',', '.')) ?? 0,
       );
-  int get _grossCents =>
-      _cart.fold(0, (sum, line) => sum + line.grossLineTotalCents);
-  int get _subtotalCents =>
-      _cart.fold(0, (sum, line) => sum + line.lineTotalCents);
-  int get _afterPercentCents =>
-      _applyPercent(_subtotalCents, _totalDiscountPercent);
+  int get _giftCardPurchaseCents => _cart
+      .where((line) => line.isGiftCardPurchase)
+      .fold(0, (sum, line) => sum + line.grossLineTotalCents);
+  int get _discountableGrossCents => _cart
+      .where((line) => !line.isGiftCardPurchase)
+      .fold(0, (sum, line) => sum + line.grossLineTotalCents);
+  int get _grossCents => _discountableGrossCents + _giftCardPurchaseCents;
+  int get _discountableSubtotalCents => _cart
+      .where((line) => !line.isGiftCardPurchase)
+      .fold(0, (sum, line) => sum + line.lineTotalCents);
+  int get _afterPercentDiscountableCents =>
+      _applyPercent(_discountableSubtotalCents, _totalDiscountPercent);
   int get _fixedCents {
     final requested =
         _fixedDiscounts.fold<int>(0, (sum, line) => sum + line.amountCents);
-    return requested > _afterPercentCents ? _afterPercentCents : requested;
+    return requested > _afterPercentDiscountableCents
+        ? _afterPercentDiscountableCents
+        : requested;
   }
 
-  int get _finalTotalCents {
-    final total = _afterPercentCents - _fixedCents;
+  int get _discountableFinalCents {
+    final total = _afterPercentDiscountableCents - _fixedCents;
     return total < 0 ? 0 : total;
   }
 
+  int get _finalTotalCents => _discountableFinalCents + _giftCardPurchaseCents;
+
   int get _giftCardAppliedCents {
     final card = _giftCard;
-    if (card == null || _finalTotalCents <= 0) return 0;
-    return card.remainingValueCents < _finalTotalCents
+    if (card == null || _discountableFinalCents <= 0) return 0;
+    return card.remainingValueCents < _discountableFinalCents
         ? card.remainingValueCents
-        : _finalTotalCents;
+        : _discountableFinalCents;
   }
 
   int get _amountDueCents {
@@ -583,12 +665,6 @@ class _CashPageState extends State<CashPage> {
     return value < 0 ? 0 : value;
   }
 
-  int _vatIncludedCents(int totalCents, double percent) {
-    final rate = percent.clamp(0, 100).toDouble();
-    if (totalCents <= 0 || rate <= 0) return 0;
-    return (totalCents * rate / (100 + rate)).round();
-  }
-
   int _applyPercent(int cents, double percent) =>
       (cents * (1 - _clampPercent(percent) / 100)).round();
   double _clampPercent(double value) => value.clamp(0, 100).toDouble();
@@ -598,15 +674,27 @@ class _CashPageState extends State<CashPage> {
 
   void _registerSale() {
     if (_cart.isEmpty) return;
-    final itemDiscountRaw = _grossCents - _subtotalCents;
+    final pendingGiftCards =
+        _cart.where((line) => line.isGiftCardPurchase).toList(growable: false);
+    final customer = _customer;
+    if (pendingGiftCards.isNotEmpty && customer == null) {
+      return _cartMessage(_itEn(
+        'Associa un cliente prima di registrare l’acquisto del buono regalo.',
+        'Link a customer before registering the gift-card purchase.',
+      ));
+    }
+
+    final itemDiscountRaw =
+        _discountableGrossCents - _discountableSubtotalCents;
     final itemDiscount = itemDiscountRaw < 0 ? 0 : itemDiscountRaw;
-    final totalPercentDiscountRaw = _subtotalCents - _afterPercentCents;
+    final totalPercentDiscountRaw =
+        _discountableSubtotalCents - _afterPercentDiscountableCents;
     final totalPercentDiscount =
         totalPercentDiscountRaw < 0 ? 0 : totalPercentDiscountRaw;
     final giftApplied = _giftCardAppliedCents;
 
     final draft = SalesOrderDraft(
-      customerId: _customer?.id,
+      customerId: customer?.id,
       giftCardId: giftApplied > 0 ? _giftCard?.id : null,
       giftCardAppliedCents: giftApplied,
       lines: _cart
@@ -631,27 +719,63 @@ class _CashPageState extends State<CashPage> {
       finalTotalCents: _finalTotalCents,
     );
 
+    SalesOrderSummary? order;
+    final createdGiftCards = <GiftCard>[];
     try {
-      final order = widget.services.customers.recordSale(draft);
+      final registeredOrder = widget.services.customers.recordSale(draft);
+      order = registeredOrder;
+      if (pendingGiftCards.isNotEmpty) {
+        for (final line in pendingGiftCards) {
+          createdGiftCards.add(
+            widget.services.customers.createGiftCard(
+              customer!.id,
+              line.unitPriceCents,
+              expiresAtUtc: line.giftCardExpiresAtUtc,
+            ),
+          );
+        }
+      }
+
       final usedGift = giftApplied > 0;
-      final giftCode = _giftCard?.code;
+      final usedGiftCode = _giftCard?.code;
+      final createdCodes = createdGiftCards.map((card) => card.code).join(', ');
       _clear(keepStatus: true);
       setState(() {
-        _cartStatus = usedGift
-            ? _itEn(
-                'Vendita ${order.orderNumber} registrata. Usati ${formatMoney(giftApplied)} dal buono $giftCode.',
-                'Sale ${order.orderNumber} registered. ${formatMoney(giftApplied)} used from gift card $giftCode.',
-              )
-            : _itEn(
-                'Vendita ${order.orderNumber} registrata. Magazzino aggiornato dove previsto.',
-                'Sale ${order.orderNumber} registered. Stock updated where applicable.',
-              );
+        final details = <String>[];
+        if (createdGiftCards.isNotEmpty) {
+          details.add(_itEn(
+            'Buoni creati: $createdCodes.',
+            'Gift cards created: $createdCodes.',
+          ));
+        }
+        if (usedGift) {
+          details.add(_itEn(
+            'Usati ${formatMoney(giftApplied)} dal buono $usedGiftCode.',
+            '${formatMoney(giftApplied)} used from gift card $usedGiftCode.',
+          ));
+        }
+        _cartStatus = _itEn(
+              'Vendita ${registeredOrder.orderNumber} registrata. Magazzino aggiornato dove previsto.',
+              'Sale ${registeredOrder.orderNumber} registered. Stock updated where applicable.',
+            ) +
+            (details.isEmpty ? '' : ' ${details.join(' ')}');
         _searchStatus = _itEn(
           'Vendita completata. Scanner pronto per il prossimo cliente o prodotto.',
           'Sale completed. Scanner ready for the next customer or product.',
         );
       });
     } catch (error) {
+      for (final card in createdGiftCards.reversed) {
+        try {
+          widget.services.customers.deleteGiftCard(card.id);
+        } catch (_) {}
+      }
+      if (order != null) {
+        try {
+          widget.services.customers.cancelOrder(order.id);
+          widget.services.customers.deleteOrder(order.id);
+        } catch (_) {}
+      }
       setState(() => _cartStatus = _itEn(
             'Impossibile registrare la vendita: $error',
             'Unable to register the sale: $error',
@@ -662,14 +786,16 @@ class _CashPageState extends State<CashPage> {
   @override
   Widget build(BuildContext context) {
     final results = _results;
-    final itemDiscountRaw = _grossCents - _subtotalCents;
+    final itemDiscountRaw =
+        _discountableGrossCents - _discountableSubtotalCents;
     final itemDiscount = itemDiscountRaw < 0 ? 0 : itemDiscountRaw;
-    final totalPercentDiscountRaw = _subtotalCents - _afterPercentCents;
+    final totalPercentDiscountRaw =
+        _discountableSubtotalCents - _afterPercentDiscountableCents;
     final totalPercentDiscount =
         totalPercentDiscountRaw < 0 ? 0 : totalPercentDiscountRaw;
     final count = _cart.fold<int>(0, (sum, line) => sum + line.quantity);
     final vatPercent = widget.services.settings.load().vatPercent;
-    final vatCents = _vatIncludedCents(_finalTotalCents, vatPercent);
+    final vatCents = calculateVatCents(_finalTotalCents, vatPercent);
     final availableGiftCards = _customer == null
         ? const <GiftCard>[]
         : widget.services.customers.availableGiftCardsForCustomer(_customer!.id);
@@ -818,12 +944,18 @@ class _CashPageState extends State<CashPage> {
                               child: Text(
                                 _giftCard == null
                                     ? _itEn(
-                                        '${availableGiftCards.length} buoni con credito residuo',
-                                        '${availableGiftCards.length} gift cards with remaining credit',
+                                        '${availableGiftCards.length} buoni validi con credito residuo',
+                                        '${availableGiftCards.length} valid gift cards with remaining credit',
                                       )
                                     : '${_giftCard!.code} · ${_itEn('residuo', 'remaining')} ${_giftCard!.remainingDisplay}',
                               ),
                             ),
+                            OutlinedButton.icon(
+                              onPressed: _addGiftCardPurchase,
+                              icon: const Icon(Icons.add_card_outlined),
+                              label: Text(_itEn('Nuovo buono', 'New gift card')),
+                            ),
+                            const SizedBox(width: 6),
                             OutlinedButton.icon(
                               onPressed: availableGiftCards.isEmpty
                                   ? null
@@ -832,7 +964,7 @@ class _CashPageState extends State<CashPage> {
                               label: Text(
                                 _giftCard == null
                                     ? _itEn('Usa buono', 'Use gift card')
-                                    : _itEn('Cambia buono', 'Change gift card'),
+                                    : _itEn('Cambia', 'Change'),
                               ),
                             ),
                           ]),
@@ -913,7 +1045,7 @@ class _CashPageState extends State<CashPage> {
                             Expanded(
                               child: TextField(
                                 controller: _totalPercent,
-                                enabled: _cart.isNotEmpty,
+                                enabled: _hasDiscountableItems,
                                 keyboardType:
                                     const TextInputType.numberWithOptions(
                                   decimal: true,
@@ -931,7 +1063,7 @@ class _CashPageState extends State<CashPage> {
                             Expanded(
                               child: TextField(
                                 controller: _fixedDiscount,
-                                enabled: _cart.isNotEmpty,
+                                enabled: _hasDiscountableItems,
                                 keyboardType:
                                     const TextInputType.numberWithOptions(
                                   decimal: true,
@@ -958,6 +1090,10 @@ class _CashPageState extends State<CashPage> {
                           if (_fixedCents > 0)
                             Text(
                               '${AppStrings.t('fixed_discounts')}: −${formatMoney(_fixedCents)}',
+                            ),
+                          if (_giftCardPurchaseCents > 0)
+                            Text(
+                              '${_itEn('Buoni regalo in acquisto', 'Gift cards being purchased')}: ${formatMoney(_giftCardPurchaseCents)}',
                             ),
                           if (_giftCard != null) ...[
                             const SizedBox(height: 4),
@@ -992,10 +1128,7 @@ class _CashPageState extends State<CashPage> {
                           Row(children: [
                             Expanded(
                               child: Text(
-                                _itEn(
-                                  'VAT inclusa (${_percentText(vatPercent)}%)',
-                                  'VAT included (${_percentText(vatPercent)}%)',
-                                ),
+                                '${AppStrings.t('vat_included')} (${_percentText(vatPercent)}%)',
                                 style: Theme.of(context).textTheme.bodyMedium,
                               ),
                             ),
@@ -1032,7 +1165,7 @@ class _CashPageState extends State<CashPage> {
                             _cartStatus,
                             style: Theme.of(context).textTheme.bodySmall,
                           ),
-                          const SizedBox(height: 8),
+                          const SizedBox(height: 16),
                           SizedBox(
                             height: 108,
                             child: Row(
@@ -1322,20 +1455,22 @@ class _CartTile extends StatelessWidget {
                   style: Theme.of(context).textTheme.titleSmall,
                 ),
                 Text(
-                  line.isGeneric
-                      ? '${AppStrings.isEnglish ? 'Generic item' : 'Articolo generico'} · ${formatMoney(line.unitPriceCents)} ${AppStrings.t('each')}'
-                      : '${line.variantDisplay} · ${line.sku} · ${formatMoney(line.unitPriceCents)} ${AppStrings.t('each')}',
+                  line.isGiftCardPurchase
+                      ? '${AppStrings.pair('Valore buono', 'Gift card value')} · ${formatMoney(line.unitPriceCents)} · ${line.variantDisplay}'
+                      : line.isGeneric
+                          ? '${AppStrings.isEnglish ? 'Generic item' : 'Articolo generico'} · ${formatMoney(line.unitPriceCents)} ${AppStrings.t('each')}'
+                          : '${line.variantDisplay} · ${line.sku} · ${formatMoney(line.unitPriceCents)} ${AppStrings.t('each')}',
                 ),
               ],
             ),
           ),
           IconButton(
-            onPressed: onDecrease,
+            onPressed: line.isGiftCardPurchase ? null : onDecrease,
             icon: const Icon(Icons.remove_circle_outline),
           ),
           Text('${line.quantity}'),
           IconButton(
-            onPressed: onIncrease,
+            onPressed: line.isGiftCardPurchase ? null : onIncrease,
             icon: const Icon(Icons.add_circle_outline),
           ),
           SizedBox(
@@ -1345,6 +1480,7 @@ class _CartTile extends StatelessWidget {
               initialValue: line.discountPercent == 0
                   ? ''
                   : line.discountPercent.toString().replaceAll('.', ','),
+              enabled: !line.isGiftCardPurchase,
               keyboardType:
                   const TextInputType.numberWithOptions(decimal: true),
               onFieldSubmitted: onDiscount,
@@ -1381,7 +1517,9 @@ class _CashLine {
   })  : product = product,
         genericId = null,
         genericName = null,
-        genericUnitPriceCents = null;
+        genericUnitPriceCents = null,
+        giftCardLineId = null,
+        giftCardExpiresAtUtc = null;
 
   const _CashLine.generic({
     required int genericId,
@@ -1392,26 +1530,64 @@ class _CashLine {
   })  : product = null,
         genericId = genericId,
         genericName = genericName,
-        genericUnitPriceCents = unitPriceCents;
+        genericUnitPriceCents = unitPriceCents,
+        giftCardLineId = null,
+        giftCardExpiresAtUtc = null;
+
+  const _CashLine.giftCard({
+    required int giftCardLineId,
+    required int unitPriceCents,
+    DateTime? expiresAtUtc,
+  })  : product = null,
+        genericId = null,
+        genericName = 'Buono regalo',
+        genericUnitPriceCents = unitPriceCents,
+        giftCardLineId = giftCardLineId,
+        giftCardExpiresAtUtc = expiresAtUtc,
+        quantity = 1,
+        discountPercent = 0;
 
   final ProductVariant? product;
   final int? genericId;
   final String? genericName;
   final int? genericUnitPriceCents;
+  final int? giftCardLineId;
+  final DateTime? giftCardExpiresAtUtc;
   final int quantity;
   final double discountPercent;
 
-  bool get isGeneric => product == null;
-  String get key => isGeneric ? 'generic-$genericId' : 'variant-${product!.id}';
+  bool get isGiftCardPurchase => giftCardLineId != null;
+  bool get isGeneric => product == null && !isGiftCardPurchase;
+  String get key => isGiftCardPurchase
+      ? 'gift-card-$giftCardLineId'
+      : isGeneric
+          ? 'generic-$genericId'
+          : 'variant-${product!.id}';
   int? get variantId => product?.id;
-  String get sku => product?.sku ?? 'GENERIC';
+  String get sku => isGiftCardPurchase ? 'GIFT-CARD' : product?.sku ?? 'GENERIC';
   String? get barcode => product?.barcode;
-  String get productName => product?.name ?? genericName ?? 'Articolo generico';
-  String get variantDisplay => product?.variantDisplay ?? '';
+  String get productName => isGiftCardPurchase
+      ? AppStrings.pair('Buono regalo', 'Gift card')
+      : product?.name ?? genericName ?? 'Articolo generico';
+  String get variantDisplay {
+    if (isGiftCardPurchase) {
+      final expiration = giftCardExpiresAtUtc;
+      if (expiration == null) {
+        return AppStrings.pair('Nessuna scadenza', 'No expiration');
+      }
+      final local = expiration.toLocal();
+      final date =
+          '${local.day.toString().padLeft(2, '0')}/${local.month.toString().padLeft(2, '0')}/${local.year}';
+      return AppStrings.pair('Scadenza $date', 'Expires $date');
+    }
+    return product?.variantDisplay ?? '';
+  }
+
   int get unitPriceCents => product?.salePriceCents ?? genericUnitPriceCents ?? 0;
   int get grossLineTotalCents => unitPriceCents * quantity;
-  int get lineTotalCents =>
-      (grossLineTotalCents * (1 - discountPercent.clamp(0, 100) / 100))
+  int get lineTotalCents => isGiftCardPurchase
+      ? grossLineTotalCents
+      : (grossLineTotalCents * (1 - discountPercent.clamp(0, 100) / 100))
           .round();
 
   _CashLine copyWith({
@@ -1419,6 +1595,13 @@ class _CashLine {
     int? quantity,
     double? discountPercent,
   }) {
+    if (isGiftCardPurchase) {
+      return _CashLine.giftCard(
+        giftCardLineId: giftCardLineId!,
+        unitPriceCents: genericUnitPriceCents!,
+        expiresAtUtc: giftCardExpiresAtUtc,
+      );
+    }
     if (isGeneric) {
       return _CashLine.generic(
         genericId: genericId!,

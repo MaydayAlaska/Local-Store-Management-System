@@ -7,3 +7,4 @@ Icon=local-store-management
 Terminal=false
 Categories=Office;
 StartupNotify=true
+StartupWMClass=local_store_management
