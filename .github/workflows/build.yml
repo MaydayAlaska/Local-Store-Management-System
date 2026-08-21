@@ -89,16 +89,8 @@ jobs:
       - name: Prepare Windows application icon
         shell: pwsh
         run: |
-          $png = [Convert]::FromBase64String((Get-Content -Raw "${{ env.ICON_BASE64 }}").Trim())
-          $iconPath = "windows/runner/resources/app_icon.ico"
-          $stream = [IO.File]::Open($iconPath, [IO.FileMode]::Create, [IO.FileAccess]::Write)
-          try {
-            $writer = [IO.BinaryWriter]::new($stream)
-            $writer.Write([UInt16]0); $writer.Write([UInt16]1); $writer.Write([UInt16]1)
-            $writer.Write([Byte]64); $writer.Write([Byte]64); $writer.Write([Byte]0); $writer.Write([Byte]0)
-            $writer.Write([UInt16]1); $writer.Write([UInt16]32)
-            $writer.Write([UInt32]$png.Length); $writer.Write([UInt32]22); $writer.Write($png); $writer.Flush()
-          } finally { $stream.Dispose() }
+          flutter pub get
+          dart run tool/generate_windows_icon.dart "${{ env.ICON_BASE64 }}" "windows/runner/resources/app_icon.ico"
 
       - name: Resolve packages
         run: flutter pub get
@@ -183,16 +175,8 @@ jobs:
       - name: Prepare Windows application icon
         shell: pwsh
         run: |
-          $png = [Convert]::FromBase64String((Get-Content -Raw "${{ env.ICON_BASE64 }}").Trim())
-          $iconPath = "windows/runner/resources/app_icon.ico"
-          $stream = [IO.File]::Open($iconPath, [IO.FileMode]::Create, [IO.FileAccess]::Write)
-          try {
-            $writer = [IO.BinaryWriter]::new($stream)
-            $writer.Write([UInt16]0); $writer.Write([UInt16]1); $writer.Write([UInt16]1)
-            $writer.Write([Byte]64); $writer.Write([Byte]64); $writer.Write([Byte]0); $writer.Write([Byte]0)
-            $writer.Write([UInt16]1); $writer.Write([UInt16]32)
-            $writer.Write([UInt32]$png.Length); $writer.Write([UInt32]22); $writer.Write($png); $writer.Flush()
-          } finally { $stream.Dispose() }
+          flutter pub get
+          dart run tool/generate_windows_icon.dart "${{ env.ICON_BASE64 }}" "windows/runner/resources/app_icon.ico"
 
       - name: Resolve packages
         run: flutter pub get
