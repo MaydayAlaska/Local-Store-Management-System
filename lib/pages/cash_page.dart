@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../core/app_runtime.dart';
 import '../core/formatters.dart';
+import '../core/vat_calculator.dart';
 import '../l10n/app_strings.dart';
 import '../models/catalog.dart';
 import '../models/customer.dart';
@@ -664,12 +665,6 @@ class _CashPageState extends State<CashPage> {
     return value < 0 ? 0 : value;
   }
 
-  int _vatIncludedCents(int totalCents, double percent) {
-    final rate = percent.clamp(0, 100).toDouble();
-    if (totalCents <= 0 || rate <= 0) return 0;
-    return (totalCents * rate / (100 + rate)).round();
-  }
-
   int _applyPercent(int cents, double percent) =>
       (cents * (1 - _clampPercent(percent) / 100)).round();
   double _clampPercent(double value) => value.clamp(0, 100).toDouble();
@@ -800,7 +795,7 @@ class _CashPageState extends State<CashPage> {
         totalPercentDiscountRaw < 0 ? 0 : totalPercentDiscountRaw;
     final count = _cart.fold<int>(0, (sum, line) => sum + line.quantity);
     final vatPercent = widget.services.settings.load().vatPercent;
-    final vatCents = _vatIncludedCents(_discountableFinalCents, vatPercent);
+    final vatCents = calculateVatCents(_finalTotalCents, vatPercent);
     final availableGiftCards = _customer == null
         ? const <GiftCard>[]
         : widget.services.customers.availableGiftCardsForCustomer(_customer!.id);
@@ -1133,10 +1128,7 @@ class _CashPageState extends State<CashPage> {
                           Row(children: [
                             Expanded(
                               child: Text(
-                                _itEn(
-                                  'VAT inclusa (${_percentText(vatPercent)}%)',
-                                  'VAT included (${_percentText(vatPercent)}%)',
-                                ),
+                                '${AppStrings.t('vat_included')} (${_percentText(vatPercent)}%)',
                                 style: Theme.of(context).textTheme.bodyMedium,
                               ),
                             ),
