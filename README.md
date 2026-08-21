@@ -2,7 +2,7 @@
 
 Gestionale desktop **offline** per negozi, sviluppato in **Flutter/Dart** con database locale **SQLite**.
 
-Il branch `Flutter` è il canale **BETA/TEST** del progetto. La versione BETA corrente è **0.1.8-b1** e viene pubblicata come prerelease `beta-latest`.
+Il branch `Flutter` è il canale **BETA/TEST** del progetto. La versione BETA corrente è **0.1.9-b1** e viene pubblicata come prerelease `beta-latest`.
 
 La versione stabile corrente su `main` è **0.1.7**. I canali OTA STABLE e BETA sono separati: una build stabile riceve solo release stabili e una build Beta riceve solo prerelease Beta.
 
@@ -18,6 +18,21 @@ Le build BETA vengono pubblicate per:
 | macOS | Apple Silicon ARM64 | `.dmg` con `.app` |
 | Linux | x86_64 | `.AppImage`, `.deb` |
 | Linux | ARM64 | `.AppImage`, `.deb` |
+
+## Novità 0.1.9-b1
+
+### Immagini per variante e nuova griglia in Cassa
+
+Ogni variante di articolo può ora avere una **propria immagine**. L'immagine viene gestita direttamente nell'editor del prodotto, viene ridimensionata automaticamente quando necessario e viene salvata nel database insieme ai dati della variante.
+
+Nella schermata **Cassa** l'elenco prodotti può essere visualizzato in due modalità:
+
+- **elenco**, che mantiene la visualizzazione compatta già esistente;
+- **anteprima a griglia**, con immagine della variante, nome prodotto, variante, SKU, prezzo e giacenza.
+
+A destra della barra di ricerca è presente un selettore a due posizioni con le icone **elenco** e **griglia**, così da passare immediatamente da una modalità all'altra senza interrompere la scansione o la ricerca.
+
+Lo schema SQLite passa a `PRAGMA user_version = 4` e aggiunge la tabella `variant_images`, collegata alle singole varianti.
 
 ## Novità 0.1.8-b1
 
@@ -42,9 +57,9 @@ La CI controlla esplicitamente che desktop ID, AppStream e application ID del ru
 
 ## Funzioni principali
 
-- catalogo prodotti e varianti con SKU, barcode multipli, prezzi e giacenze;
+- catalogo prodotti e varianti con SKU, barcode multipli, prezzi, giacenze e immagine opzionale per variante;
 - magazzino con movimenti di carico/scarico;
-- cassa con scanner HID, ricerca prodotti, tastierino numerico, sconti, articoli generici e cliente associato;
+- cassa con scanner HID, ricerca prodotti, visualizzazione elenco/griglia con anteprime, tastierino numerico, sconti, articoli generici e cliente associato;
 - clienti con codice identificativo interno, codice fiscale facoltativo e storico acquisti;
 - gestione ordini e vendite, annullamento con ripristino della merce ed eliminazione dello storico;
 - buoni regalo associati ai clienti, con utilizzo parziale o totale, valore residuo e scadenza facoltativa;
@@ -132,7 +147,7 @@ I dati restano localmente in:
 Documenti/Local Store Management System/
 ```
 
-Lo schema SQLite corrente usa `PRAGMA user_version = 3`. Le migrazioni vengono applicate automaticamente per mantenere compatibili anche i database creati dalle versioni precedenti.
+Lo schema SQLite corrente usa `PRAGMA user_version = 4`. Le migrazioni vengono applicate automaticamente per mantenere compatibili anche i database creati dalle versioni precedenti.
 
 Il dataset dei codici luogo utilizzato per il codice fiscale viene verificato dalla CI rispetto alla fonte aggiornata prima della compilazione delle release.
 
