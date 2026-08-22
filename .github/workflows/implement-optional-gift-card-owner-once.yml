@@ -5,6 +5,7 @@ on:
     branches: [Flutter]
     paths:
       - '.github/implement_optional_gift_card_owner.py'
+      - '.github/run_gift_card_cash_flow_fix.py'
       - '.github/workflows/implement-optional-gift-card-owner-once.yml'
 
 permissions:
@@ -38,7 +39,7 @@ jobs:
           fi
 
       - name: Apply implementation
-        run: python3 .github/implement_optional_gift_card_owner.py
+        run: python3 .github/run_gift_card_cash_flow_fix.py
 
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
