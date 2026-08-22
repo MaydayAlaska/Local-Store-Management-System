@@ -5,758 +5,227 @@ import re
 def replace_once(path: str, old: str, new: str) -> None:
     p = Path(path)
     text = p.read_text()
-    if old not in text:
-        raise SystemExit(f"{path}: exact fragment not found: {old[:120]!r}")
+    count = text.count(old)
+    if count != 1:
+        raise SystemExit(f'{path}: expected 1 exact match, found {count}: {old[:100]!r}')
     p.write_text(text.replace(old, new, 1))
 
 
 def regex_once(path: str, pattern: str, replacement: str) -> None:
     p = Path(path)
     text = p.read_text()
-    new_text, count = re.subn(pattern, replacement, text, count=1, flags=re.S)
+    new_text, count = re.subn(pattern, replacement, text, count=1, flags=re.S | re.M)
     if count != 1:
-        raise SystemExit(f"{path}: regex match count {count}: {pattern[:120]!r}")
+        raise SystemExit(f'{path}: expected 1 regex match, found {count}: {pattern}')
     p.write_text(new_text)
 
 
-# Model: a gift card may have no associated customer.
-replace_once(
-    "lib/models/customer.dart",
-    "  final int customerId;\n  final int totalValueCents;",
-    "  final int? customerId;\n  final int totalValueCents;",
-)
-
-# Repository schema: nullable owner, ON DELETE SET NULL.
-repo_path = Path("lib/repositories/customer_repository.dart")
-repo_text = repo_path.read_text()
-repo_text = repo_text.replace("customer_id INTEGER NOT NULL,", "customer_id INTEGER,")
-repo_text = repo_text.replace(
-    "FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE CASCADE",
-    "FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE SET NULL",
-)
-repo_path.write_text(repo_text)
-
+# Customers: creating a gift card from the customer tab must support an optional expiration.
 regex_once(
-    "lib/repositories/customer_repository.dart",
-    r"  void _migrateGiftCardSchemaIfNeeded\(\) \{.*?\n  \}\n\n  void _backfillCustomerSnapshots\(\)",
-    """  void _migrateGiftCardSchemaIfNeeded() {
-    final columns = database.db.select('PRAGMA table_info(gift_cards);');
-    final customerColumn = columns.firstWhere(
-      (row) => (row['name'] as String).toLowerCase() == 'customer_id',
-    );
-    final hasDeletedAt = columns.any(
-      (row) => (row['name'] as String).toLowerCase() == 'deleted_at_utc',
-    );
-    final customerIsRequired = (customerColumn['notnull'] as int) != 0;
-    final foreignKeys = database.db.select('PRAGMA foreign_key_list(gift_cards);');
-    final customerForeignKey = foreignKeys.where(
-      (row) => (row['from'] as String).toLowerCase() == 'customer_id',
-    );
-    final customerDeleteActionIsWrong = customerForeignKey.isEmpty ||
-        ((customerForeignKey.first['on_delete'] as String?) ?? '').toUpperCase() !=
-            'SET NULL';
-    if (!hasDeletedAt && !customerIsRequired && !customerDeleteActionIsWrong) {
-      return;
+    'lib/pages/customers_page.dart',
+    r"  Future<void> _createGiftCard\(\) async \{.*?\n  \}\n\n  Future<void> _deleteGiftCard",
+    """  Future<void> _createGiftCard() async {
+    final valueController = TextEditingController();
+    DateTime? expirationDate;
+    String? error;
+
+    String dateText(DateTime value) =>
+        '${value.day.toString().padLeft(2, '0')}/${value.month.toString().padLeft(2, '0')}/${value.year}';
+    int valueCents() {
+      final parsed = double.tryParse(
+        valueController.text.trim().replaceAll(',', '.'),
+      );
+      return parsed == null ? 0 : (parsed * 100).round();
     }
 
-    final db = database.db;
-    if (hasDeletedAt) {
-      db.execute('DELETE FROM gift_cards WHERE deleted_at_utc IS NOT NULL;');
-    }
-    db.execute('DROP INDEX IF EXISTS ix_gift_cards_cleanup;');
+    final draft = await showDialog<_CustomerGiftCardDraft>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialogState) {
+          Future<void> pickExpiration() async {
+            final now = DateTime.now();
+            final selected = await showDatePicker(
+              context: dialogContext,
+              initialDate: expirationDate ?? now.add(const Duration(days: 365)),
+              firstDate: DateTime(now.year, now.month, now.day),
+              lastDate: DateTime(now.year + 20, 12, 31),
+            );
+            if (selected == null) return;
+            setDialogState(() => expirationDate = selected);
+          }
 
-    db.execute('PRAGMA foreign_keys = OFF;');
-    try {
-      db.execute('BEGIN IMMEDIATE;');
-      db.execute('DROP TABLE IF EXISTS gift_cards_new;');
-      db.execute('''
-        CREATE TABLE gift_cards_new (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          code TEXT NOT NULL COLLATE NOCASE UNIQUE,
-          customer_id INTEGER,
-          total_value_cents INTEGER NOT NULL CHECK(total_value_cents > 0),
-          spent_value_cents INTEGER NOT NULL DEFAULT 0
-            CHECK(spent_value_cents >= 0 AND spent_value_cents <= total_value_cents),
-          expires_at_utc TEXT,
-          purchase_order_id INTEGER,
-          created_at_utc TEXT NOT NULL,
-          updated_at_utc TEXT NOT NULL,
-          FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE SET NULL
-        );
-      ''');
-      final activeFilter = hasDeletedAt ? ' WHERE deleted_at_utc IS NULL' : '';
-      db.execute('''
-        INSERT INTO gift_cards_new (
-          id, code, customer_id, total_value_cents, spent_value_cents,
-          expires_at_utc, purchase_order_id, created_at_utc, updated_at_utc)
-        SELECT
-          id, code, customer_id, total_value_cents, spent_value_cents,
-          expires_at_utc, purchase_order_id, created_at_utc, updated_at_utc
-        FROM gift_cards$activeFilter;
-      ''');
-      db.execute('DROP TABLE gift_cards;');
-      db.execute('ALTER TABLE gift_cards_new RENAME TO gift_cards;');
-      db.execute('COMMIT;');
-    } catch (_) {
-      db.execute('ROLLBACK;');
-      rethrow;
-    } finally {
-      db.execute('PRAGMA foreign_keys = ON;');
-    }
-  }
+          void submit() {
+            final cents = valueCents();
+            if (cents <= 0) {
+              setDialogState(() => error = _itEn(
+                    'Inserisci un valore maggiore di zero.',
+                    'Enter a value greater than zero.',
+                  ));
+              return;
+            }
 
-  void _backfillCustomerSnapshots()""",
-)
+            DateTime? expiresAtUtc;
+            if (expirationDate != null) {
+              final value = expirationDate!;
+              expiresAtUtc = DateTime(
+                value.year,
+                value.month,
+                value.day,
+                23,
+                59,
+                59,
+                999,
+              ).toUtc();
+            }
+            Navigator.of(dialogContext).pop(
+              _CustomerGiftCardDraft(
+                valueCents: cents,
+                expiresAtUtc: expiresAtUtc,
+              ),
+            );
+          }
 
-# Backfill and purchase-order matching support anonymous gift cards.
-replace_once(
-    "lib/repositories/customer_repository.dart",
-    "        customerId: row['customer_id'] as int,\n        totalValueCents: row['total_value_cents'] as int,\n        giftCardCreatedAtUtc: row['created_at_utc'] as String,",
-    "        customerId: row['customer_id'] as int?,\n        totalValueCents: row['total_value_cents'] as int,\n        giftCardCreatedAtUtc: row['created_at_utc'] as String,",
-)
-
-regex_once(
-    "lib/repositories/customer_repository.dart",
-    r"  int\? _findAvailableGiftCardPurchaseOrder\(\{.*?\n  \}\n\n  List<Customer> search",
-    """  int? _findAvailableGiftCardPurchaseOrder({
-    required int? customerId,
-    required int totalValueCents,
-    required String giftCardCreatedAtUtc,
-  }) {
-    final rows = database.db.select('''
-      SELECT so.id
-      FROM sales_orders so
-      WHERE ((? IS NULL AND so.customer_id IS NULL) OR so.customer_id=?)
-        AND ABS((julianday(so.created_at_utc) - julianday(?)) * 86400.0) <= 120
-        AND (
-          SELECT COALESCE(SUM(soi.quantity), 0)
-          FROM sales_order_items soi
-          WHERE soi.order_id=so.id
-            AND soi.sku='GIFT-CARD' COLLATE NOCASE
-            AND soi.unit_price_cents=?
-        ) > (
-          SELECT COUNT(*)
-          FROM gift_cards linked
-          WHERE linked.purchase_order_id=so.id
-            AND linked.total_value_cents=?
-        )
-      ORDER BY
-        ABS((julianday(so.created_at_utc) - julianday(?)) * 86400.0),
-        so.id DESC
-      LIMIT 1;
-    ''', [
-      customerId,
-      customerId,
-      giftCardCreatedAtUtc,
-      totalValueCents,
-      totalValueCents,
-      giftCardCreatedAtUtc,
-    ]);
-    return rows.isEmpty ? null : rows.first['id'] as int;
-  }
-
-  List<Customer> search""",
-)
-
-# Deleting a customer now leaves their gift cards alive and unassigned.
-replace_once(
-    "lib/repositories/customer_repository.dart",
-    "      db.execute('DELETE FROM customers WHERE id=?;', [customerId]);\n      db.execute('COMMIT;');",
-    "      final giftCardUpdatedAt = DateTime.now().toUtc().toIso8601String();\n      db.execute(\n        'UPDATE gift_cards SET customer_id=NULL, updated_at_utc=? WHERE customer_id=?;',\n        [giftCardUpdatedAt, customerId],\n      );\n      db.execute('DELETE FROM customers WHERE id=?;', [customerId]);\n      db.execute('COMMIT;');",
-)
-
-# Global list and cash-available list.
-replace_once(
-    "lib/repositories/customer_repository.dart",
-    "  List<GiftCard> availableGiftCardsForCustomer(int customerId, [int limit = 500]) {",
-    """  List<GiftCard> giftCards([int limit = 5000]) {
-    final rows = database.db.select('''
-      SELECT * FROM gift_cards
-      ORDER BY created_at_utc DESC, id DESC
-      LIMIT ?;
-    ''', [limit.clamp(1, 10000)]);
-    return rows.map(_giftCardFromRow).toList();
-  }
-
-  List<GiftCard> availableGiftCardsForCash(int? customerId, [int limit = 500]) {
-    final now = DateTime.now().toUtc().toIso8601String();
-    final rows = database.db.select('''
-      SELECT * FROM gift_cards
-      WHERE (customer_id IS NULL OR customer_id=?)
-        AND spent_value_cents < total_value_cents
-        AND (expires_at_utc IS NULL OR expires_at_utc > ?)
-      ORDER BY created_at_utc DESC, id DESC
-      LIMIT ?;
-    ''', [customerId, now, limit.clamp(1, 5000)]);
-    return rows.map(_giftCardFromRow).toList();
-  }
-
-  List<GiftCard> availableGiftCardsForCustomer(int customerId, [int limit = 500]) {""",
-)
-
-# Creation allows null owner, explicit purchase order; editing supports owner and expiry.
-regex_once(
-    "lib/repositories/customer_repository.dart",
-    r"  GiftCard createGiftCard\(.*?\n  \}\n\n  SalesOrderSummary\? purchaseOrderForGiftCard",
-    """  GiftCard createGiftCard(
-    int? customerId,
-    int totalValueCents, {
-    DateTime? expiresAtUtc,
-    int? purchaseOrderId,
-  }) {
-    if (totalValueCents <= 0) {
-      throw ArgumentError('Il valore del buono regalo deve essere maggiore di zero.');
-    }
-    final db = database.db;
-    db.execute('BEGIN IMMEDIATE;');
-    try {
-      if (customerId != null) {
-        final customerExists = db.select(
-          'SELECT 1 FROM customers WHERE id=? LIMIT 1;',
-          [customerId],
-        ).isNotEmpty;
-        if (!customerExists) {
-          throw StateError('Il cliente selezionato non esiste più.');
-        }
-      }
-
-      final nowUtc = DateTime.now().toUtc();
-      final now = nowUtc.toIso8601String();
-      final expiration = expiresAtUtc?.toUtc().toIso8601String();
-      final resolvedPurchaseOrderId = purchaseOrderId ??
-          _findAvailableGiftCardPurchaseOrder(
-            customerId: customerId,
-            totalValueCents: totalValueCents,
-            giftCardCreatedAtUtc: now,
-          );
-      final id = _nextAvailableGiftCardId();
-      final code = _newUniqueGiftCardCode();
-      db.execute('''
-        INSERT INTO gift_cards (
-          id, code, customer_id, total_value_cents, spent_value_cents,
-          expires_at_utc, purchase_order_id, created_at_utc, updated_at_utc)
-        VALUES (?, ?, ?, ?, 0, ?, ?, ?, ?);
-      ''', [
-        id,
-        code,
-        customerId,
-        totalValueCents,
-        expiration,
-        resolvedPurchaseOrderId,
-        now,
-        now,
-      ]);
-      db.execute('COMMIT;');
-      return getGiftCard(id)!;
-    } catch (_) {
-      db.execute('ROLLBACK;');
-      rethrow;
-    }
-  }
-
-  GiftCard updateGiftCard(
-    int giftCardId, {
-    required int? customerId,
-    required DateTime? expiresAtUtc,
-  }) {
-    final db = database.db;
-    db.execute('BEGIN IMMEDIATE;');
-    try {
-      final exists = db.select(
-        'SELECT 1 FROM gift_cards WHERE id=? LIMIT 1;',
-        [giftCardId],
-      ).isNotEmpty;
-      if (!exists) throw StateError('Buono regalo non trovato.');
-      if (customerId != null) {
-        final customerExists = db.select(
-          'SELECT 1 FROM customers WHERE id=? LIMIT 1;',
-          [customerId],
-        ).isNotEmpty;
-        if (!customerExists) {
-          throw StateError('Il cliente selezionato non esiste più.');
-        }
-      }
-      final now = DateTime.now().toUtc().toIso8601String();
-      db.execute('''
-        UPDATE gift_cards
-        SET customer_id=?, expires_at_utc=?, updated_at_utc=?
-        WHERE id=?;
-      ''', [
-        customerId,
-        expiresAtUtc?.toUtc().toIso8601String(),
-        now,
-        giftCardId,
-      ]);
-      db.execute('COMMIT;');
-      return getGiftCard(giftCardId)!;
-    } catch (_) {
-      db.execute('ROLLBACK;');
-      rethrow;
-    }
-  }
-
-  SalesOrderSummary? purchaseOrderForGiftCard""",
-)
-
-# Redemption: an assigned card still requires its matching customer;
-# an unassigned card can be used without selecting a customer.
-replace_once(
-    "lib/repositories/customer_repository.dart",
-    """        if (draft.customerId == null) {
-          throw ArgumentError('Per usare un buono regalo è necessario associare il cliente.');
-        }
-""",
-    "",
-)
-replace_once(
-    "lib/repositories/customer_repository.dart",
-    """        if ((card['customer_id'] as int) != draft.customerId) {
-          throw StateError('Il buono regalo non appartiene al cliente selezionato.');
-        }
-""",
-    """        final ownerId = card['customer_id'] as int?;
-        if (ownerId != null && ownerId != draft.customerId) {
-          throw StateError('Il buono regalo è associato a un altro cliente.');
-        }
-""",
-)
-
-# Mapper uses nullable owner.
-replace_once(
-    "lib/repositories/customer_repository.dart",
-    "        customerId: row['customer_id'] as int,\n        totalValueCents: row['total_value_cents'] as int,",
-    "        customerId: row['customer_id'] as int?,\n        totalValueCents: row['total_value_cents'] as int,",
-)
-
-# Purchase popup: customer is optional and association is explicitly selectable.
-dialog_path = Path("lib/pages/gift_card_purchase_dialog.dart")
-dialog = dialog_path.read_text()
-dialog = dialog.replace(
-    """  const GiftCardPurchaseDraft({
-    required this.valueCents,
-    this.expiresAtUtc,
-  });
-
-  final int valueCents;
-  final DateTime? expiresAtUtc;
-""",
-    """  const GiftCardPurchaseDraft({
-    required this.valueCents,
-    required this.associateCustomer,
-    this.expiresAtUtc,
-  });
-
-  final int valueCents;
-  final bool associateCustomer;
-  final DateTime? expiresAtUtc;
-""",
-)
-dialog = dialog.replace(
-    """Future<GiftCardPurchaseDraft?> showGiftCardPurchaseDialog(
-  BuildContext context, {
-  required String customerName,
-}) async {""",
-    """Future<GiftCardPurchaseDraft?> showGiftCardPurchaseDialog(
-  BuildContext context, {
-  String? customerName,
-}) async {""",
-)
-dialog = dialog.replace(
-    """  DateTime? expirationDate;
-  String? error;
-""",
-    """  DateTime? expirationDate;
-  var associateCustomer = customerName != null;
-  String? error;
-""",
-)
-dialog = dialog.replace(
-    """            GiftCardPurchaseDraft(
-              valueCents: cents,
-              expiresAtUtc: expiresAtUtc,
-            ),""",
-    """            GiftCardPurchaseDraft(
-              valueCents: cents,
-              associateCustomer: associateCustomer,
-              expiresAtUtc: expiresAtUtc,
-            ),""",
-)
-dialog = dialog.replace(
-    """                Text(
-                  AppStrings.t(
-                    'gift_card_purchase_help',
-                    {'customerName': customerName},
+          return AlertDialog(
+            title: Text(_itEn('Nuovo buono regalo', 'New gift card')),
+            content: SizedBox(
+              width: 440,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(
+                    _itEn(
+                      'Il buono verrà associato a ${widget.customer.displayName}. Il valore speso partirà da zero.',
+                      'The gift card will be linked to ${widget.customer.displayName}. Its spent value will start at zero.',
+                    ),
                   ),
-                ),
-                const SizedBox(height: 14),""",
-    """                Text(
-                  customerName == null
-                      ? AppStrings.pair(
-                          'Il buono verrà emesso senza cliente associato. Potrai associarlo successivamente dalla gestione Buoni regalo.',
-                          'The gift card will be issued without an associated customer. You can assign one later from Gift card management.',
-                        )
-                      : AppStrings.t(
-                          'gift_card_purchase_help',
-                          {'customerName': customerName},
+                  const SizedBox(height: 14),
+                  TextField(
+                    controller: valueController,
+                    autofocus: true,
+                    keyboardType:
+                        const TextInputType.numberWithOptions(decimal: true),
+                    decoration: InputDecoration(
+                      border: const OutlineInputBorder(),
+                      labelText: _itEn('Valore totale', 'Total value'),
+                      prefixText: '€ ',
+                      errorText: error,
+                    ),
+                    onChanged: (_) {
+                      if (error != null) setDialogState(() => error = null);
+                    },
+                    onSubmitted: (_) => submit(),
+                  ),
+                  const SizedBox(height: 14),
+                  Text(
+                    _itEn('Scadenza (facoltativa)', 'Expiration (optional)'),
+                    style: Theme.of(context).textTheme.labelLarge,
+                  ),
+                  const SizedBox(height: 6),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: pickExpiration,
+                          icon: const Icon(Icons.event_outlined),
+                          label: Text(
+                            expirationDate == null
+                                ? _itEn('Nessuna scadenza', 'No expiration')
+                                : dateText(expirationDate!),
+                          ),
                         ),
-                ),
-                if (customerName != null) ...[
-                  const SizedBox(height: 10),
-                  CheckboxListTile(
-                    contentPadding: EdgeInsets.zero,
-                    value: associateCustomer,
-                    onChanged: (value) => setDialogState(
-                      () => associateCustomer = value ?? false,
-                    ),
-                    title: Text(
-                      AppStrings.pair(
-                        'Associa il buono a $customerName',
-                        'Associate the gift card with $customerName',
                       ),
-                    ),
-                    subtitle: Text(
-                      AppStrings.pair(
-                        'Facoltativo: l’associazione potrà essere cambiata o rimossa in seguito.',
-                        'Optional: the association can be changed or removed later.',
-                      ),
-                    ),
+                      if (expirationDate != null) ...[
+                        const SizedBox(width: 6),
+                        IconButton(
+                          tooltip: _itEn('Rimuovi scadenza', 'Remove expiration'),
+                          onPressed: () =>
+                              setDialogState(() => expirationDate = null),
+                          icon: const Icon(Icons.close),
+                        ),
+                      ],
+                    ],
                   ),
                 ],
-                const SizedBox(height: 14),""",
-)
-dialog_path.write_text(dialog)
-
-# Dedicated gift-card editor dialog.
-Path("lib/pages/gift_card_editor_dialog.dart").write_text(r"""import 'package:flutter/material.dart';
-
-import '../l10n/app_strings.dart';
-import '../models/customer.dart';
-import '../repositories/customer_repository.dart';
-import 'customer_picker_dialog.dart';
-
-class GiftCardEditDraft {
-  const GiftCardEditDraft({
-    required this.customerId,
-    required this.expiresAtUtc,
-  });
-
-  final int? customerId;
-  final DateTime? expiresAtUtc;
-}
-
-Future<GiftCardEditDraft?> showGiftCardEditorDialog(
-  BuildContext context, {
-  required CustomerRepository repository,
-  required GiftCard card,
-}) async {
-  Customer? customer =
-      card.customerId == null ? null : repository.getById(card.customerId!);
-  DateTime? expirationDate = card.expiresAtUtc?.toLocal();
-
-  String t(String it, String en) => AppStrings.pair(it, en);
-  String dateText(DateTime value) =>
-      '${value.day.toString().padLeft(2, '0')}/${value.month.toString().padLeft(2, '0')}/${value.year}';
-
-  return showDialog<GiftCardEditDraft>(
-    context: context,
-    builder: (dialogContext) => StatefulBuilder(
-      builder: (context, setDialogState) {
-        Future<void> pickCustomer() async {
-          final selected = await showCustomerPickerDialog(
-            dialogContext,
-            repository: repository,
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(dialogContext).pop(),
+                child: Text(AppStrings.t('cancel')),
+              ),
+              FilledButton.icon(
+                onPressed: submit,
+                icon: const Icon(Icons.card_giftcard),
+                label: Text(_itEn('Crea buono', 'Create gift card')),
+              ),
+            ],
           );
-          if (selected == null) return;
-          setDialogState(() => customer = selected);
-        }
-
-        Future<void> pickExpiration() async {
-          final now = DateTime.now();
-          final selected = await showDatePicker(
-            context: dialogContext,
-            initialDate: expirationDate ?? now.add(const Duration(days: 365)),
-            firstDate: DateTime(now.year, now.month, now.day),
-            lastDate: DateTime(now.year + 20, 12, 31),
-          );
-          if (selected == null) return;
-          setDialogState(() => expirationDate = selected);
-        }
-
-        void save() {
-          DateTime? expiresAtUtc;
-          if (expirationDate != null) {
-            final value = expirationDate!;
-            expiresAtUtc = DateTime(
-              value.year,
-              value.month,
-              value.day,
-              23,
-              59,
-              59,
-              999,
-            ).toUtc();
-          }
-          Navigator.of(dialogContext).pop(
-            GiftCardEditDraft(
-              customerId: customer?.id,
-              expiresAtUtc: expiresAtUtc,
-            ),
-          );
-        }
-
-        return AlertDialog(
-          title: Text(t('Modifica buono regalo', 'Edit gift card')),
-          content: SizedBox(
-            width: 520,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: const Icon(Icons.card_giftcard_outlined),
-                  title: Text(
-                    card.code,
-                    style: const TextStyle(fontWeight: FontWeight.w700),
-                  ),
-                  subtitle: Text(
-                    '${t('Valore', 'Value')}: ${card.totalDisplay} · ${t('Residuo', 'Remaining')}: ${card.remainingDisplay}',
-                  ),
-                ),
-                const Divider(),
-                Text(
-                  t('Cliente associato', 'Associated customer'),
-                  style: Theme.of(context).textTheme.labelLarge,
-                ),
-                const SizedBox(height: 6),
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        customer == null
-                            ? t('Nessun cliente associato', 'No associated customer')
-                            : '${customer!.displayName} (${customer!.customerCodeDisplay})',
-                      ),
-                    ),
-                    OutlinedButton.icon(
-                      onPressed: pickCustomer,
-                      icon: const Icon(Icons.person_search_outlined),
-                      label: Text(
-                        customer == null ? t('Associa', 'Assign') : t('Cambia', 'Change'),
-                      ),
-                    ),
-                    if (customer != null) ...[
-                      const SizedBox(width: 6),
-                      IconButton.outlined(
-                        tooltip: t('Rimuovi associazione', 'Remove association'),
-                        onPressed: () => setDialogState(() => customer = null),
-                        icon: const Icon(Icons.person_remove_outlined),
-                      ),
-                    ],
-                  ],
-                ),
-                const SizedBox(height: 18),
-                Text(
-                  t('Scadenza', 'Expiration'),
-                  style: Theme.of(context).textTheme.labelLarge,
-                ),
-                const SizedBox(height: 6),
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: pickExpiration,
-                        icon: const Icon(Icons.event_outlined),
-                        label: Text(
-                          expirationDate == null
-                              ? t('Nessuna scadenza', 'No expiration')
-                              : dateText(expirationDate!),
-                        ),
-                      ),
-                    ),
-                    if (expirationDate != null) ...[
-                      const SizedBox(width: 6),
-                      IconButton.outlined(
-                        tooltip: t('Rimuovi scadenza', 'Remove expiration'),
-                        onPressed: () =>
-                            setDialogState(() => expirationDate = null),
-                        icon: const Icon(Icons.close),
-                      ),
-                    ],
-                  ],
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(),
-              child: Text(AppStrings.t('cancel')),
-            ),
-            FilledButton.icon(
-              onPressed: save,
-              icon: const Icon(Icons.save_outlined),
-              label: Text(t('Salva modifiche', 'Save changes')),
-            ),
-          ],
-        );
-      },
-    ),
-  );
-}
-""")
-
-# Global Gift Cards page: include unassigned cards and expose edit/delete menu.
-page_path = Path("lib/pages/gift_cards_page.dart")
-page = page_path.read_text()
-page = page.replace(
-    "import 'gift_card_management_dialog.dart';\n",
-    "import 'gift_card_editor_dialog.dart';\nimport 'gift_card_management_dialog.dart';\n",
-    1,
-)
-page = page.replace(
-    "  Future<void> _deleteGiftCard(GiftCard card, Customer? customer) async {",
-    """  Future<void> _editGiftCard(GiftCard card) async {
-    final draft = await showGiftCardEditorDialog(
-      context,
-      repository: widget.services.customers,
-      card: card,
+        },
+      ),
     );
-    if (!mounted || draft == null) return;
+    valueController.dispose();
+    if (draft == null || !mounted) return;
+
     try {
-      final updated = widget.services.customers.updateGiftCard(
-        card.id,
-        customerId: draft.customerId,
+      final card = widget.repository.createGiftCard(
+        widget.customer.id,
+        draft.valueCents,
         expiresAtUtc: draft.expiresAtUtc,
       );
       if (!mounted) return;
-      setState(() {
-        _status = _t(
-          'Buono ${updated.code} aggiornato.',
-          'Gift card ${updated.code} updated.',
-        );
-      });
+      final expiration = card.expirationDateDisplay;
+      setState(() => _giftStatus = _itEn(
+            'Buono ${card.code} creato con valore ${card.totalDisplay}. ${expiration == null ? 'Nessuna scadenza.' : 'Scadenza: $expiration.'}',
+            'Gift card ${card.code} created with value ${card.totalDisplay}. ${expiration == null ? 'No expiration.' : 'Expires: $expiration.'}',
+          ));
     } catch (error) {
       if (!mounted) return;
-      setState(() {
-        _status = _t(
-          'Impossibile aggiornare il buono: $error',
-          'Unable to update the gift card: $error',
-        );
-      });
+      setState(() => _giftStatus = _itEn(
+            'Impossibile creare il buono regalo: $error',
+            'Unable to create gift card: $error',
+          ));
     }
   }
 
-  Future<void> _deleteGiftCard(GiftCard card, Customer? customer) async {""",
-    1,
-)
-replace_entries = """    final entries = <_GiftCardEntry>[];
-    for (final customer in customers) {
-      for (final card in repository.giftCardsForCustomer(customer.id, 5000)) {
-        entries.add(_GiftCardEntry(card: card, customer: customer));
-      }
-    }
-    entries.sort(
-      (a, b) => b.card.createdAtUtc.compareTo(a.card.createdAtUtc),
-    );
-"""
-new_entries = """    final entries = repository
-        .giftCards(5000)
-        .map(
-          (card) => _GiftCardEntry(
-            card: card,
-            customer: card.customerId == null
-                ? null
-                : customerById[card.customerId!],
-          ),
-        )
-        .toList(growable: false);
-"""
-if replace_entries not in page:
-    raise SystemExit("gift_cards_page.dart: entries block not found")
-page = page.replace(replace_entries, new_entries, 1)
-page = page.replace(
-    "            final customer = customerById[entry.card.customerId];",
-    "            final customer = entry.customer;",
-    1,
-)
-page = page.replace(
-    """                            '${customer.displayName} · ${customer.customerCodeDisplay}\\n'
-                            '${_t('Totale', 'Total')}: ${card.totalDisplay} · '
-""",
-    """                            '${customer == null ? _t('Nessun cliente associato', 'No associated customer') : '${customer.displayName} · ${customer.customerCodeDisplay}'}\\n'
-                            '${_t('Totale', 'Total')}: ${card.totalDisplay} · '
-""",
-    1,
-)
-page = page.replace(
-    """                          trailing: IconButton(
-                            tooltip: _t('Elimina buono', 'Delete gift card'),
-                            onPressed: () => _deleteGiftCard(card, customer),
-                            icon: const Icon(Icons.delete_outline),
-                          ),
-""",
-    """                          trailing: PopupMenuButton<String>(
-                            tooltip: _t('Azioni buono', 'Gift card actions'),
-                            onSelected: (value) {
-                              if (value == 'edit') {
-                                _editGiftCard(card);
-                              } else if (value == 'delete') {
-                                _deleteGiftCard(card, customer);
-                              }
-                            },
-                            itemBuilder: (context) => [
-                              PopupMenuItem(
-                                value: 'edit',
-                                child: ListTile(
-                                  contentPadding: EdgeInsets.zero,
-                                  leading: const Icon(Icons.edit_outlined),
-                                  title: Text(_t('Modifica', 'Edit')),
-                                ),
-                              ),
-                              PopupMenuItem(
-                                value: 'delete',
-                                child: ListTile(
-                                  contentPadding: EdgeInsets.zero,
-                                  leading: Icon(
-                                    Icons.delete_outline,
-                                    color: Theme.of(context).colorScheme.error,
-                                  ),
-                                  title: Text(_t('Elimina', 'Delete')),
-                                ),
-                              ),
-                            ],
-                          ),
-""",
-    1,
-)
-page = page.replace("  final Customer customer;", "  final Customer? customer;", 1)
-page_path.write_text(page)
-
-# Cash page: virtual article, optional association, anonymous purchase/use.
-cash_path = Path("lib/pages/cash_page.dart")
-cash = cash_path.read_text()
-cash = cash.replace(
-    """  List<ProductVariant> get _results =>
-      widget.services.products.search(_search.text, 50);
-""",
-    """  List<ProductVariant> get _results =>
-      widget.services.products.search(_search.text, 50);
-
-  bool get _showGiftCardVirtualItem {
-    final query = _search.text.trim().toLowerCase();
-    if (query.isEmpty) return true;
-    return 'buono regalo'.contains(query) ||
-        'gift card'.contains(query) ||
-        'regalo'.contains(query) ||
-        'gift'.contains(query);
-  }
-""",
-    1,
+  Future<void> _deleteGiftCard""",
 )
 
+replace_once(
+    'lib/pages/customers_page.dart',
+    """class _CustomerDetail extends StatefulWidget {
+""",
+    """class _CustomerGiftCardDraft {
+  const _CustomerGiftCardDraft({
+    required this.valueCents,
+    required this.expiresAtUtc,
+  });
+
+  final int valueCents;
+  final DateTime? expiresAtUtc;
+}
+
+class _CustomerDetail extends StatefulWidget {
+""",
+)
+
+replace_once(
+    'lib/pages/customers_page.dart',
+    """      details.add(_itEn(
+        'Verranno eliminati definitivamente anche ${giftCards.length} buoni regalo associati. Il credito residuo complessivo di ${formatMoney(remainingGiftValue)} verrà perso.',
+        '${giftCards.length} linked gift cards will also be permanently deleted. Their total remaining credit of ${formatMoney(remainingGiftValue)} will be lost.',
+      ));
+""",
+    """      details.add(_itEn(
+        'I ${giftCards.length} buoni regalo associati non verranno eliminati: verrà rimossa soltanto l’associazione al cliente. Il credito residuo complessivo di ${formatMoney(remainingGiftValue)} resterà disponibile.',
+        'The ${giftCards.length} linked gift cards will not be deleted: only their customer association will be removed. Their total remaining credit of ${formatMoney(remainingGiftValue)} will remain available.',
+      ));
+""",
+)
+
+# Cash: gift-card purchase is an article-like flow and no longer requires a customer.
 regex_once(
-    "lib/pages/cash_page.dart",
+    'lib/pages/cash_page.dart',
     r"  Future<void> _addGiftCardPurchase\(\) async \{.*?\n  \}\n\n  Future<void> _pickGiftCard",
     """  Future<void> _addGiftCardPurchase() async {
     final customer = _customer;
@@ -766,30 +235,30 @@ regex_once(
     );
     if (!mounted || draft == null) return;
 
-    final associate = draft.associateCustomer && customer != null;
+    final associateCustomer = customer != null && draft.associateCustomer;
     final line = _CashLine.giftCard(
       giftCardLineId: _nextGiftCardLineId++,
       unitPriceCents: draft.valueCents,
       expiresAtUtc: draft.expiresAtUtc,
-      customerId: associate ? customer.id : null,
-      customerName: associate ? customer.displayName : null,
+      customerId: associateCustomer ? customer.id : null,
+      customerName: associateCustomer ? customer.displayName : null,
     );
     setState(() {
       _cart.add(line);
-      final ownerText = associate
+      final ownerText = associateCustomer
           ? _itEn(
-              'Associato a ${customer.displayName}.',
-              'Associated with ${customer.displayName}.',
+              ' Associato a ${customer.displayName}.',
+              ' Associated with ${customer.displayName}.',
             )
-          : _itEn('Nessun cliente associato.', 'No associated customer.');
+          : _itEn(' Nessun cliente associato.', ' No associated customer.');
       _cartStatus = draft.expiresAtUtc == null
           ? _itEn(
-              'Buono regalo da ${formatMoney(draft.valueCents)} aggiunto al carrello senza scadenza. $ownerText',
-              'Gift card for ${formatMoney(draft.valueCents)} added to the cart with no expiration. $ownerText',
+              'Buono regalo da ${formatMoney(draft.valueCents)} aggiunto al carrello senza scadenza.$ownerText',
+              'Gift card for ${formatMoney(draft.valueCents)} added to the cart with no expiration.$ownerText',
             )
           : _itEn(
-              'Buono regalo da ${formatMoney(draft.valueCents)} aggiunto al carrello. Scadenza: ${_dateText(draft.expiresAtUtc!)}. $ownerText',
-              'Gift card for ${formatMoney(draft.valueCents)} added to the cart. Expires: ${_dateText(draft.expiresAtUtc!)}. $ownerText',
+              'Buono regalo da ${formatMoney(draft.valueCents)} aggiunto al carrello. Scadenza: ${_dateText(draft.expiresAtUtc!)}.$ownerText',
+              'Gift card for ${formatMoney(draft.valueCents)} added to the cart. Expires: ${_dateText(draft.expiresAtUtc!)}.$ownerText',
             );
     });
   }
@@ -797,39 +266,134 @@ regex_once(
   Future<void> _pickGiftCard""",
 )
 
+# Cash: Use gift card can select any valid card. If it has an owner, offer to attach that owner to the order.
 regex_once(
-    "lib/pages/cash_page.dart",
-    r"  Future<void> _pickGiftCard\(\) async \{.*?\n    final selected = await showDialog<GiftCard>",
+    'lib/pages/cash_page.dart',
+    r"  Future<void> _pickGiftCard\(\) async \{.*?\n  \}\n\n  void _removeCustomer",
     """  Future<void> _pickGiftCard() async {
-    final customer = _customer;
-    final cards = widget.services.customers.availableGiftCardsForCash(customer?.id);
+    final cards = widget.services.customers.availableGiftCards();
     if (cards.isEmpty) {
-      return _cartMessage(
-        customer == null
-            ? _itEn(
-                'Non ci sono buoni regalo non associati validi con credito residuo.',
-                'There are no valid unassigned gift cards with remaining credit.',
-              )
-            : _itEn(
-                'Non ci sono buoni validi utilizzabili per questo cliente.',
-                'There are no valid gift cards available for this customer.',
-              ),
-      );
+      return _cartMessage(_itEn(
+        'Non ci sono buoni regalo validi con credito residuo.',
+        'There are no valid gift cards with remaining credit.',
+      ));
     }
 
-    final selected = await showDialog<GiftCard>""",
+    final selected = await showDialog<GiftCard>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(_itEn('Seleziona buono regalo', 'Select gift card')),
+        content: SizedBox(
+          width: 600,
+          height: (cards.length * 98.0).clamp(180.0, 460.0).toDouble(),
+          child: ListView.separated(
+            itemCount: cards.length,
+            separatorBuilder: (_, _) => const Divider(height: 1),
+            itemBuilder: (context, index) {
+              final card = cards[index];
+              final expiration = card.expirationDateDisplay;
+              final owner = card.customerId == null
+                  ? null
+                  : widget.services.customers.getById(card.customerId!);
+              final ownerText = owner == null
+                  ? _itEn('Nessun cliente associato', 'No associated customer')
+                  : _itEn(
+                      'Cliente: ${owner.displayName} (${owner.customerCodeDisplay})',
+                      'Customer: ${owner.displayName} (${owner.customerCodeDisplay})',
+                    );
+              return ListTile(
+                leading: const Icon(Icons.card_giftcard_outlined),
+                title: Text(
+                  card.code,
+                  style: const TextStyle(fontWeight: FontWeight.w700),
+                ),
+                subtitle: Text(
+                  '${_itEn('Valore totale', 'Total value')}: ${card.totalDisplay} · '
+                  '${_itEn('Speso', 'Spent')}: ${card.spentDisplay}\n'
+                  '${_itEn('Acquistato', 'Purchased')}: ${card.purchasedDateDisplay} · '
+                  '${expiration == null ? _itEn('Nessuna scadenza', 'No expiration') : '${_itEn('Scadenza', 'Expires')}: $expiration'}\n'
+                  '$ownerText',
+                ),
+                trailing: Text(
+                  '${_itEn('Residuo', 'Remaining')}\n${card.remainingDisplay}',
+                  textAlign: TextAlign.right,
+                  style: const TextStyle(fontWeight: FontWeight.w700),
+                ),
+                onTap: () => Navigator.of(dialogContext).pop(card),
+              );
+            },
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: Text(AppStrings.t('cancel')),
+          ),
+        ],
+      ),
+    );
+    if (!mounted || selected == null) return;
+
+    final owner = selected.customerId == null
+        ? null
+        : widget.services.customers.getById(selected.customerId!);
+    if (owner != null && _customer?.id != owner.id) {
+      final associate = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: Text(_itEn('Buono associato a un cliente', 'Gift card linked to a customer')),
+          content: Text(
+            _itEn(
+              'Il buono ${selected.code} è associato a ${owner.displayName} (${owner.customerCodeDisplay}). Vuoi associare questo cliente anche all’ordine?',
+              'Gift card ${selected.code} is linked to ${owner.displayName} (${owner.customerCodeDisplay}). Do you want to link this customer to the order as well?',
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: Text(AppStrings.t('cancel')),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: Text(_itEn('Usa senza associare', 'Use without linking')),
+            ),
+            FilledButton.icon(
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              icon: const Icon(Icons.person_add_alt_1),
+              label: Text(_itEn('Associa cliente', 'Link customer')),
+            ),
+          ],
+        ),
+      );
+      if (!mounted || associate == null) return;
+      if (associate) {
+        setState(() => _customer = owner);
+      }
+    }
+
+    setState(() {
+      _giftCard = selected;
+      _cartStatus = _itEn(
+        'Buono ${selected.code} selezionato. Credito residuo: ${selected.remainingDisplay}.',
+        'Gift card ${selected.code} selected. Remaining credit: ${selected.remainingDisplay}.',
+      );
+    });
+  }
+
+  void _removeCustomer""",
 )
 
 regex_once(
-    "lib/pages/cash_page.dart",
+    'lib/pages/cash_page.dart',
     r"  void _removeCustomer\(\) \{.*?\n  \}\n\n  void _removeGiftCard",
     """  void _removeCustomer() {
+    final customer = _customer;
+    if (customer == null) return;
     setState(() {
       _customer = null;
-      _giftCard = null;
       _cartStatus = _itEn(
-        'Cliente rimosso dall’ordine. I buoni regalo in acquisto restano nel carrello con l’associazione scelta al momento dell’aggiunta.',
-        'Customer removed from the order. Gift cards being purchased remain in the cart with the association chosen when they were added.',
+        'Cliente ${customer.displayName} rimosso dall’ordine. I buoni regalo nel carrello e l’eventuale buono usato come pagamento restano invariati.',
+        'Customer ${customer.displayName} removed from the order. Gift cards in the cart and any gift card used as payment remain unchanged.',
       );
     });
   }
@@ -837,472 +401,218 @@ regex_once(
   void _removeGiftCard""",
 )
 
-cash = cash.replace(
-    """    final customer = _customer;
-    if (pendingGiftCards.isNotEmpty && customer == null) {
-      return _cartMessage(_itEn(
-        'Associa un cliente prima di registrare l’acquisto del buono regalo.',
-        'Link a customer before registering the gift-card purchase.',
-      ));
-    }
+# Changing/adding an order customer must not silently discard a selected payment gift card.
+for old, new in [
+    ("""        _customer = existing;
+        _giftCard = null;
+        _searchStatus = _itEn(
+""", """        _customer = existing;
+        _searchStatus = _itEn(
+"""),
+    ("""      _customer = created;
+      _giftCard = null;
+      _searchStatus = _itEn(
+""", """      _customer = created;
+      _searchStatus = _itEn(
+"""),
+    ("""      _customer = customer;
+      _giftCard = null;
+      _searchStatus = _itEn(
+""", """      _customer = customer;
+      _searchStatus = _itEn(
+"""),
+]:
+    replace_once('lib/pages/cash_page.dart', old, new)
 
-""",
-    """    final customer = _customer;
-""",
-    1,
-)
-cash = cash.replace(
-    """            widget.services.customers.createGiftCard(
-              customer!.id,
-              line.unitPriceCents,
-              expiresAtUtc: line.giftCardExpiresAtUtc,
-            ),
-""",
-    """            widget.services.customers.createGiftCard(
-              line.giftCardCustomerId,
-              line.unitPriceCents,
-              expiresAtUtc: line.giftCardExpiresAtUtc,
-              purchaseOrderId: registeredOrder.id,
-            ),
-""",
-    1,
-)
-cash = cash.replace(
-    """    final availableGiftCards = _customer == null
-        ? const <GiftCard>[]
-        : widget.services.customers.availableGiftCardsForCustomer(_customer!.id);
-""",
+replace_once(
+    'lib/pages/cash_page.dart',
     """    final availableGiftCards =
         widget.services.customers.availableGiftCardsForCash(_customer?.id);
 """,
-    1,
+    '',
 )
 
-# Product list: virtual gift card is shown as a normal selectable cash item.
-old_list = """                        child: results.isEmpty
-                            ? Center(child: Text(AppStrings.t('no_product_found')))
-                            : _productViewMode == _ProductViewMode.list
-                                ? ListView.separated(
-                                    itemCount: results.length,
-                                    separatorBuilder: (_, _) =>
-                                        const Divider(height: 1),
-                                    itemBuilder: (context, index) {
-                                      final product = results[index];
-                                      return ListTile(
-                                        title: Text(product.name),
-                                        subtitle: Text(
-                                          '${product.variantDisplay} · SKU ${product.sku} · ${AppStrings.t('quantity').toLowerCase()} ${product.stockQuantity}',
-                                        ),
-                                        trailing:
-                                            Text(product.salePriceDisplay),
-                                        onTap: () => _add(product),
-                                      );
-                                    },
-                                  )
-                                : LayoutBuilder(
-"""
-new_list = """                        child: results.isEmpty && !_showGiftCardVirtualItem
-                            ? Center(child: Text(AppStrings.t('no_product_found')))
-                            : _productViewMode == _ProductViewMode.list
-                                ? ListView.separated(
-                                    itemCount: results.length +
-                                        (_showGiftCardVirtualItem ? 1 : 0),
-                                    separatorBuilder: (_, _) =>
-                                        const Divider(height: 1),
-                                    itemBuilder: (context, index) {
-                                      if (_showGiftCardVirtualItem && index == 0) {
-                                        return ListTile(
-                                          leading: Icon(
-                                            Icons.card_giftcard_rounded,
-                                            color: Theme.of(context).colorScheme.primary,
-                                          ),
-                                          title: Text(_itEn('Buono regalo', 'Gift card')),
-                                          subtitle: Text(_itEn(
-                                            'Articolo speciale · valore da impostare',
-                                            'Special item · value to be entered',
-                                          )),
-                                          trailing: Text(_itEn('Valore libero', 'Custom value')),
-                                          onTap: _addGiftCardPurchase,
-                                        );
-                                      }
-                                      final productIndex = index -
-                                          (_showGiftCardVirtualItem ? 1 : 0);
-                                      final product = results[productIndex];
-                                      return ListTile(
-                                        title: Text(product.name),
-                                        subtitle: Text(
-                                          '${product.variantDisplay} · SKU ${product.sku} · ${AppStrings.t('quantity').toLowerCase()} ${product.stockQuantity}',
-                                        ),
-                                        trailing:
-                                            Text(product.salePriceDisplay),
-                                        onTap: () => _add(product),
-                                      );
-                                    },
-                                  )
-                                : LayoutBuilder(
-"""
-if old_list not in cash:
-    raise SystemExit("cash_page.dart: product list block not found")
-cash = cash.replace(old_list, new_list, 1)
-
-old_grid = """                                        itemCount: results.length,
-                                        itemBuilder: (context, index) {
-                                          final product = results[index];
-                                          return _ProductGridTile(
-                                            product: product,
-                                            imageBytes:
-                                                variantImages[product.id],
-                                            onTap: () => _add(product),
-                                          );
-                                        },
-"""
-new_grid = """                                        itemCount: results.length +
-                                            (_showGiftCardVirtualItem ? 1 : 0),
-                                        itemBuilder: (context, index) {
-                                          if (_showGiftCardVirtualItem && index == 0) {
-                                            return _GiftCardGridTile(
-                                              onTap: _addGiftCardPurchase,
-                                            );
-                                          }
-                                          final productIndex = index -
-                                              (_showGiftCardVirtualItem ? 1 : 0);
-                                          final product = results[productIndex];
-                                          return _ProductGridTile(
-                                            product: product,
-                                            imageBytes:
-                                                variantImages[product.id],
-                                            onTap: () => _add(product),
-                                          );
-                                        },
-"""
-if old_grid not in cash:
-    raise SystemExit("cash_page.dart: grid block not found")
-cash = cash.replace(old_grid, new_grid, 1)
-
-# Redemption row is always visible. The old New gift card button is removed because
-# the gift card is now a virtual article in the product list/grid.
-regex_once(
-    "lib/pages/cash_page.dart",
-    r"                        if \(_customer != null\) \.\.\.\[\n                          const SizedBox\(height: 8\),\n                          Row\(children: \[\n                            const Icon\(Icons.card_giftcard_outlined, size: 20\),.*?\n                          \]\),\n                        \],",
-    """                        const SizedBox(height: 8),
-                        Row(children: [
-                          const Icon(Icons.card_giftcard_outlined, size: 20),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: Text(
-                              _giftCard == null
-                                  ? _itEn(
-                                      '${availableGiftCards.length} buoni validi utilizzabili',
-                                      '${availableGiftCards.length} valid gift cards available',
-                                    )
-                                  : '${_giftCard!.code} · ${_itEn('residuo', 'remaining')} ${_giftCard!.remainingDisplay}',
-                            ),
-                          ),
-                          OutlinedButton.icon(
-                            onPressed: availableGiftCards.isEmpty
-                                ? null
-                                : _pickGiftCard,
-                            icon: const Icon(Icons.redeem_outlined),
-                            label: Text(
-                              _giftCard == null
-                                  ? _itEn('Usa buono', 'Use gift card')
-                                  : _itEn('Cambia', 'Change'),
-                            ),
-                          ),
-                        ]),""",
+# Move "Use gift card" to the cart header next to Clear and keep it always visible.
+replace_once(
+    'lib/pages/cash_page.dart',
+    """                        TextButton.icon(
+                          onPressed: _cart.isEmpty &&
+                                  _fixedDiscounts.isEmpty &&
+                                  _customer == null &&
+                                  _giftCard == null &&
+                                  _keypadPriceCents == 0
+                              ? null
+                              : _clear,
+                          icon: const Icon(Icons.delete_sweep),
+                          label: Text(AppStrings.t('clear')),
+                        ),
+""",
+    """                        TextButton.icon(
+                          onPressed: _pickGiftCard,
+                          icon: const Icon(Icons.redeem_outlined),
+                          label: Text(_itEn('Usa buono', 'Use gift card')),
+                        ),
+                        const SizedBox(width: 4),
+                        TextButton.icon(
+                          onPressed: _cart.isEmpty &&
+                                  _fixedDiscounts.isEmpty &&
+                                  _customer == null &&
+                                  _giftCard == null &&
+                                  _keypadPriceCents == 0
+                              ? null
+                              : _clear,
+                          icon: const Icon(Icons.delete_sweep),
+                          label: Text(AppStrings.t('clear')),
+                        ),
+""",
 )
 
-# Themed gift-card grid tile.
-marker = "class _ProductGridTile extends StatelessWidget {"
-gift_tile = r"""class _GiftCardGridTile extends StatelessWidget {
-  const _GiftCardGridTile({required this.onTap});
+# Remove the old customer-scoped New gift card / Use gift card row.
+replace_once(
+    'lib/pages/cash_page.dart',
+    """                        if (_customer != null) ...[
+                          const SizedBox(height: 8),
+                          Row(children: [
+                            const Icon(Icons.card_giftcard_outlined, size: 20),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                _giftCard == null
+                                    ? _itEn(
+                                        '${availableGiftCards.length} buoni validi con credito residuo',
+                                        '${availableGiftCards.length} valid gift cards with remaining credit',
+                                      )
+                                    : '${_giftCard!.code} · ${_itEn('residuo', 'remaining')} ${_giftCard!.remainingDisplay}',
+                              ),
+                            ),
+                            OutlinedButton.icon(
+                              onPressed: _addGiftCardPurchase,
+                              icon: const Icon(Icons.add_card_outlined),
+                              label: Text(_itEn('Nuovo buono', 'New gift card')),
+                            ),
+                            const SizedBox(width: 6),
+                            OutlinedButton.icon(
+                              onPressed: availableGiftCards.isEmpty
+                                  ? null
+                                  : _pickGiftCard,
+                              icon: const Icon(Icons.redeem_outlined),
+                              label: Text(
+                                _giftCard == null
+                                    ? _itEn('Usa buono', 'Use gift card')
+                                    : _itEn('Cambia', 'Change'),
+                              ),
+                            ),
+                          ]),
+                        ],
+""",
+    '',
+)
 
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final tokens = UiStyleTokens.of(context);
-    return Card(
-      margin: EdgeInsets.zero,
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: onTap,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Expanded(
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  color: tokens.imagePreviewSurface,
-                ),
-                child: Center(
-                  child: Icon(
-                    Icons.card_giftcard_rounded,
-                    size: 82,
-                    color: theme.colorScheme.primary,
-                  ),
-                ),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    AppStrings.pair('Buono regalo', 'Gift card'),
-                    style: theme.textTheme.titleSmall?.copyWith(
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  const SizedBox(height: 3),
-                  Text(
-                    AppStrings.pair('Valore da impostare', 'Custom value'),
-                    style: theme.textTheme.bodySmall,
-                  ),
-                  const SizedBox(height: 5),
-                  Text(
-                    AppStrings.pair('Articolo speciale', 'Special item'),
-                    style: theme.textTheme.labelSmall,
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
+# Repository: expose all valid gift cards to the cash picker.
+replace_once(
+    'lib/repositories/customer_repository.dart',
+    """  List<GiftCard> availableGiftCardsForCash(int? customerId, [int limit = 500]) {
+""",
+    """  List<GiftCard> availableGiftCards([int limit = 500]) {
+    final now = DateTime.now().toUtc().toIso8601String();
+    final rows = database.db.select('''
+      SELECT * FROM gift_cards
+      WHERE spent_value_cents < total_value_cents
+        AND (expires_at_utc IS NULL OR expires_at_utc > ?)
+      ORDER BY created_at_utc DESC, id DESC
+      LIMIT ?;
+    ''', [now, limit.clamp(1, 5000)]);
+    return rows.map(_giftCardFromRow).toList();
   }
-}
 
-"""
-if marker not in cash:
-    raise SystemExit("cash_page.dart: ProductGridTile marker missing")
-cash = cash.replace(marker, gift_tile + marker, 1)
-
-# Cart line title gets the themed gift icon.
-cash = cash.replace(
-    """          Text(
-            line.cartTitle,
-            style: theme.textTheme.titleSmall?.copyWith(
-              fontWeight: FontWeight.w700,
-            ),
-          ),
+  List<GiftCard> availableGiftCardsForCash(int? customerId, [int limit = 500]) {
 """,
-    """          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (line.isGiftCardPurchase) ...[
-                Icon(
-                  Icons.card_giftcard_rounded,
-                  size: 18,
-                  color: theme.colorScheme.primary,
-                ),
-                const SizedBox(width: 6),
-              ],
-              Flexible(
-                child: Text(
-                  line.cartTitle,
-                  style: theme.textTheme.titleSmall?.copyWith(
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
-            ],
-          ),
+)
+
+replace_once(
+    'lib/repositories/customer_repository.dart',
+    """        final ownerId = card['customer_id'] as int?;
+        if (ownerId != null && ownerId != draft.customerId) {
+          throw StateError('Il buono regalo è associato a un altro cliente.');
+        }
 """,
-    1,
+    '',
 )
 
-# Cash-line gift-card metadata stores association chosen when item was added.
-cash = cash.replace(
-    """        giftCardLineId = null,
-        giftCardExpiresAtUtc = null;""",
-    """        giftCardLineId = null,
-        giftCardExpiresAtUtc = null,
-        giftCardCustomerId = null,
-        giftCardCustomerName = null;""",
-    2,
-)
-cash = cash.replace(
-    """  const _CashLine.giftCard({
-    required int giftCardLineId,
-    required int unitPriceCents,
-    DateTime? expiresAtUtc,
-  })  : product = null,""",
-    """  const _CashLine.giftCard({
-    required int giftCardLineId,
-    required int unitPriceCents,
-    DateTime? expiresAtUtc,
-    int? customerId,
-    String? customerName,
-  })  : product = null,""",
-    1,
-)
-cash = cash.replace(
-    """        giftCardLineId = giftCardLineId,
-        giftCardExpiresAtUtc = expiresAtUtc,
-        quantity = 1,""",
-    """        giftCardLineId = giftCardLineId,
-        giftCardExpiresAtUtc = expiresAtUtc,
-        giftCardCustomerId = customerId,
-        giftCardCustomerName = customerName,
-        quantity = 1,""",
-    1,
-)
-cash = cash.replace(
-    """  final int? giftCardLineId;
-  final DateTime? giftCardExpiresAtUtc;
-  final int quantity;""",
-    """  final int? giftCardLineId;
-  final DateTime? giftCardExpiresAtUtc;
-  final int? giftCardCustomerId;
-  final String? giftCardCustomerName;
-  final int quantity;""",
-    1,
-)
-cash = cash.replace(
-    """    if (isGiftCardPurchase) {
-      return '${AppStrings.pair('Valore buono', 'Gift card value')} · ${formatMoney(unitPriceCents)} · $variantDisplay';
-    }""",
-    """    if (isGiftCardPurchase) {
-      final owner = giftCardCustomerName == null
-          ? AppStrings.pair('Nessun cliente', 'No customer')
-          : AppStrings.pair(
-              'Cliente: $giftCardCustomerName',
-              'Customer: $giftCardCustomerName',
-            );
-      return '${AppStrings.pair('Valore buono', 'Gift card value')} · ${formatMoney(unitPriceCents)} · $variantDisplay · $owner';
-    }""",
-    1,
-)
-cash = cash.replace(
-    """        expiresAtUtc: giftCardExpiresAtUtc,
-      );""",
-    """        expiresAtUtc: giftCardExpiresAtUtc,
-        customerId: giftCardCustomerId,
-        customerName: giftCardCustomerName,
-      );""",
-    1,
-)
-cash_path.write_text(cash)
-
-# Tests: deleting a customer detaches cards; owner can be assigned/changed/removed;
-# unassigned cards can be used anonymously.
-test_path = Path("test/customer_repository_test.dart")
-test = test_path.read_text()
-test = test.replace(
-    "test('deleting a customer deletes gift cards and releases customer code', () async {",
-    "test('deleting a customer detaches gift cards and releases customer code', () async {",
-    1,
-)
-test = test.replace(
-    """      expect(repository.deleteCustomer(first.id), isTrue);
-      expect(repository.getGiftCard(card.id), isNull);""",
-    """      expect(repository.deleteCustomer(first.id), isTrue);
-      expect(repository.getGiftCard(card.id), isNotNull);
-      expect(repository.getGiftCard(card.id)!.customerId, isNull);""",
-    1,
-)
-insert_marker = """  test(
-    'generic sale item is stored without changing stock and order numbers stay unique',"""
-optional_test = r"""  test('gift card customer association is optional and editable', () async {
+# Tests: an associated gift card can pay an order for another/no customer; UI decides whether to link the owner.
+regex_once(
+    'test/customer_repository_test.dart',
+    r"  test\('gift cards are customer-bound and physical deletion preserves order snapshots', \(\) async \{.*?\n  \}\);\n\n  test\('deleting a customer detaches gift cards and releases customer code'",
+    """  test('associated gift cards can be used without changing the order customer', () async {
     final temp = await Directory.systemTemp.createTemp(
-      'lsms-flutter-gift-card-optional-owner-',
+      'lsms-flutter-gift-card-independent-customer-',
     );
     final path = '${temp.path}${Platform.pathSeparator}store.db';
     final service = DatabaseService(path);
     try {
       await service.initialize();
       final repository = CustomerRepository(service);
-      final first = repository.save(const CustomerDraft(
+      final owner = repository.save(const CustomerDraft(
         firstName: 'Mario',
         lastName: 'Rossi',
       ));
-      final second = repository.save(const CustomerDraft(
+      final other = repository.save(const CustomerDraft(
         firstName: 'Luigi',
         lastName: 'Bianchi',
       ));
+      final card = repository.createGiftCard(owner.id, 5000);
 
-      final card = repository.createGiftCard(null, 5000);
-      expect(card.customerId, isNull);
+      expect(repository.availableGiftCards().map((item) => item.id), contains(card.id));
 
-      final assigned = repository.updateGiftCard(
-        card.id,
-        customerId: first.id,
-        expiresAtUtc: null,
-      );
-      expect(assigned.customerId, first.id);
-
-      final changed = repository.updateGiftCard(
-        card.id,
-        customerId: second.id,
-        expiresAtUtc: DateTime.utc(2027, 12, 31, 23, 59, 59),
-      );
-      expect(changed.customerId, second.id);
-      expect(changed.expiresAtUtc, isNotNull);
-
-      final unassigned = repository.updateGiftCard(
-        card.id,
-        customerId: null,
-        expiresAtUtc: null,
-      );
-      expect(unassigned.customerId, isNull);
-      expect(unassigned.expiresAtUtc, isNull);
-
-      final sale = repository.recordSale(SalesOrderDraft(
-        customerId: null,
-        giftCardId: card.id,
-        giftCardAppliedCents: 1000,
-        lines: const [
-          SalesOrderDraftLine(
-            variantId: null,
-            sku: 'GENERIC',
-            productName: 'Articolo generico',
-            variantDisplay: '',
-            quantity: 1,
-            unitPriceCents: 1000,
-            discountBasisPoints: 0,
+      SalesOrderDraft draftFor(int? customerId) => SalesOrderDraft(
+            customerId: customerId,
+            giftCardId: card.id,
+            giftCardAppliedCents: 1000,
+            lines: const [
+              SalesOrderDraftLine(
+                variantId: null,
+                sku: 'GENERIC',
+                productName: 'Articolo generico',
+                variantDisplay: '',
+                quantity: 1,
+                unitPriceCents: 1000,
+                discountBasisPoints: 0,
+                grossTotalCents: 1000,
+                finalTotalCents: 1000,
+              ),
+            ],
             grossTotalCents: 1000,
+            itemDiscountCents: 0,
+            orderDiscountBasisPoints: 0,
+            orderPercentDiscountCents: 0,
+            fixedDiscountCents: 0,
             finalTotalCents: 1000,
-          ),
-        ],
-        grossTotalCents: 1000,
-        itemDiscountCents: 0,
-        orderDiscountBasisPoints: 0,
-        orderPercentDiscountCents: 0,
-        fixedDiscountCents: 0,
-        finalTotalCents: 1000,
-      ));
-      expect(sale.customerId, isNull);
-      expect(sale.giftCardCode, card.code);
+          );
+
+      final otherOrder = repository.recordSale(draftFor(other.id));
+      expect(otherOrder.customerId, other.id);
+      expect(otherOrder.giftCardCode, card.code);
       expect(repository.getGiftCard(card.id)!.remainingValueCents, 4000);
+
+      final anonymousOrder = repository.recordSale(draftFor(null));
+      expect(anonymousOrder.customerId, isNull);
+      expect(anonymousOrder.giftCardCode, card.code);
+      expect(repository.getGiftCard(card.id)!.remainingValueCents, 3000);
+
+      expect(repository.deleteGiftCard(card.id), isTrue);
+      expect(repository.getGiftCard(card.id), isNull);
+
+      final preserved = repository.getOrder(otherOrder.id)!.summary;
+      expect(preserved.giftCardId, isNull);
+      expect(preserved.giftCardCode, card.code);
+      expect(preserved.giftCardAppliedCents, 1000);
+      expect(preserved.amountDueCents, 0);
+      expect(repository.searchOrders(card.code).map((order) => order.id), contains(otherOrder.id));
     } finally {
       service.dispose();
       await temp.delete(recursive: true);
     }
   });
 
-"""
-if insert_marker not in test:
-    raise SystemExit("customer_repository_test.dart: insertion marker not found")
-test = test.replace(insert_marker, optional_test + insert_marker, 1)
-test_path.write_text(test)
-
-cleanup_path = Path("test/gift_card_cleanup_test.dart")
-cleanup = cleanup_path.read_text()
-marker = "      expect(repository.getGiftCard(2), isNull);\n"
-addition = """      expect(repository.getGiftCard(2), isNull);
-      final customerColumn =
-          columns.firstWhere((row) => row['name'] == 'customer_id');
-      expect(customerColumn['notnull'], 0);
-      final customerFk = service.db
-          .select('PRAGMA foreign_key_list(gift_cards);')
-          .firstWhere((row) => row['from'] == 'customer_id');
-      expect((customerFk['on_delete'] as String).toUpperCase(), 'SET NULL');
-"""
-if marker not in cleanup:
-    raise SystemExit("gift_card_cleanup_test.dart: migration marker not found")
-cleanup = cleanup.replace(marker, addition, 1)
-cleanup_path.write_text(cleanup)
+  test('deleting a customer detaches gift cards and releases customer code'""",
+)
