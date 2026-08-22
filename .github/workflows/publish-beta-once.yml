@@ -27,7 +27,6 @@ jobs:
           rm -rf downloaded dist
           mkdir -p downloaded dist
           gh run download 32597791240 --repo "$GITHUB_REPOSITORY" --pattern 'package-*' --dir downloaded
-          find downloaded -type f -maxdepth 3 -print
           find downloaded -type f -exec cp '{}' dist/ \;
           test -f dist/LocalStoreManagement-Setup-win-x64.exe
           test -f dist/LocalStoreManagement-Setup-win-arm64.exe
@@ -48,6 +47,7 @@ jobs:
           set -euo pipefail
           VERSION='0.2.1-b1'
           TAG='beta-latest'
+          TARGET='72d32c03cc02cb43657669ada1c34bb7b776ba66'
           mv dist/LocalStoreManagement-Setup-win-x64.exe "dist/LocalStoreManagement-${VERSION}-BETA-Setup-win-x64.exe"
           mv dist/LocalStoreManagement-Setup-win-arm64.exe "dist/LocalStoreManagement-${VERSION}-BETA-Setup-win-arm64.exe"
           mv dist/LocalStoreManagement-macos-x64.dmg "dist/LocalStoreManagement-${VERSION}-BETA-macos-x64.dmg"
@@ -59,7 +59,7 @@ jobs:
           if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             gh release delete "$TAG" --repo "$GITHUB_REPOSITORY" --cleanup-tag --yes
           fi
-          gh release create "$TAG" dist/* --repo "$GITHUB_REPOSITORY" --target '0d87c0eccadf9391a7c3456e3d0190732d7f379f' --prerelease --latest=false \
+          gh release create "$TAG" dist/* --repo "$GITHUB_REPOSITORY" --target "$TARGET" --prerelease --latest=false \
             --title 'Local Store Management v0.2.1-b1 BETA' \
             --notes 'Versione BETA 0.2.1-b1 generata dal branch Flutter. Include Windows x64/ARM64, macOS Intel/Apple Silicon in formato DMG e Linux x64/ARM64 in formato AppImage e DEB.'
 
