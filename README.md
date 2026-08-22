@@ -2,9 +2,9 @@
 
 Gestionale desktop **offline** per negozi, sviluppato in **Flutter/Dart** con database locale **SQLite**.
 
-Il branch `Flutter` è il canale **BETA/TEST** del progetto. La versione BETA corrente è **0.1.9-b1** e viene pubblicata come prerelease `beta-latest`.
+Il branch `Flutter` è il canale **BETA/TEST** del progetto. La versione BETA corrente è **0.1.9-b2** e viene pubblicata come prerelease `beta-latest`.
 
-La versione stabile corrente su `main` è **0.1.7**. I canali OTA STABLE e BETA sono separati: una build stabile riceve solo release stabili e una build Beta riceve solo prerelease Beta.
+La versione stabile corrente su `main` è **0.1.9**. I canali OTA STABLE e BETA sono separati: una build stabile riceve solo release stabili e una build Beta riceve solo prerelease Beta.
 
 ## Download BETA
 
@@ -18,6 +18,18 @@ Le build BETA vengono pubblicate per:
 | macOS | Apple Silicon ARM64 | `.dmg` con `.app` |
 | Linux | x86_64 | `.AppImage`, `.deb` |
 | Linux | ARM64 | `.AppImage`, `.deb` |
+
+## Novità 0.1.9-b2
+
+### Elenco / griglia anche nella Dashboard
+
+La ricerca prodotti della **Dashboard** usa ora lo stesso selettore di visualizzazione già presente nella **Cassa**.
+
+- **elenco**: mantiene la visualizzazione compatta esistente;
+- **griglia**: mostra l'immagine della variante, nome, variante, SKU, prezzo e giacenza;
+- il selettore con le icone elenco/griglia è posizionato accanto al campo di ricerca;
+- il clic su un prodotto, sia in elenco sia in griglia, continua ad aprire l'editor del prodotto;
+- le immagini vengono caricate in blocco dal database solo quando la modalità griglia è attiva.
 
 ## Novità 0.1.9-b1
 
@@ -59,6 +71,7 @@ La CI controlla esplicitamente che desktop ID, AppStream e application ID del ru
 
 - catalogo prodotti e varianti con SKU, barcode multipli, prezzi, giacenze e immagine opzionale per variante;
 - magazzino con movimenti di carico/scarico;
+- dashboard con scanner HID, ricerca prodotti e visualizzazione elenco/griglia con anteprime;
 - cassa con scanner HID, ricerca prodotti, visualizzazione elenco/griglia con anteprime, tastierino numerico, sconti, articoli generici e cliente associato;
 - clienti con codice identificativo interno, codice fiscale facoltativo e storico acquisti;
 - gestione ordini e vendite, annullamento con ripristino della merce ed eliminazione dello storico;
@@ -70,9 +83,9 @@ La CI controlla esplicitamente che desktop ID, AppStream e application ID del ru
 - aggiornamenti OTA separati tra canale STABLE e canale BETA;
 - una sola istanza operativa dell'applicazione alla volta.
 
-## Base stabile 0.1.7
+## Base stabile 0.1.9
 
-La **0.1.7** ha promosso in stabile il ciclo di sviluppo `0.1.7-b1` → `0.1.7-b6`.
+La **0.1.9** ha promosso in stabile le immagini per variante, la visualizzazione elenco/griglia in Cassa, gli aggiornamenti dell'identità Linux e le correzioni OTA del ciclo precedente.
 
 ### Buoni regalo
 
