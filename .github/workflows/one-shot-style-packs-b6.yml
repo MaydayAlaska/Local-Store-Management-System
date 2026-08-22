@@ -1,0 +1,1306 @@
+name: One-shot runtime style packs b6
+
+on:
+  push:
+    branches: [Flutter]
+    paths:
+      - '.github/workflows/one-shot-style-packs-b6.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: Flutter
+          fetch-depth: 0
+
+      - name: Apply runtime style pack support
+        shell: bash
+        run: |
+          python3 <<'PY'
+          from pathlib import Path
+          import json
+
+          root = Path('.')
+
+          def read(path):
+              return (root / path).read_text(encoding='utf-8')
+
+          def write(path, content):
+              target = root / path
+              target.parent.mkdir(parents=True, exist_ok=True)
+              target.write_text(content, encoding='utf-8')
+
+          def replace(path, old, new, count=1):
+              content = read(path)
+              actual = content.count(old)
+              if actual != count:
+                  raise SystemExit(f'{path}: expected {count} occurrences, found {actual}: {old[:80]!r}')
+              write(path, content.replace(old, new, count))
+
+          # Data paths: add external Styles directory.
+          replace(
+              'lib/core/app_paths.dart',
+              "  static late final String translationsDirectory;\n",
+              "  static late final String translationsDirectory;\n  static late final String stylesDirectory;\n",
+          )
+          replace(
+              'lib/core/app_paths.dart',
+              "    translationsDirectory = p.join(dataDirectory, 'Translations');\n",
+              "    translationsDirectory = p.join(dataDirectory, 'Translations');\n    stylesDirectory = p.join(dataDirectory, 'Styles');\n",
+          )
+          replace(
+              'lib/core/app_paths.dart',
+              "    await Directory(translationsDirectory).create(recursive: true);\n",
+              "    await Directory(translationsDirectory).create(recursive: true);\n    await Directory(stylesDirectory).create(recursive: true);\n",
+          )
+
+          # Initialize style packs before settings are loaded.
+          replace(
+              'lib/main.dart',
+              "import 'services/single_instance_service.dart';\n",
+              "import 'services/single_instance_service.dart';\nimport 'theme/ui_style_registry.dart';\n",
+          )
+          replace(
+              'lib/main.dart',
+              "    await AppStrings.initialize();\n    await BirthPlaceService.initialize();\n",
+              "    await AppStrings.initialize();\n    await UiStyleRegistry.initialize();\n    await BirthPlaceService.initialize();\n",
+          )
+
+          # Persist syntactically safe dynamic style IDs; availability is checked by SettingsService.
+          replace(
+              'lib/models/app_settings.dart',
+              "  static const supportedUiStyles = ['glassmorphism'];\n\n  static const defaults = AppSettings(shopName: 'Negozio');\n",
+              "  static bool isSafeUiStyleId(String? value) {\n    final normalized = value?.trim().toLowerCase();\n    return normalized != null &&\n        RegExp(r'^[a-z0-9][a-z0-9_-]{0,63}$').hasMatch(normalized);\n  }\n\n  static const defaults = AppSettings(shopName: 'Negozio');\n",
+          )
+          replace(
+              'lib/models/app_settings.dart',
+              "      uiStyle: supportedUiStyles.contains(uiStyle)\n          ? uiStyle!\n          : defaults.uiStyle,\n",
+              "      uiStyle: isSafeUiStyleId(uiStyle) ? uiStyle! : defaults.uiStyle,\n",
+          )
+
+          # Settings service validates requested style IDs against the live registry.
+          replace(
+              'lib/services/settings_service.dart',
+              "import '../models/fiscal_register.dart';\n",
+              "import '../models/fiscal_register.dart';\nimport '../theme/ui_style_registry.dart';\n",
+          )
+          replace(
+              'lib/services/settings_service.dart',
+              "      final settings = AppSettings.fromJson(decoded);\n      if (AppStrings.hasLanguage(settings.languageCode)) return settings;\n      return settings.copyWith(languageCode: AppStrings.fallbackLanguageCode);\n",
+              "      var settings = AppSettings.fromJson(decoded);\n      if (!AppStrings.hasLanguage(settings.languageCode)) {\n        settings = settings.copyWith(\n          languageCode: AppStrings.fallbackLanguageCode,\n        );\n      }\n      if (!UiStyleRegistry.hasStyle(settings.uiStyle)) {\n        settings = settings.copyWith(uiStyle: UiStyleRegistry.fallbackId);\n      }\n      return settings;\n",
+          )
+          replace(
+              'lib/services/settings_service.dart',
+              "    final requestedUiStyle = uiStyle?.trim().toLowerCase();\n    final normalizedUiStyle = AppSettings.supportedUiStyles.contains(requestedUiStyle)\n        ? requestedUiStyle!\n        : current.uiStyle;\n",
+              "    final requestedUiStyle = uiStyle?.trim().toLowerCase();\n    final normalizedUiStyle = UiStyleRegistry.hasStyle(requestedUiStyle)\n        ? requestedUiStyle!\n        : UiStyleRegistry.hasStyle(current.uiStyle)\n            ? current.uiStyle\n            : UiStyleRegistry.fallbackId;\n",
+          )
+
+          # Version bump.
+          replace('pubspec.yaml', 'version: 0.2.0-b5\n', 'version: 0.2.0-b6\n')
+          replace(
+              'lib/services/update_service.dart',
+              "  static const currentVersion = '0.2.0-b5';\n",
+              "  static const currentVersion = '0.2.0-b6';\n",
+          )
+          replace(
+              'pubspec.yaml',
+              "    - assets/translations/\n",
+              "    - assets/translations/\n    - assets/styles/\n",
+          )
+
+          # Theme extension now supports an optional pack background image.
+          write('lib/theme/ui_style_tokens.dart', r'''import 'package:flutter/material.dart';
+
+@immutable
+class UiStyleTokens extends ThemeExtension<UiStyleTokens> {
+  const UiStyleTokens({
+    required this.backgroundStart,
+    required this.backgroundMiddle,
+    required this.backgroundEnd,
+    required this.glowPrimary,
+    required this.glowSecondary,
+    required this.glowTertiary,
+    required this.cardSurface,
+    required this.strongSurface,
+    required this.subtleSurface,
+    required this.surfaceBase,
+    required this.surfaceOpacity,
+    required this.contentSurfaceOpacity,
+    required this.notificationSurfaceOpacity,
+    required this.border,
+    required this.softBorder,
+    required this.shadow,
+    required this.menuSurface,
+    required this.menuBorder,
+    required this.menuShadow,
+    required this.tooltipSurface,
+    required this.tooltipBorder,
+    required this.tooltipShadow,
+    required this.imagePreviewSurface,
+    required this.captionHover,
+    required this.surfaceBlur,
+    required this.menuBlur,
+    this.backgroundImagePath,
+    this.backgroundImageOpacity = 1,
+  });
+
+  final Color backgroundStart;
+  final Color backgroundMiddle;
+  final Color backgroundEnd;
+  final Color glowPrimary;
+  final Color glowSecondary;
+  final Color glowTertiary;
+  final Color cardSurface;
+  final Color strongSurface;
+  final Color subtleSurface;
+  final Color surfaceBase;
+  final double surfaceOpacity;
+  final double contentSurfaceOpacity;
+  final double notificationSurfaceOpacity;
+  final Color border;
+  final Color softBorder;
+  final Color shadow;
+  final Color menuSurface;
+  final Color menuBorder;
+  final Color menuShadow;
+  final Color tooltipSurface;
+  final Color tooltipBorder;
+  final Color tooltipShadow;
+  final Color imagePreviewSurface;
+  final Color captionHover;
+  final double surfaceBlur;
+  final double menuBlur;
+  final String? backgroundImagePath;
+  final double backgroundImageOpacity;
+
+  List<Color> get backgroundGradient => [
+        backgroundStart,
+        backgroundMiddle,
+        backgroundEnd,
+      ];
+
+  static UiStyleTokens of(BuildContext context) {
+    final tokens = Theme.of(context).extension<UiStyleTokens>();
+    assert(tokens != null, 'UiStyleTokens non installati nel ThemeData corrente.');
+    return tokens!;
+  }
+
+  @override
+  UiStyleTokens copyWith({
+    Color? backgroundStart,
+    Color? backgroundMiddle,
+    Color? backgroundEnd,
+    Color? glowPrimary,
+    Color? glowSecondary,
+    Color? glowTertiary,
+    Color? cardSurface,
+    Color? strongSurface,
+    Color? subtleSurface,
+    Color? surfaceBase,
+    double? surfaceOpacity,
+    double? contentSurfaceOpacity,
+    double? notificationSurfaceOpacity,
+    Color? border,
+    Color? softBorder,
+    Color? shadow,
+    Color? menuSurface,
+    Color? menuBorder,
+    Color? menuShadow,
+    Color? tooltipSurface,
+    Color? tooltipBorder,
+    Color? tooltipShadow,
+    Color? imagePreviewSurface,
+    Color? captionHover,
+    double? surfaceBlur,
+    double? menuBlur,
+    String? backgroundImagePath,
+    double? backgroundImageOpacity,
+  }) =>
+      UiStyleTokens(
+        backgroundStart: backgroundStart ?? this.backgroundStart,
+        backgroundMiddle: backgroundMiddle ?? this.backgroundMiddle,
+        backgroundEnd: backgroundEnd ?? this.backgroundEnd,
+        glowPrimary: glowPrimary ?? this.glowPrimary,
+        glowSecondary: glowSecondary ?? this.glowSecondary,
+        glowTertiary: glowTertiary ?? this.glowTertiary,
+        cardSurface: cardSurface ?? this.cardSurface,
+        strongSurface: strongSurface ?? this.strongSurface,
+        subtleSurface: subtleSurface ?? this.subtleSurface,
+        surfaceBase: surfaceBase ?? this.surfaceBase,
+        surfaceOpacity: surfaceOpacity ?? this.surfaceOpacity,
+        contentSurfaceOpacity:
+            contentSurfaceOpacity ?? this.contentSurfaceOpacity,
+        notificationSurfaceOpacity:
+            notificationSurfaceOpacity ?? this.notificationSurfaceOpacity,
+        border: border ?? this.border,
+        softBorder: softBorder ?? this.softBorder,
+        shadow: shadow ?? this.shadow,
+        menuSurface: menuSurface ?? this.menuSurface,
+        menuBorder: menuBorder ?? this.menuBorder,
+        menuShadow: menuShadow ?? this.menuShadow,
+        tooltipSurface: tooltipSurface ?? this.tooltipSurface,
+        tooltipBorder: tooltipBorder ?? this.tooltipBorder,
+        tooltipShadow: tooltipShadow ?? this.tooltipShadow,
+        imagePreviewSurface: imagePreviewSurface ?? this.imagePreviewSurface,
+        captionHover: captionHover ?? this.captionHover,
+        surfaceBlur: surfaceBlur ?? this.surfaceBlur,
+        menuBlur: menuBlur ?? this.menuBlur,
+        backgroundImagePath: backgroundImagePath ?? this.backgroundImagePath,
+        backgroundImageOpacity:
+            backgroundImageOpacity ?? this.backgroundImageOpacity,
+      );
+
+  @override
+  UiStyleTokens lerp(covariant UiStyleTokens? other, double t) {
+    if (other == null) return this;
+    double lerpDouble(double a, double b) => a + (b - a) * t;
+    return UiStyleTokens(
+      backgroundStart: Color.lerp(backgroundStart, other.backgroundStart, t)!,
+      backgroundMiddle:
+          Color.lerp(backgroundMiddle, other.backgroundMiddle, t)!,
+      backgroundEnd: Color.lerp(backgroundEnd, other.backgroundEnd, t)!,
+      glowPrimary: Color.lerp(glowPrimary, other.glowPrimary, t)!,
+      glowSecondary: Color.lerp(glowSecondary, other.glowSecondary, t)!,
+      glowTertiary: Color.lerp(glowTertiary, other.glowTertiary, t)!,
+      cardSurface: Color.lerp(cardSurface, other.cardSurface, t)!,
+      strongSurface: Color.lerp(strongSurface, other.strongSurface, t)!,
+      subtleSurface: Color.lerp(subtleSurface, other.subtleSurface, t)!,
+      surfaceBase: Color.lerp(surfaceBase, other.surfaceBase, t)!,
+      surfaceOpacity: lerpDouble(surfaceOpacity, other.surfaceOpacity),
+      contentSurfaceOpacity:
+          lerpDouble(contentSurfaceOpacity, other.contentSurfaceOpacity),
+      notificationSurfaceOpacity: lerpDouble(
+        notificationSurfaceOpacity,
+        other.notificationSurfaceOpacity,
+      ),
+      border: Color.lerp(border, other.border, t)!,
+      softBorder: Color.lerp(softBorder, other.softBorder, t)!,
+      shadow: Color.lerp(shadow, other.shadow, t)!,
+      menuSurface: Color.lerp(menuSurface, other.menuSurface, t)!,
+      menuBorder: Color.lerp(menuBorder, other.menuBorder, t)!,
+      menuShadow: Color.lerp(menuShadow, other.menuShadow, t)!,
+      tooltipSurface: Color.lerp(tooltipSurface, other.tooltipSurface, t)!,
+      tooltipBorder: Color.lerp(tooltipBorder, other.tooltipBorder, t)!,
+      tooltipShadow: Color.lerp(tooltipShadow, other.tooltipShadow, t)!,
+      imagePreviewSurface:
+          Color.lerp(imagePreviewSurface, other.imagePreviewSurface, t)!,
+      captionHover: Color.lerp(captionHover, other.captionHover, t)!,
+      surfaceBlur: lerpDouble(surfaceBlur, other.surfaceBlur),
+      menuBlur: lerpDouble(menuBlur, other.menuBlur),
+      backgroundImagePath:
+          t < 0.5 ? backgroundImagePath : other.backgroundImagePath,
+      backgroundImageOpacity:
+          lerpDouble(backgroundImageOpacity, other.backgroundImageOpacity),
+    );
+  }
+}
+''')
+
+          # Runtime declarative style pack implementation.
+          write('lib/theme/external_ui_style_pack.dart', r'''import 'dart:convert';
+import 'dart:io';
+
+import 'package:flutter/material.dart';
+import 'package:path/path.dart' as p;
+
+import 'ui_style.dart';
+import 'ui_style_tokens.dart';
+
+class ExternalUiStylePack implements AppUiStyle {
+  const ExternalUiStylePack._({
+    required this.id,
+    required this.label,
+    required this.directoryPath,
+    required _ExternalStyleVariant light,
+    required _ExternalStyleVariant dark,
+  })  : _light = light,
+        _dark = dark;
+
+  static const schemaVersion = 1;
+
+  @override
+  final String id;
+  @override
+  final String label;
+  final String directoryPath;
+  final _ExternalStyleVariant _light;
+  final _ExternalStyleVariant _dark;
+
+  factory ExternalUiStylePack.load(Directory directory) {
+    final metadataFile = File(p.join(directory.path, 'style.json'));
+    final lightFile = File(p.join(directory.path, 'light.json'));
+    final darkFile = File(p.join(directory.path, 'dark.json'));
+    if (!metadataFile.existsSync()) {
+      throw const FormatException('style.json mancante.');
+    }
+    if (!lightFile.existsSync() || !darkFile.existsSync()) {
+      throw const FormatException(
+        'Ogni stile deve contenere sia light.json sia dark.json.',
+      );
+    }
+
+    final metadata = _readObject(metadataFile);
+    final rawSchema = metadata['schemaVersion'];
+    if (rawSchema is! num || rawSchema.toInt() != schemaVersion) {
+      throw FormatException(
+        'schemaVersion non supportato: ${rawSchema ?? 'assente'}.',
+      );
+    }
+    final rawId = metadata['id'];
+    final rawName = metadata['name'];
+    if (rawId is! String || rawId.trim().isEmpty) {
+      throw const FormatException('id stile mancante o non valido.');
+    }
+    final id = rawId.trim().toLowerCase();
+    if (!RegExp(r'^[a-z0-9][a-z0-9_-]{0,63}$').hasMatch(id)) {
+      throw const FormatException(
+        'id stile non valido: usa solo lettere minuscole, numeri, - e _.',
+      );
+    }
+    if (rawName is! String || rawName.trim().isEmpty) {
+      throw const FormatException('name stile mancante o non valido.');
+    }
+
+    return ExternalUiStylePack._(
+      id: id,
+      label: rawName.trim(),
+      directoryPath: p.normalize(p.absolute(directory.path)),
+      light: _ExternalStyleVariant.parse(
+        lightFile,
+        directory,
+        Brightness.light,
+      ),
+      dark: _ExternalStyleVariant.parse(
+        darkFile,
+        directory,
+        Brightness.dark,
+      ),
+    );
+  }
+
+  @override
+  ThemeData lightTheme() => _buildTheme(Brightness.light, _light);
+
+  @override
+  ThemeData darkTheme() => _buildTheme(Brightness.dark, _dark);
+
+  ThemeData _buildTheme(Brightness brightness, _ExternalStyleVariant variant) {
+    final tokens = variant.tokens;
+    final c = variant.components;
+    final scheme = ColorScheme.fromSeed(
+      seedColor: variant.seedColor,
+      brightness: brightness,
+    );
+
+    OutlineInputBorder inputBorder(Color color, {double width = 1}) =>
+        OutlineInputBorder(
+          borderRadius: BorderRadius.circular(c.inputRadius),
+          borderSide: BorderSide(color: color, width: width),
+        );
+
+    final menuShape = RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(c.menuRadius),
+      side: BorderSide(color: tokens.menuBorder),
+    );
+    final menuStyle = MenuStyle(
+      backgroundColor: WidgetStatePropertyAll(tokens.menuSurface),
+      surfaceTintColor: const WidgetStatePropertyAll(Colors.transparent),
+      shadowColor: WidgetStatePropertyAll(tokens.menuShadow),
+      elevation: const WidgetStatePropertyAll(8),
+      shape: WidgetStatePropertyAll(menuShape),
+    );
+
+    return ThemeData(
+      useMaterial3: true,
+      brightness: brightness,
+      colorScheme: scheme,
+      scaffoldBackgroundColor: Colors.transparent,
+      canvasColor: tokens.strongSurface,
+      visualDensity: VisualDensity.compact,
+      extensions: <ThemeExtension<dynamic>>[tokens],
+      cardTheme: CardThemeData(
+        color: tokens.cardSurface,
+        surfaceTintColor: Colors.transparent,
+        shadowColor: Colors.transparent,
+        elevation: 0,
+        clipBehavior: Clip.antiAlias,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(c.cardRadius),
+          side: BorderSide(color: tokens.border),
+        ),
+      ),
+      inputDecorationTheme: InputDecorationThemeData(
+        filled: true,
+        fillColor: tokens.subtleSurface,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        border: inputBorder(tokens.softBorder),
+        enabledBorder: inputBorder(tokens.softBorder),
+        focusedBorder: inputBorder(
+          scheme.primary.withValues(alpha: 0.7),
+          width: 1.5,
+        ),
+        errorBorder: inputBorder(scheme.error.withValues(alpha: 0.75)),
+        focusedErrorBorder: inputBorder(scheme.error, width: 1.5),
+      ),
+      navigationRailTheme: NavigationRailThemeData(
+        backgroundColor: Colors.transparent,
+        indicatorColor:
+            scheme.primary.withValues(alpha: c.railIndicatorOpacity),
+        selectedIconTheme: IconThemeData(color: scheme.primary),
+        selectedLabelTextStyle: TextStyle(
+          color: scheme.primary,
+          fontWeight: FontWeight.w700,
+        ),
+        unselectedIconTheme: IconThemeData(
+          color: scheme.onSurfaceVariant.withValues(alpha: 0.82),
+        ),
+        unselectedLabelTextStyle: TextStyle(color: scheme.onSurfaceVariant),
+      ),
+      dividerTheme: DividerThemeData(
+        color: tokens.softBorder,
+        thickness: 1,
+        space: 1,
+      ),
+      dialogTheme: DialogThemeData(
+        backgroundColor: tokens.strongSurface,
+        surfaceTintColor: Colors.transparent,
+        shadowColor: tokens.tooltipShadow,
+        elevation: 10,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(c.dialogRadius),
+          side: BorderSide(color: tokens.border),
+        ),
+      ),
+      menuTheme: MenuThemeData(style: menuStyle),
+      dropdownMenuTheme: DropdownMenuThemeData(menuStyle: menuStyle),
+      popupMenuTheme: PopupMenuThemeData(
+        color: tokens.menuSurface,
+        surfaceTintColor: Colors.transparent,
+        elevation: 8,
+        shadowColor: tokens.menuShadow,
+        shape: menuShape,
+      ),
+      snackBarTheme: SnackBarThemeData(
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: tokens.strongSurface,
+        contentTextStyle: TextStyle(color: scheme.onSurface),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(c.snackBarRadius),
+          side: BorderSide(color: tokens.border),
+        ),
+      ),
+      filledButtonTheme: FilledButtonThemeData(
+        style: FilledButton.styleFrom(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(c.buttonRadius),
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 13),
+        ),
+      ),
+      outlinedButtonTheme: OutlinedButtonThemeData(
+        style: OutlinedButton.styleFrom(
+          side: BorderSide(color: scheme.primary.withValues(alpha: 0.34)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(c.buttonRadius),
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        ),
+      ),
+      iconButtonTheme: IconButtonThemeData(
+        style: IconButton.styleFrom(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(c.iconButtonRadius),
+          ),
+        ),
+      ),
+      listTileTheme: ListTileThemeData(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(c.listTileRadius),
+        ),
+        selectedTileColor:
+            scheme.primary.withValues(alpha: c.selectedTileOpacity),
+      ),
+    );
+  }
+}
+
+class _ExternalStyleVariant {
+  const _ExternalStyleVariant({
+    required this.seedColor,
+    required this.tokens,
+    required this.components,
+  });
+
+  final Color seedColor;
+  final UiStyleTokens tokens;
+  final _ExternalComponentTokens components;
+
+  factory _ExternalStyleVariant.parse(
+    File file,
+    Directory styleDirectory,
+    Brightness brightness,
+  ) {
+    final json = _readObject(file);
+    final tokenJson = _object(json, 'tokens');
+    final componentJson = json['components'] is Map
+        ? Map<String, dynamic>.from(json['components'] as Map)
+        : const <String, dynamic>{};
+    final backgroundImagePath = _backgroundImagePath(
+      styleDirectory,
+      json['backgroundImage'],
+    );
+
+    return _ExternalStyleVariant(
+      seedColor: _color(json['seedColor'], 'seedColor'),
+      tokens: UiStyleTokens(
+        backgroundStart: _color(tokenJson['backgroundStart'], 'backgroundStart'),
+        backgroundMiddle:
+            _color(tokenJson['backgroundMiddle'], 'backgroundMiddle'),
+        backgroundEnd: _color(tokenJson['backgroundEnd'], 'backgroundEnd'),
+        glowPrimary: _color(tokenJson['glowPrimary'], 'glowPrimary'),
+        glowSecondary: _color(tokenJson['glowSecondary'], 'glowSecondary'),
+        glowTertiary: _color(tokenJson['glowTertiary'], 'glowTertiary'),
+        cardSurface: _color(tokenJson['cardSurface'], 'cardSurface'),
+        strongSurface: _color(tokenJson['strongSurface'], 'strongSurface'),
+        subtleSurface: _color(tokenJson['subtleSurface'], 'subtleSurface'),
+        surfaceBase: _color(tokenJson['surfaceBase'], 'surfaceBase'),
+        surfaceOpacity:
+            _number(tokenJson['surfaceOpacity'], 'surfaceOpacity', 0, 1),
+        contentSurfaceOpacity: _number(
+          tokenJson['contentSurfaceOpacity'],
+          'contentSurfaceOpacity',
+          0,
+          1,
+        ),
+        notificationSurfaceOpacity: _number(
+          tokenJson['notificationSurfaceOpacity'],
+          'notificationSurfaceOpacity',
+          0,
+          1,
+        ),
+        border: _color(tokenJson['border'], 'border'),
+        softBorder: _color(tokenJson['softBorder'], 'softBorder'),
+        shadow: _color(tokenJson['shadow'], 'shadow'),
+        menuSurface: _color(tokenJson['menuSurface'], 'menuSurface'),
+        menuBorder: _color(tokenJson['menuBorder'], 'menuBorder'),
+        menuShadow: _color(tokenJson['menuShadow'], 'menuShadow'),
+        tooltipSurface:
+            _color(tokenJson['tooltipSurface'], 'tooltipSurface'),
+        tooltipBorder: _color(tokenJson['tooltipBorder'], 'tooltipBorder'),
+        tooltipShadow: _color(tokenJson['tooltipShadow'], 'tooltipShadow'),
+        imagePreviewSurface:
+            _color(tokenJson['imagePreviewSurface'], 'imagePreviewSurface'),
+        captionHover: _color(tokenJson['captionHover'], 'captionHover'),
+        surfaceBlur: _number(tokenJson['surfaceBlur'], 'surfaceBlur', 0, 100),
+        menuBlur: _number(tokenJson['menuBlur'], 'menuBlur', 0, 100),
+        backgroundImagePath: backgroundImagePath,
+        backgroundImageOpacity: json['backgroundImageOpacity'] == null
+            ? 1
+            : _number(
+                json['backgroundImageOpacity'],
+                'backgroundImageOpacity',
+                0,
+                1,
+              ),
+      ),
+      components: _ExternalComponentTokens.fromJson(
+        componentJson,
+        brightness,
+      ),
+    );
+  }
+}
+
+class _ExternalComponentTokens {
+  const _ExternalComponentTokens({
+    required this.cardRadius,
+    required this.inputRadius,
+    required this.menuRadius,
+    required this.dialogRadius,
+    required this.snackBarRadius,
+    required this.buttonRadius,
+    required this.iconButtonRadius,
+    required this.listTileRadius,
+    required this.railIndicatorOpacity,
+    required this.selectedTileOpacity,
+  });
+
+  final double cardRadius;
+  final double inputRadius;
+  final double menuRadius;
+  final double dialogRadius;
+  final double snackBarRadius;
+  final double buttonRadius;
+  final double iconButtonRadius;
+  final double listTileRadius;
+  final double railIndicatorOpacity;
+  final double selectedTileOpacity;
+
+  factory _ExternalComponentTokens.fromJson(
+    Map<String, dynamic> json,
+    Brightness brightness,
+  ) {
+    double value(String key, double fallback, double min, double max) =>
+        json[key] == null ? fallback : _number(json[key], key, min, max);
+    final dark = brightness == Brightness.dark;
+    return _ExternalComponentTokens(
+      cardRadius: value('cardRadius', 20, 0, 64),
+      inputRadius: value('inputRadius', 16, 0, 64),
+      menuRadius: value('menuRadius', 16, 0, 64),
+      dialogRadius: value('dialogRadius', 24, 0, 64),
+      snackBarRadius: value('snackBarRadius', 16, 0, 64),
+      buttonRadius: value('buttonRadius', 14, 0, 64),
+      iconButtonRadius: value('iconButtonRadius', 12, 0, 64),
+      listTileRadius: value('listTileRadius', 14, 0, 64),
+      railIndicatorOpacity:
+          value('railIndicatorOpacity', dark ? 0.24 : 0.16, 0, 1),
+      selectedTileOpacity:
+          value('selectedTileOpacity', dark ? 0.16 : 0.10, 0, 1),
+    );
+  }
+}
+
+Map<String, dynamic> _readObject(File file) {
+  final decoded = jsonDecode(file.readAsStringSync());
+  if (decoded is! Map) {
+    throw FormatException('${p.basename(file.path)} deve contenere un oggetto JSON.');
+  }
+  return Map<String, dynamic>.from(decoded);
+}
+
+Map<String, dynamic> _object(Map<String, dynamic> source, String key) {
+  final value = source[key];
+  if (value is! Map) {
+    throw FormatException('$key mancante o non valido.');
+  }
+  return Map<String, dynamic>.from(value);
+}
+
+Color _color(Object? raw, String key) {
+  if (raw is num) return Color(raw.toInt());
+  if (raw is! String) throw FormatException('$key deve essere un colore.');
+  var value = raw.trim().toLowerCase();
+  if (value.startsWith('#')) value = value.substring(1);
+  if (value.startsWith('0x')) value = value.substring(2);
+  if (value.length == 6) value = 'ff$value';
+  if (value.length != 8 || !RegExp(r'^[0-9a-f]{8}$').hasMatch(value)) {
+    throw FormatException('$key: colore non valido ($raw).');
+  }
+  return Color(int.parse(value, radix: 16));
+}
+
+double _number(Object? raw, String key, double min, double max) {
+  if (raw is! num) throw FormatException('$key deve essere numerico.');
+  final value = raw.toDouble();
+  if (!value.isFinite || value < min || value > max) {
+    throw FormatException('$key deve essere compreso tra $min e $max.');
+  }
+  return value;
+}
+
+String? _backgroundImagePath(Directory directory, Object? raw) {
+  if (raw == null) return null;
+  if (raw is! String || raw.trim().isEmpty) {
+    throw const FormatException('backgroundImage non valido.');
+  }
+  final relative = raw.trim();
+  if (p.isAbsolute(relative)) {
+    throw const FormatException('backgroundImage deve essere un percorso relativo.');
+  }
+  final root = p.normalize(p.absolute(directory.path));
+  final full = p.normalize(p.absolute(p.join(root, relative)));
+  if (!p.isWithin(root, full)) {
+    throw const FormatException('backgroundImage deve restare nella cartella dello stile.');
+  }
+  final extension = p.extension(full).toLowerCase();
+  if (!const {'.png', '.jpg', '.jpeg', '.webp', '.bmp'}.contains(extension)) {
+    throw const FormatException('Formato backgroundImage non supportato.');
+  }
+  if (!File(full).existsSync()) {
+    throw FormatException('backgroundImage non trovato: $relative.');
+  }
+  return full;
+}
+''')
+
+          # Dynamic registry: built-in fallback + externally loaded packs.
+          write('lib/theme/ui_style_registry.dart', r'''import 'dart:io';
+
+import 'package:flutter/services.dart';
+import 'package:path/path.dart' as p;
+
+import '../core/app_paths.dart';
+import 'external_ui_style_pack.dart';
+import 'styles/glassmorphism/glassmorphism_style.dart';
+import 'ui_style.dart';
+
+class UiStyleRegistry {
+  const UiStyleRegistry._();
+
+  static const fallbackId = GlassmorphismStyle.styleId;
+  static const _fallback = GlassmorphismStyle();
+  static const _bundledGlassmorphismFiles = <String, String>{
+    'assets/styles/glassmorphism/style.json': 'style.json',
+    'assets/styles/glassmorphism/light.json': 'light.json',
+    'assets/styles/glassmorphism/dark.json': 'dark.json',
+  };
+
+  static final Map<String, AppUiStyle> _external = {};
+  static final Map<String, String> _invalidPacks = {};
+
+  static List<AppUiStyle> get all {
+    final styles = <String, AppUiStyle>{fallbackId: _fallback, ..._external};
+    final values = styles.values.toList(growable: false)
+      ..sort((a, b) => a.label.toLowerCase().compareTo(b.label.toLowerCase()));
+    return values;
+  }
+
+  static Map<String, String> get invalidPacks =>
+      Map<String, String>.unmodifiable(_invalidPacks);
+
+  static Future<void> initialize() async {
+    await _seedBundledGlassmorphism();
+    await reload();
+  }
+
+  static Future<void> reload() => reloadFromDirectory(AppPaths.stylesDirectory);
+
+  static Future<void> reloadFromDirectory(String directoryPath) async {
+    final directory = Directory(directoryPath);
+    await directory.create(recursive: true);
+    final loaded = <String, AppUiStyle>{};
+    final invalid = <String, String>{};
+    final folders = directory
+        .listSync()
+        .whereType<Directory>()
+        .toList(growable: false)
+      ..sort((a, b) => a.path.toLowerCase().compareTo(b.path.toLowerCase()));
+
+    for (final folder in folders) {
+      final folderName = p.basename(folder.path);
+      try {
+        final style = ExternalUiStylePack.load(folder);
+        if (loaded.containsKey(style.id)) {
+          throw FormatException('id stile duplicato: ${style.id}.');
+        }
+        loaded[style.id] = style;
+      } catch (error) {
+        invalid[folderName] = error.toString();
+      }
+    }
+
+    _external
+      ..clear()
+      ..addAll(loaded);
+    _invalidPacks
+      ..clear()
+      ..addAll(invalid);
+  }
+
+  static bool hasStyle(String? id) {
+    final normalized = id?.trim().toLowerCase();
+    if (normalized == null || normalized.isEmpty) return false;
+    return normalized == fallbackId || _external.containsKey(normalized);
+  }
+
+  static AppUiStyle resolve(String? id) {
+    final normalized = id?.trim().toLowerCase();
+    if (normalized != null) {
+      final external = _external[normalized];
+      if (external != null) return external;
+      if (normalized == fallbackId) return _fallback;
+    }
+    return _fallback;
+  }
+
+  static Future<void> _seedBundledGlassmorphism() async {
+    final root = Directory(AppPaths.stylesDirectory);
+    await root.create(recursive: true);
+    final destination = Directory(p.join(root.path, 'Glassmorphism'));
+    if (await destination.exists()) return;
+    await destination.create(recursive: true);
+    for (final entry in _bundledGlassmorphismFiles.entries) {
+      final content = await rootBundle.loadString(entry.key);
+      await File(p.join(destination.path, entry.value)).writeAsString(
+        content,
+        flush: true,
+      );
+    }
+  }
+}
+''')
+
+          # Background asset support while keeping the gradient and glow layers.
+          write('lib/widgets/glass.dart', r'''import 'dart:io';
+import 'dart:ui';
+
+import 'package:flutter/material.dart';
+
+import '../theme/ui_style_tokens.dart';
+
+enum GlassSurfaceRole { standard, content, notification }
+
+class GlassBackground extends StatelessWidget {
+  const GlassBackground({super.key, required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = UiStyleTokens.of(context);
+    final backgroundImagePath = tokens.backgroundImagePath;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: tokens.backgroundGradient,
+        ),
+      ),
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          if (backgroundImagePath != null)
+            IgnorePointer(
+              child: Opacity(
+                opacity: tokens.backgroundImageOpacity,
+                child: Image.file(
+                  File(backgroundImagePath),
+                  fit: BoxFit.cover,
+                  gaplessPlayback: true,
+                ),
+              ),
+            ),
+          _GlowOrb(
+            alignment: const Alignment(-1.15, -1.05),
+            size: 430,
+            color: tokens.glowPrimary,
+          ),
+          _GlowOrb(
+            alignment: const Alignment(1.10, -0.65),
+            size: 360,
+            color: tokens.glowSecondary,
+          ),
+          _GlowOrb(
+            alignment: const Alignment(0.55, 1.15),
+            size: 430,
+            color: tokens.glowTertiary,
+          ),
+          child,
+        ],
+      ),
+    );
+  }
+}
+
+class GlassSurface extends StatelessWidget {
+  const GlassSurface({
+    super.key,
+    required this.child,
+    this.borderRadius = const BorderRadius.all(Radius.circular(22)),
+    this.padding,
+    this.blur,
+    this.opacity,
+    this.role = GlassSurfaceRole.standard,
+  });
+
+  final Widget child;
+  final BorderRadius borderRadius;
+  final EdgeInsetsGeometry? padding;
+  final double? blur;
+  final double? opacity;
+  final GlassSurfaceRole role;
+
+  double _roleOpacity(UiStyleTokens tokens) => switch (role) {
+        GlassSurfaceRole.standard => tokens.surfaceOpacity,
+        GlassSurfaceRole.content => tokens.contentSurfaceOpacity,
+        GlassSurfaceRole.notification => tokens.notificationSurfaceOpacity,
+      };
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = UiStyleTokens.of(context);
+    final effectiveOpacity = opacity ?? _roleOpacity(tokens);
+    final effectiveBlur = blur ?? tokens.surfaceBlur;
+
+    return ClipRRect(
+      borderRadius: borderRadius,
+      child: BackdropFilter(
+        filter: ImageFilter.blur(
+          sigmaX: effectiveBlur,
+          sigmaY: effectiveBlur,
+        ),
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: tokens.surfaceBase.withValues(alpha: effectiveOpacity),
+            borderRadius: borderRadius,
+            border: Border.all(color: tokens.border),
+            boxShadow: [
+              BoxShadow(
+                color: tokens.shadow,
+                blurRadius: 30,
+                offset: const Offset(0, 12),
+              ),
+            ],
+          ),
+          child: padding == null
+              ? child
+              : Padding(padding: padding!, child: child),
+        ),
+      ),
+    );
+  }
+}
+
+class _GlowOrb extends StatelessWidget {
+  const _GlowOrb({
+    required this.alignment,
+    required this.size,
+    required this.color,
+  });
+
+  final Alignment alignment;
+  final double size;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) => Align(
+        alignment: alignment,
+        child: IgnorePointer(
+          child: ImageFiltered(
+            imageFilter: ImageFilter.blur(sigmaX: 70, sigmaY: 70),
+            child: Container(
+              width: size,
+              height: size,
+              decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+            ),
+          ),
+        ),
+      );
+}
+''')
+
+          # Settings UI: reload button next to Style dropdown and Styles folder path.
+          replace(
+              'lib/pages/settings_page.dart',
+              "  bool _checking = false;\n  bool _saving = false;\n",
+              "  bool _checking = false;\n  bool _saving = false;\n  bool _reloadingStyles = false;\n",
+          )
+          marker = "  Future<void> _checkUpdates() async {\n"
+          reload_method = r'''  Future<void> _reloadStyles() async {
+    setState(() => _reloadingStyles = true);
+    try {
+      await UiStyleRegistry.reload();
+      if (!mounted) return;
+      final selectedStyle = UiStyleRegistry.hasStyle(_uiStyle)
+          ? _uiStyle
+          : UiStyleRegistry.fallbackId;
+      final activeStyle = UiStyleRegistry.hasStyle(widget.current.uiStyle)
+          ? widget.current.uiStyle
+          : UiStyleRegistry.fallbackId;
+      setState(() {
+        _uiStyle = selectedStyle;
+        final invalidCount = UiStyleRegistry.invalidPacks.length;
+        _status = invalidCount == 0
+            ? _itEn(
+                'Stili ricaricati. ${UiStyleRegistry.all.length} stili disponibili.',
+                'Styles reloaded. ${UiStyleRegistry.all.length} styles available.',
+              )
+            : _itEn(
+                'Stili ricaricati. $invalidCount pacchetti non validi sono stati ignorati.',
+                'Styles reloaded. $invalidCount invalid packs were ignored.',
+              );
+      });
+      widget.onSaved(widget.current.copyWith(uiStyle: activeStyle));
+    } catch (error) {
+      if (mounted) {
+        setState(() => _status = _itEn(
+              'Impossibile ricaricare gli stili: $error',
+              'Unable to reload styles: $error',
+            ));
+      }
+    } finally {
+      if (mounted) setState(() => _reloadingStyles = false);
+    }
+  }
+
+'''
+          replace('lib/pages/settings_page.dart', marker, reload_method + marker)
+
+          old_style_widget = r'''                      Expanded(
+                        child: GlassDropdown<String>(
+                          value: _uiStyle,
+                          labelText: _itEn('Stile', 'Style'),
+                          items: [
+                            for (final style in UiStyleRegistry.all)
+                              GlassDropdownItem(
+                                value: style.id,
+                                label: style.label,
+                              ),
+                          ],
+                          onChanged: (value) => setState(
+                            () => _uiStyle =
+                                value ?? UiStyleRegistry.fallbackId,
+                          ),
+                        ),
+                      ),
+'''
+          new_style_widget = r'''                      Expanded(
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: GlassDropdown<String>(
+                                value: _uiStyle,
+                                labelText: _itEn('Stile', 'Style'),
+                                items: [
+                                  for (final style in UiStyleRegistry.all)
+                                    GlassDropdownItem(
+                                      value: style.id,
+                                      label: style.label,
+                                    ),
+                                ],
+                                onChanged: (value) => setState(
+                                  () => _uiStyle =
+                                      value ?? UiStyleRegistry.fallbackId,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            IconButton.outlined(
+                              tooltip: _itEn(
+                                'Ricarica stili',
+                                'Reload styles',
+                              ),
+                              onPressed: _saving || _reloadingStyles
+                                  ? null
+                                  : _reloadStyles,
+                              icon: _reloadingStyles
+                                  ? const SizedBox(
+                                      width: 18,
+                                      height: 18,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                      ),
+                                    )
+                                  : const Icon(Icons.refresh_rounded),
+                            ),
+                          ],
+                        ),
+                      ),
+'''
+          replace('lib/pages/settings_page.dart', old_style_widget, new_style_widget)
+
+          replace(
+              'lib/pages/settings_page.dart',
+              "                  Text(\n                    '${AppStrings.t('translation_folder')}: ${AppPaths.translationsDirectory}',\n                    style: Theme.of(context).textTheme.bodySmall,\n                  ),\n",
+              "                  Text(\n                    '${AppStrings.t('translation_folder')}: ${AppPaths.translationsDirectory}',\n                    style: Theme.of(context).textTheme.bodySmall,\n                  ),\n                  const SizedBox(height: 2),\n                  Text(\n                    '${_itEn('Cartella stili', 'Styles folder')}: ${AppPaths.stylesDirectory}',\n                    style: Theme.of(context).textTheme.bodySmall,\n                  ),\n",
+          )
+
+          # Bundled Glassmorphism reference pack. It is seeded only when the folder does not exist.
+          style_meta = {
+              'schemaVersion': 1,
+              'id': 'glassmorphism',
+              'name': 'Glassmorphism',
+              'version': '1.0',
+          }
+          light = {
+              'seedColor': '#FF315FCE',
+              'tokens': {
+                  'backgroundStart': '#FFE9F2FF',
+                  'backgroundMiddle': '#FFF5EEFF',
+                  'backgroundEnd': '#FFE8FAF7',
+                  'glowPrimary': '#553A86FF',
+                  'glowSecondary': '#44B95CFF',
+                  'glowTertiary': '#3D37D6B0',
+                  'cardSurface': '#8FFFFFFF',
+                  'strongSurface': '#FAFFFFFF',
+                  'subtleSurface': '#70FFFFFF',
+                  'surfaceBase': '#FFFFFFFF',
+                  'surfaceOpacity': 0.42,
+                  'contentSurfaceOpacity': 0.24,
+                  'notificationSurfaceOpacity': 0.58,
+                  'border': '#A8FFFFFF',
+                  'softBorder': '#72FFFFFF',
+                  'shadow': '#0F000000',
+                  'menuSurface': '#E8FFFFFF',
+                  'menuBorder': '#B8FFFFFF',
+                  'menuShadow': '#29000000',
+                  'tooltipSurface': '#FAFFFFFF',
+                  'tooltipBorder': '#A8FFFFFF',
+                  'tooltipShadow': '#2E000000',
+                  'imagePreviewSurface': '#75FFFFFF',
+                  'captionHover': '#57FFFFFF',
+                  'surfaceBlur': 22,
+                  'menuBlur': 30,
+              },
+              'components': {
+                  'cardRadius': 20,
+                  'inputRadius': 16,
+                  'menuRadius': 16,
+                  'dialogRadius': 24,
+                  'snackBarRadius': 16,
+                  'buttonRadius': 14,
+                  'iconButtonRadius': 12,
+                  'listTileRadius': 14,
+                  'railIndicatorOpacity': 0.16,
+                  'selectedTileOpacity': 0.10,
+              },
+          }
+          dark = {
+              'seedColor': '#FF8EBBFF',
+              'tokens': {
+                  'backgroundStart': '#FF101521',
+                  'backgroundMiddle': '#FF151A2B',
+                  'backgroundEnd': '#FF101821',
+                  'glowPrimary': '#553A86FF',
+                  'glowSecondary': '#44B95CFF',
+                  'glowTertiary': '#3D37D6B0',
+                  'cardSurface': '#1FFFFFFF',
+                  'strongSurface': '#F2232936',
+                  'subtleSurface': '#14FFFFFF',
+                  'surfaceBase': '#FFFFFFFF',
+                  'surfaceOpacity': 0.10,
+                  'contentSurfaceOpacity': 0.055,
+                  'notificationSurfaceOpacity': 0.18,
+                  'border': '#38FFFFFF',
+                  'softBorder': '#24FFFFFF',
+                  'shadow': '#2E000000',
+                  'menuSurface': '#E0212836',
+                  'menuBorder': '#55FFFFFF',
+                  'menuShadow': '#61000000',
+                  'tooltipSurface': '#F2232936',
+                  'tooltipBorder': '#38FFFFFF',
+                  'tooltipShadow': '#6B000000',
+                  'imagePreviewSurface': '#57000000',
+                  'captionHover': '#1AFFFFFF',
+                  'surfaceBlur': 22,
+                  'menuBlur': 30,
+              },
+              'components': {
+                  'cardRadius': 20,
+                  'inputRadius': 16,
+                  'menuRadius': 16,
+                  'dialogRadius': 24,
+                  'snackBarRadius': 16,
+                  'buttonRadius': 14,
+                  'iconButtonRadius': 12,
+                  'listTileRadius': 14,
+                  'railIndicatorOpacity': 0.24,
+                  'selectedTileOpacity': 0.16,
+              },
+          }
+          write('assets/styles/glassmorphism/style.json', json.dumps(style_meta, indent=2) + '\n')
+          write('assets/styles/glassmorphism/light.json', json.dumps(light, indent=2) + '\n')
+          write('assets/styles/glassmorphism/dark.json', json.dumps(dark, indent=2) + '\n')
+
+          # Tests: settings preserve safe external IDs; registry requires both themes and loads runtime packs.
+          replace(
+              'test/app_settings_test.dart',
+              "  test('unsupported UI styles fall back to glassmorphism', () {\n    final settings = AppSettings.fromJson(<String, dynamic>{\n      'ShopName': 'Negozio test',\n      'UiStyle': 'unknown-style',\n    });\n\n    expect(settings.uiStyle, 'glassmorphism');\n  });\n",
+              "  test('safe external UI style IDs survive settings parsing', () {\n    final settings = AppSettings.fromJson(<String, dynamic>{\n      'ShopName': 'Negozio test',\n      'UiStyle': 'community-style',\n    });\n\n    expect(settings.uiStyle, 'community-style');\n  });\n\n  test('invalid UI style IDs fall back to glassmorphism', () {\n    final settings = AppSettings.fromJson(<String, dynamic>{\n      'ShopName': 'Negozio test',\n      'UiStyle': '../bad/style',\n    });\n\n    expect(settings.uiStyle, 'glassmorphism');\n  });\n",
+          )
+
+          write('test/ui_style_registry_test.dart', r'''import 'dart:convert';
+import 'dart:io';
+
+import 'package:flutter/material.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:local_store_management/theme/ui_style_registry.dart';
+import 'package:local_store_management/theme/ui_style_tokens.dart';
+
+void main() {
+  test('glassmorphism installs style tokens in light and dark themes', () {
+    final style = UiStyleRegistry.resolve('glassmorphism');
+    final light = style.lightTheme();
+    final dark = style.darkTheme();
+
+    expect(light.brightness, Brightness.light);
+    expect(dark.brightness, Brightness.dark);
+    expect(light.extension<UiStyleTokens>(), isNotNull);
+    expect(dark.extension<UiStyleTokens>(), isNotNull);
+  });
+
+  test('runtime pack is loaded only when both light and dark files exist', () async {
+    final root = Directory.systemTemp.createTempSync('lsms-style-registry-');
+    addTearDown(() => root.deleteSync(recursive: true));
+    final valid = Directory('${root.path}/Community')..createSync();
+    File('${valid.path}/style.json').writeAsStringSync(jsonEncode({
+      'schemaVersion': 1,
+      'id': 'community',
+      'name': 'Community',
+    }));
+    File('${valid.path}/light.json').writeAsStringSync(jsonEncode(_variant(false)));
+    File('${valid.path}/dark.json').writeAsStringSync(jsonEncode(_variant(true)));
+
+    final invalid = Directory('${root.path}/MissingDark')..createSync();
+    File('${invalid.path}/style.json').writeAsStringSync(jsonEncode({
+      'schemaVersion': 1,
+      'id': 'missing-dark',
+      'name': 'Missing dark',
+    }));
+    File('${invalid.path}/light.json').writeAsStringSync(jsonEncode(_variant(false)));
+
+    await UiStyleRegistry.reloadFromDirectory(root.path);
+
+    expect(UiStyleRegistry.hasStyle('community'), isTrue);
+    expect(UiStyleRegistry.resolve('community').lightTheme().brightness, Brightness.light);
+    expect(UiStyleRegistry.resolve('community').darkTheme().brightness, Brightness.dark);
+    expect(UiStyleRegistry.invalidPacks, contains('MissingDark'));
+  });
+
+  test('unknown style falls back to built-in glassmorphism', () {
+    expect(
+      UiStyleRegistry.resolve('unknown-style').id,
+      UiStyleRegistry.fallbackId,
+    );
+  });
+}
+
+Map<String, dynamic> _variant(bool dark) => {
+      'seedColor': dark ? '#FF8EBBFF' : '#FF315FCE',
+      'tokens': {
+        'backgroundStart': dark ? '#FF101521' : '#FFE9F2FF',
+        'backgroundMiddle': dark ? '#FF151A2B' : '#FFF5EEFF',
+        'backgroundEnd': dark ? '#FF101821' : '#FFE8FAF7',
+        'glowPrimary': '#553A86FF',
+        'glowSecondary': '#44B95CFF',
+        'glowTertiary': '#3D37D6B0',
+        'cardSurface': dark ? '#1FFFFFFF' : '#8FFFFFFF',
+        'strongSurface': dark ? '#F2232936' : '#FAFFFFFF',
+        'subtleSurface': dark ? '#14FFFFFF' : '#70FFFFFF',
+        'surfaceBase': '#FFFFFFFF',
+        'surfaceOpacity': dark ? 0.10 : 0.42,
+        'contentSurfaceOpacity': dark ? 0.055 : 0.24,
+        'notificationSurfaceOpacity': dark ? 0.18 : 0.58,
+        'border': dark ? '#38FFFFFF' : '#A8FFFFFF',
+        'softBorder': dark ? '#24FFFFFF' : '#72FFFFFF',
+        'shadow': dark ? '#2E000000' : '#0F000000',
+        'menuSurface': dark ? '#E0212836' : '#E8FFFFFF',
+        'menuBorder': dark ? '#55FFFFFF' : '#B8FFFFFF',
+        'menuShadow': dark ? '#61000000' : '#29000000',
+        'tooltipSurface': dark ? '#F2232936' : '#FAFFFFFF',
+        'tooltipBorder': dark ? '#38FFFFFF' : '#A8FFFFFF',
+        'tooltipShadow': dark ? '#6B000000' : '#2E000000',
+        'imagePreviewSurface': dark ? '#57000000' : '#75FFFFFF',
+        'captionHover': dark ? '#1AFFFFFF' : '#57FFFFFF',
+        'surfaceBlur': 22,
+        'menuBlur': 30,
+      },
+    };
+''')
+
+          # Remove this one-shot workflow in the resulting implementation commit.
+          Path('.github/workflows/one-shot-style-packs-b6.yml').unlink()
+          PY
+
+          git diff --check
+          git config user.name "MaydayAlaska"
+          git config user.email "43659965+MaydayAlaska@users.noreply.github.com"
+          git add -A
+          git commit -m "Add runtime style packs for 0.2.0-b6"
+          git push origin Flutter
