@@ -6,9 +6,9 @@ import 'package:local_store_management/models/customer.dart';
 import 'package:local_store_management/repositories/customer_repository.dart';
 
 void main() {
-  test('deleting a gift card is logical and keeps its code reserved', () async {
+  test('deleting a gift card physically removes it and keeps its code reserved', () async {
     final temp = await Directory.systemTemp.createTemp(
-      'lsms-flutter-gift-card-soft-delete-',
+      'lsms-flutter-gift-card-hard-delete-',
     );
     final path = '${temp.path}${Platform.pathSeparator}store.db';
     final service = DatabaseService(path);
@@ -24,14 +24,16 @@ void main() {
       expect(repository.deleteGiftCard(card.id), isTrue);
       expect(repository.getGiftCard(card.id), isNull);
       expect(repository.giftCardsForCustomer(customer.id), isEmpty);
-
-      final stored = service.db.select(
-        'SELECT code, deleted_at_utc FROM gift_cards WHERE id=? LIMIT 1;',
-        [card.id],
+      expect(
+        service.db.select(
+          'SELECT code FROM gift_cards WHERE id=? LIMIT 1;',
+          [card.id],
+        ),
+        isEmpty,
       );
-      expect(stored, hasLength(1));
-      expect(stored.first['code'], card.code);
-      expect(stored.first['deleted_at_utc'], isNotNull);
+
+      final columns = service.db.select('PRAGMA table_info(gift_cards);');
+      expect(columns.any((row) => row['name'] == 'deleted_at_utc'), isFalse);
 
       final registry = service.db.select(
         'SELECT code FROM gift_card_code_registry WHERE code=? LIMIT 1;',
@@ -44,7 +46,7 @@ void main() {
     }
   });
 
-  test('gift card cleanup matches age, exhausted or expired criteria', () async {
+  test('gift card cleanup physically deletes age, exhausted or expired matches', () async {
     final temp = await Directory.systemTemp.createTemp(
       'lsms-flutter-gift-card-cleanup-',
     );
@@ -96,15 +98,91 @@ void main() {
       final remaining = repository.giftCardsForCustomer(customer.id);
       expect(remaining.map((card) => card.code).toList(), [activeCard.code]);
 
-      final deletedRows = service.db.select(
-        'SELECT COUNT(*) AS count FROM gift_cards WHERE deleted_at_utc IS NOT NULL;',
+      final storedCount = service.db.select(
+        'SELECT COUNT(*) AS count FROM gift_cards;',
       ).first['count'] as int;
-      expect(deletedRows, 3);
+      expect(storedCount, 1);
 
       final registryCount = service.db.select(
         'SELECT COUNT(*) AS count FROM gift_card_code_registry;',
       ).first['count'] as int;
       expect(registryCount, 4);
+    } finally {
+      service.dispose();
+      await temp.delete(recursive: true);
+    }
+  });
+
+  test('soft-delete beta schema is migrated to physical deletion', () async {
+    final temp = await Directory.systemTemp.createTemp(
+      'lsms-flutter-gift-card-hard-delete-migration-',
+    );
+    final path = '${temp.path}${Platform.pathSeparator}store.db';
+    final service = DatabaseService(path);
+    try {
+      await service.initialize();
+      const created = '2026-08-20T10:00:00.000Z';
+      service.db.execute('''
+        CREATE TABLE customers (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          customer_code INTEGER NOT NULL UNIQUE CHECK(customer_code > 0),
+          fiscal_code TEXT COLLATE NOCASE UNIQUE,
+          first_name TEXT NOT NULL,
+          last_name TEXT NOT NULL,
+          birth_date TEXT,
+          sex TEXT,
+          birth_place_code TEXT,
+          notes TEXT,
+          created_at_utc TEXT NOT NULL,
+          updated_at_utc TEXT NOT NULL
+        );
+        CREATE TABLE gift_cards (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          code TEXT NOT NULL COLLATE NOCASE UNIQUE,
+          customer_id INTEGER NOT NULL,
+          total_value_cents INTEGER NOT NULL,
+          spent_value_cents INTEGER NOT NULL DEFAULT 0,
+          expires_at_utc TEXT,
+          purchase_order_id INTEGER,
+          deleted_at_utc TEXT,
+          created_at_utc TEXT NOT NULL,
+          updated_at_utc TEXT NOT NULL,
+          FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE CASCADE
+        );
+      ''');
+      service.db.execute('''
+        INSERT INTO customers (
+          id, customer_code, first_name, last_name, created_at_utc, updated_at_utc)
+        VALUES (1, 1, 'Mario', 'Rossi', ?, ?);
+      ''', [created, created]);
+      service.db.execute('''
+        INSERT INTO gift_cards (
+          id, code, customer_id, total_value_cents, spent_value_cents,
+          expires_at_utc, purchase_order_id, deleted_at_utc,
+          created_at_utc, updated_at_utc)
+        VALUES
+          (1, 'AAAABBBB', 1, 1000, 0, NULL, NULL, NULL, ?, ?),
+          (2, 'CCCCDDDD', 1, 2000, 0, NULL, NULL, ?, ?, ?);
+      ''', [
+        created,
+        created,
+        '2026-08-21T10:00:00.000Z',
+        created,
+        created,
+      ]);
+
+      final repository = CustomerRepository(service);
+
+      final columns = service.db.select('PRAGMA table_info(gift_cards);');
+      expect(columns.any((row) => row['name'] == 'deleted_at_utc'), isFalse);
+      expect(repository.getGiftCard(1)?.code, 'AAAABBBB');
+      expect(repository.getGiftCard(2), isNull);
+      expect(
+        service.db.select('SELECT code FROM gift_card_code_registry ORDER BY code;')
+            .map((row) => row['code'] as String)
+            .toList(),
+        ['AAAABBBB', 'CCCCDDDD'],
+      );
     } finally {
       service.dispose();
       await temp.delete(recursive: true);
