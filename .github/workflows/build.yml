@@ -115,10 +115,24 @@ jobs:
       - name: SQLite smoke test
         run: flutter test
 
-  package-windows-x64:
-    name: Windows installer (x64) — priority
+  package-windows:
+    name: Windows installer (${{ matrix.arch }})
     needs: verify
-    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: windows-latest
+            arch: x64
+            build_arch: x64
+            allowed_architectures: x64compatible
+            cache: true
+          - runner: windows-11-vs2026-arm
+            arch: arm64
+            build_arch: arm64
+            allowed_architectures: arm64
+            cache: false
+    runs-on: ${{ matrix.runner }}
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -128,73 +142,7 @@ jobs:
         with:
           channel: stable
           architecture: x64
-          cache: true
-
-      - name: Show Flutter and host architecture
-        shell: pwsh
-        run: |
-          flutter --version
-          Write-Host "PROCESSOR_ARCHITECTURE=$env:PROCESSOR_ARCHITECTURE"
-          Write-Host "PROCESSOR_ARCHITEW6432=$env:PROCESSOR_ARCHITEW6432"
-
-      - name: Generate Windows runner
-        run: flutter create --platforms=windows --project-name local_store_management --org com.maydayalaska .
-
-      - name: Prepare Windows application icon
-        shell: pwsh
-        run: |
-          flutter pub get
-          dart run tool/generate_windows_icon.dart "${{ env.ICON_BASE64 }}" "windows/runner/resources/app_icon.ico"
-
-      - name: Resolve packages
-        run: flutter pub get
-
-      - name: Build Windows release
-        shell: pwsh
-        run: |
-          $commit = if ("${{ github.event.pull_request.head.sha }}") { "${{ github.event.pull_request.head.sha }}" } else { "${{ github.sha }}" }
-          $branch = if ("${{ github.head_ref }}") { "${{ github.head_ref }}" } else { "${{ github.ref_name }}" }
-          flutter build windows --release --dart-define="GIT_COMMIT=$commit" --dart-define="BUILD_BRANCH=$branch"
-
-      - name: Build installer
-        shell: pwsh
-        run: |
-          New-Item -ItemType Directory -Force -Path dist | Out-Null
-          $rawVersion = ((Select-String -Path pubspec.yaml -Pattern '^version:\s*(\S+)' | Select-Object -First 1).Matches.Groups[1].Value)
-          $version = $rawVersion -replace '\+', '.'
-          $publishDir = (Resolve-Path 'build/windows/x64/runner/Release').Path
-          $outputDir = (Resolve-Path 'dist').Path
-          $iconFile = (Resolve-Path 'windows/runner/resources/app_icon.ico').Path
-          $iscc = (Get-Command ISCC.exe -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty Source)
-          if (-not $iscc) {
-            $iscc = Get-ChildItem 'C:\Program Files*\Inno Setup *\ISCC.exe' -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty FullName
-          }
-          if (-not $iscc) { throw 'ISCC.exe (Inno Setup) non trovato nel runner Windows.' }
-          & $iscc "/DPublishDir=$publishDir" "/DOutputDir=$outputDir" "/DAppVersion=$version" "/DIconFile=$iconFile" "/DAllowedArchitectures=x64compatible" "/DOutputBaseFilename=LocalStoreManagement-Setup-win-x64" 'packaging/windows/installer.iss'
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-
-      - name: Upload Windows x64 installer immediately
-        uses: actions/upload-artifact@v6
-        with:
-          name: package-win-x64
-          path: dist/LocalStoreManagement-Setup-win-x64.exe
-          if-no-files-found: error
-          retention-days: 1
-
-  package-windows-arm64:
-    name: Windows installer (arm64)
-    needs: package-windows-x64
-    runs-on: windows-11-vs2026-arm
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v7
-
-      - name: Setup Flutter x64 host SDK for Windows ARM64
-        uses: subosito/flutter-action@v2
-        with:
-          channel: stable
-          architecture: x64
-          cache: false
+          cache: ${{ matrix.cache }}
 
       - name: Show Flutter and host architecture
         shell: pwsh
@@ -204,6 +152,7 @@ jobs:
           Write-Host "PROCESSOR_ARCHITEW6432=$env:PROCESSOR_ARCHITEW6432"
 
       - name: Force Flutter Windows ARM64 host detection
+        if: matrix.arch == 'arm64'
         shell: pwsh
         run: |
           $source = Join-Path $env:FLUTTER_ROOT 'packages/flutter_tools/lib/src/base/os.dart'
@@ -248,7 +197,7 @@ jobs:
           New-Item -ItemType Directory -Force -Path dist | Out-Null
           $rawVersion = ((Select-String -Path pubspec.yaml -Pattern '^version:\s*(\S+)' | Select-Object -First 1).Matches.Groups[1].Value)
           $version = $rawVersion -replace '\+', '.'
-          $publishDir = (Resolve-Path 'build/windows/arm64/runner/Release').Path
+          $publishDir = (Resolve-Path 'build/windows/${{ matrix.build_arch }}/runner/Release').Path
           $outputDir = (Resolve-Path 'dist').Path
           $iconFile = (Resolve-Path 'windows/runner/resources/app_icon.ico').Path
           $iscc = (Get-Command ISCC.exe -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty Source)
@@ -256,20 +205,20 @@ jobs:
             $iscc = Get-ChildItem 'C:\Program Files*\Inno Setup *\ISCC.exe' -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty FullName
           }
           if (-not $iscc) { throw 'ISCC.exe (Inno Setup) non trovato nel runner Windows.' }
-          & $iscc "/DPublishDir=$publishDir" "/DOutputDir=$outputDir" "/DAppVersion=$version" "/DIconFile=$iconFile" "/DAllowedArchitectures=arm64" "/DOutputBaseFilename=LocalStoreManagement-Setup-win-arm64" 'packaging/windows/installer.iss'
+          & $iscc "/DPublishDir=$publishDir" "/DOutputDir=$outputDir" "/DAppVersion=$version" "/DIconFile=$iconFile" "/DAllowedArchitectures=${{ matrix.allowed_architectures }}" "/DOutputBaseFilename=LocalStoreManagement-Setup-win-${{ matrix.arch }}" 'packaging/windows/installer.iss'
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
-      - name: Upload Windows ARM64 installer for release jobs
+      - name: Upload Windows installer for release jobs
         uses: actions/upload-artifact@v6
         with:
-          name: package-win-arm64
-          path: dist/LocalStoreManagement-Setup-win-arm64.exe
+          name: package-win-${{ matrix.arch }}
+          path: dist/LocalStoreManagement-Setup-win-${{ matrix.arch }}.exe
           if-no-files-found: error
           retention-days: 1
 
   package-macos:
     name: macOS DMG (${{ matrix.arch }})
-    needs: package-windows-x64
+    needs: verify
     strategy:
       fail-fast: false
       matrix:
@@ -475,7 +424,7 @@ jobs:
 
   package-linux:
     name: Linux packages (${{ matrix.arch }})
-    needs: package-windows-x64
+    needs: verify
     strategy:
       fail-fast: false
       matrix:
@@ -722,7 +671,7 @@ jobs:
   release-beta:
     name: Publish Flutter beta assets
     if: github.event_name == 'push' && github.ref == 'refs/heads/Flutter'
-    needs: [package-windows-x64, package-windows-arm64, package-macos, package-linux]
+    needs: [package-windows, package-macos, package-linux]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -760,7 +709,7 @@ jobs:
   release-main:
     name: Publish main release assets
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    needs: [package-windows-x64, package-windows-arm64, package-macos, package-linux]
+    needs: [package-windows, package-macos, package-linux]
     runs-on: ubuntu-latest
     permissions:
       contents: write
