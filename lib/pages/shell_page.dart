@@ -124,7 +124,6 @@ class _ShellPageState extends State<ShellPage> {
     final entry = OverlayEntry(
       builder: (context) {
         final theme = Theme.of(context);
-        final isDark = theme.brightness == Brightness.dark;
         return Positioned(
           right: 24,
           bottom: 24,
@@ -134,7 +133,7 @@ class _ShellPageState extends State<ShellPage> {
               constraints: const BoxConstraints(maxWidth: 360),
               child: GlassSurface(
                 blur: 30,
-                opacity: isDark ? 0.18 : 0.58,
+                role: GlassSurfaceRole.notification,
                 borderRadius: BorderRadius.circular(18),
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(16, 14, 10, 14),
@@ -223,7 +222,6 @@ class _ShellPageState extends State<ShellPage> {
     final entry = OverlayEntry(
       builder: (context) {
         final theme = Theme.of(context);
-        final isDark = theme.brightness == Brightness.dark;
         return Positioned(
           right: 24,
           bottom: bottomOffset,
@@ -233,7 +231,7 @@ class _ShellPageState extends State<ShellPage> {
               constraints: const BoxConstraints(maxWidth: 360),
               child: GlassSurface(
                 blur: 30,
-                opacity: isDark ? 0.18 : 0.58,
+                role: GlassSurfaceRole.notification,
                 borderRadius: BorderRadius.circular(18),
                 child: InkWell(
                   borderRadius: BorderRadius.circular(18),
@@ -430,9 +428,7 @@ class _ShellPageState extends State<ShellPage> {
                     const SizedBox(width: 10),
                     Expanded(
                       child: GlassSurface(
-                        opacity: Theme.of(context).brightness == Brightness.dark
-                            ? 0.055
-                            : 0.24,
+                        role: GlassSurfaceRole.content,
                         borderRadius: BorderRadius.circular(24),
                         child: ClipRRect(
                           borderRadius: BorderRadius.circular(24),
