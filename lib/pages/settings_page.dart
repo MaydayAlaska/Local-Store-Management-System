@@ -8,6 +8,7 @@ import '../models/fiscal_register.dart';
 import '../services/app_services.dart';
 import '../services/settings_service.dart';
 import '../services/update_service.dart';
+import '../theme/ui_style_registry.dart';
 import '../widgets/fiscal_register_settings_section.dart';
 import '../widgets/glass_dropdown.dart';
 
@@ -941,14 +942,16 @@ class _SettingsPageState extends State<SettingsPage> {
                         child: GlassDropdown<String>(
                           value: _uiStyle,
                           labelText: _itEn('Stile', 'Style'),
-                          items: const [
-                            GlassDropdownItem(
-                              value: 'glassmorphism',
-                              label: 'Glassmorphism',
-                            ),
+                          items: [
+                            for (final style in UiStyleRegistry.all)
+                              GlassDropdownItem(
+                                value: style.id,
+                                label: style.label,
+                              ),
                           ],
                           onChanged: (value) => setState(
-                            () => _uiStyle = value ?? 'glassmorphism',
+                            () => _uiStyle =
+                                value ?? UiStyleRegistry.fallbackId,
                           ),
                         ),
                       ),
