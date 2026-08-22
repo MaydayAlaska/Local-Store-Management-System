@@ -10,6 +10,7 @@ import '../models/catalog.dart';
 import '../models/customer.dart';
 import '../services/app_services.dart';
 import '../services/fiscal_code_service.dart';
+import '../theme/ui_style_tokens.dart';
 import '../widgets/hid_barcode_listener.dart';
 import 'customer_editor_dialog.dart';
 import 'customer_picker_dialog.dart';
@@ -321,7 +322,7 @@ class _CashPageState extends State<CashPage> {
             )
           : _itEn(
               'Cliente rimosso dal carrello. L’eventuale buono regalo è stato rimosso.',
-              'Customer removed from the cart. Any selected gift card was removed too.',
+              'Customer removed from the cart. Any selected gift card was removed.',
             );
     });
   }
@@ -1861,13 +1862,10 @@ class _CartImageHoverPreview extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-    final background = theme.canvasColor;
-    final border = isDark
-        ? const Color(0x38FFFFFF)
-        : const Color(0xA8FFFFFF);
-    final shadow = Colors.black.withValues(alpha: isDark ? 0.42 : 0.18);
+    final tokens = UiStyleTokens.of(context);
+    final background = tokens.tooltipSurface;
+    final border = tokens.tooltipBorder;
+    final shadow = tokens.tooltipShadow;
 
     final body = Container(
       width: 190,
@@ -1888,8 +1886,7 @@ class _CartImageHoverPreview extends StatelessWidget {
       child: ClipRRect(
         borderRadius: BorderRadius.circular(14),
         child: ColoredBox(
-          color: theme.colorScheme.surfaceContainerHighest
-              .withValues(alpha: isDark ? 0.34 : 0.46),
+          color: tokens.imagePreviewSurface,
           child: Image.memory(
             imageBytes,
             fit: BoxFit.contain,
