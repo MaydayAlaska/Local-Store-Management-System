@@ -64,7 +64,7 @@ class GlassSurface extends StatelessWidget {
   const GlassSurface({
     super.key,
     required this.child,
-    this.borderRadius = const BorderRadius.all(Radius.circular(22)),
+    this.borderRadius,
     this.padding,
     this.blur,
     this.opacity,
@@ -72,7 +72,7 @@ class GlassSurface extends StatelessWidget {
   });
 
   final Widget child;
-  final BorderRadius borderRadius;
+  final BorderRadius? borderRadius;
   final EdgeInsetsGeometry? padding;
   final double? blur;
   final double? opacity;
@@ -84,14 +84,23 @@ class GlassSurface extends StatelessWidget {
         GlassSurfaceRole.notification => tokens.notificationSurfaceOpacity,
       };
 
+  BorderRadius _themeBorderRadius(BuildContext context) {
+    final shape = Theme.of(context).cardTheme.shape;
+    if (shape is RoundedRectangleBorder) {
+      return shape.borderRadius.resolve(Directionality.of(context));
+    }
+    return const BorderRadius.all(Radius.circular(22));
+  }
+
   @override
   Widget build(BuildContext context) {
     final tokens = UiStyleTokens.of(context);
     final effectiveOpacity = opacity ?? _roleOpacity(tokens);
     final effectiveBlur = blur ?? tokens.surfaceBlur;
+    final effectiveBorderRadius = borderRadius ?? _themeBorderRadius(context);
 
     return ClipRRect(
-      borderRadius: borderRadius,
+      borderRadius: effectiveBorderRadius,
       child: BackdropFilter(
         filter: ImageFilter.blur(
           sigmaX: effectiveBlur,
@@ -100,7 +109,7 @@ class GlassSurface extends StatelessWidget {
         child: DecoratedBox(
           decoration: BoxDecoration(
             color: tokens.surfaceBase.withValues(alpha: effectiveOpacity),
-            borderRadius: borderRadius,
+            borderRadius: effectiveBorderRadius,
             border: Border.all(color: tokens.border),
             boxShadow: [
               BoxShadow(

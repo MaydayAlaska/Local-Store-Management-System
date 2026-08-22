@@ -184,6 +184,21 @@ class _GlassDropdownState<T> extends State<GlassDropdown<T>> {
     }
   }
 
+  BorderRadius _menuBorderRadius(ThemeData theme) {
+    final shape = theme.popupMenuTheme.shape;
+    if (shape is RoundedRectangleBorder) {
+      return shape.borderRadius.resolve(Directionality.of(context));
+    }
+    return const BorderRadius.all(Radius.circular(16));
+  }
+
+  BorderRadius _inputBorderRadius(ThemeData theme) {
+    final border = theme.inputDecorationTheme.enabledBorder ??
+        theme.inputDecorationTheme.border;
+    if (border is OutlineInputBorder) return border.borderRadius;
+    return const BorderRadius.all(Radius.circular(16));
+  }
+
   void _open() {
     final overlay = Overlay.of(context);
     final targetBox =
@@ -194,6 +209,7 @@ class _GlassDropdownState<T> extends State<GlassDropdown<T>> {
     final theme = Theme.of(context);
     final tokens = UiStyleTokens.of(context);
     final isDark = theme.brightness == Brightness.dark;
+    final menuBorderRadius = _menuBorderRadius(theme);
 
     _entry = OverlayEntry(
       builder: (_) => Stack(
@@ -216,7 +232,7 @@ class _GlassDropdownState<T> extends State<GlassDropdown<T>> {
               child: SizedBox(
                 width: targetSize.width,
                 child: ClipRRect(
-                  borderRadius: BorderRadius.circular(16),
+                  borderRadius: menuBorderRadius,
                   child: BackdropFilter(
                     filter: ui.ImageFilter.blur(
                       sigmaX: tokens.menuBlur,
@@ -227,7 +243,7 @@ class _GlassDropdownState<T> extends State<GlassDropdown<T>> {
                           BoxConstraints(maxHeight: widget.maxMenuHeight),
                       decoration: BoxDecoration(
                         color: tokens.menuSurface,
-                        borderRadius: BorderRadius.circular(16),
+                        borderRadius: menuBorderRadius,
                         border: Border.all(color: tokens.menuBorder),
                         boxShadow: [
                           BoxShadow(
@@ -250,9 +266,9 @@ class _GlassDropdownState<T> extends State<GlassDropdown<T>> {
                                       alpha: isDark ? 0.25 : 0.14,
                                     )
                                   : Colors.transparent,
-                              borderRadius: BorderRadius.circular(12),
+                              borderRadius: menuBorderRadius,
                               child: InkWell(
-                                borderRadius: BorderRadius.circular(12),
+                                borderRadius: menuBorderRadius,
                                 onTap: () {
                                   widget.onChanged?.call(item.value);
                                   _close();
@@ -327,11 +343,12 @@ class _GlassDropdownState<T> extends State<GlassDropdown<T>> {
 
   Widget _buildDropdown(BuildContext context) {
     final selected = _selectedItem();
+    final theme = Theme.of(context);
     return CompositedTransformTarget(
       key: _targetKey,
       link: _layerLink,
       child: InkWell(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: _inputBorderRadius(theme),
         onTap: _enabled ? _toggle : null,
         child: InputDecorator(
           isEmpty: selected == null,
@@ -350,8 +367,8 @@ class _GlassDropdownState<T> extends State<GlassDropdown<T>> {
             overflow: TextOverflow.ellipsis,
             style: _enabled
                 ? null
-                : Theme.of(context).textTheme.bodyLarge?.copyWith(
-                      color: Theme.of(context).disabledColor,
+                : theme.textTheme.bodyLarge?.copyWith(
+                      color: theme.disabledColor,
                     ),
           ),
         ),

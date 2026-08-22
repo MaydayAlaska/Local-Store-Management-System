@@ -3,8 +3,23 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:local_store_management/theme/external_ui_style_pack.dart';
 import 'package:local_store_management/theme/ui_style_registry.dart';
 import 'package:local_store_management/theme/ui_style_tokens.dart';
+
+const _bundledStyleIds = <String>[
+  'flutiger-aero',
+  'brutalism',
+  'neumorphism',
+  'material-design',
+  'astractmorphism',
+  'skeumorphism',
+  'flat-design',
+  'retrofuturism',
+  'monochromatic-design',
+  'minimal-vintage',
+  'glassmorphism-2',
+];
 
 void main() {
   test('glassmorphism installs style tokens in light and dark themes', () {
@@ -16,6 +31,41 @@ void main() {
     expect(dark.brightness, Brightness.dark);
     expect(light.extension<UiStyleTokens>(), isNotNull);
     expect(dark.extension<UiStyleTokens>(), isNotNull);
+  });
+
+  test('every bundled style contains valid light and dark themes', () {
+    final root = Directory.systemTemp.createTempSync('lsms-bundled-styles-');
+    addTearDown(() => root.deleteSync(recursive: true));
+
+    for (final id in _bundledStyleIds) {
+      final file = File('assets/styles/bundled/$id.json');
+      expect(file.existsSync(), isTrue, reason: '$id bundle is missing');
+      final decoded = jsonDecode(file.readAsStringSync());
+      expect(decoded, isA<Map>());
+      final bundle = Map<String, dynamic>.from(decoded as Map);
+      expect(bundle['style'], isA<Map>(), reason: '$id is missing style metadata');
+      expect(bundle['light'], isA<Map>(), reason: '$id is missing light theme');
+      expect(bundle['dark'], isA<Map>(), reason: '$id is missing dark theme');
+      final metadata = Map<String, dynamic>.from(bundle['style'] as Map);
+      expect(metadata['id'], id);
+
+      final styleDirectory = Directory('${root.path}/$id')..createSync();
+      File('${styleDirectory.path}/style.json')
+          .writeAsStringSync(jsonEncode(bundle['style']));
+      File('${styleDirectory.path}/light.json')
+          .writeAsStringSync(jsonEncode(bundle['light']));
+      File('${styleDirectory.path}/dark.json')
+          .writeAsStringSync(jsonEncode(bundle['dark']));
+
+      final style = ExternalUiStylePack.load(styleDirectory);
+      final lightTheme = style.lightTheme();
+      final darkTheme = style.darkTheme();
+      expect(style.id, id);
+      expect(lightTheme.brightness, Brightness.light);
+      expect(darkTheme.brightness, Brightness.dark);
+      expect(lightTheme.extension<UiStyleTokens>(), isNotNull);
+      expect(darkTheme.extension<UiStyleTokens>(), isNotNull);
+    }
   });
 
   test('runtime pack loads only with both light and dark themes', () async {
