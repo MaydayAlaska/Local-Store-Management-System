@@ -288,9 +288,9 @@ void main() {
     },
   );
 
-  test('gift cards are customer-bound and physical deletion preserves order snapshots', () async {
+  test('associated gift cards can be used without changing the order customer', () async {
     final temp = await Directory.systemTemp.createTemp(
-      'lsms-flutter-gift-card-delete-',
+      'lsms-flutter-gift-card-independent-customer-',
     );
     final path = '${temp.path}${Platform.pathSeparator}store.db';
     final service = DatabaseService(path);
@@ -307,7 +307,9 @@ void main() {
       ));
       final card = repository.createGiftCard(owner.id, 5000);
 
-      SalesOrderDraft draftFor(int customerId) => SalesOrderDraft(
+      expect(repository.availableGiftCards().map((item) => item.id), contains(card.id));
+
+      SalesOrderDraft draftFor(int? customerId) => SalesOrderDraft(
             customerId: customerId,
             giftCardId: card.id,
             giftCardAppliedCents: 1000,
@@ -332,37 +334,25 @@ void main() {
             finalTotalCents: 1000,
           );
 
-      expect(
-        () => repository.recordSale(draftFor(other.id)),
-        throwsA(isA<StateError>()),
-      );
+      final otherOrder = repository.recordSale(draftFor(other.id));
+      expect(otherOrder.customerId, other.id);
+      expect(otherOrder.giftCardCode, card.code);
+      expect(repository.getGiftCard(card.id)!.remainingValueCents, 4000);
 
-      final order = repository.recordSale(draftFor(owner.id));
-      expect(order.giftCardCode, card.code);
-      expect(order.giftCardAppliedCents, 1000);
+      final anonymousOrder = repository.recordSale(draftFor(null));
+      expect(anonymousOrder.customerId, isNull);
+      expect(anonymousOrder.giftCardCode, card.code);
+      expect(repository.getGiftCard(card.id)!.remainingValueCents, 3000);
+
       expect(repository.deleteGiftCard(card.id), isTrue);
       expect(repository.getGiftCard(card.id), isNull);
 
-      final preserved = repository.getOrder(order.id)!.summary;
+      final preserved = repository.getOrder(otherOrder.id)!.summary;
       expect(preserved.giftCardId, isNull);
       expect(preserved.giftCardCode, card.code);
       expect(preserved.giftCardAppliedCents, 1000);
       expect(preserved.amountDueCents, 0);
-      expect(repository.searchOrders(card.code).single.id, order.id);
-
-      expect(
-        service.db.select(
-          'SELECT id FROM gift_cards WHERE id=? LIMIT 1;',
-          [card.id],
-        ),
-        isEmpty,
-      );
-      expect(
-        service.db.select(
-          "SELECT name FROM sqlite_master WHERE type='table' AND name='gift_card_code_registry';",
-        ),
-        isEmpty,
-      );
+      expect(repository.searchOrders(card.code).map((order) => order.id), contains(otherOrder.id));
     } finally {
       service.dispose();
       await temp.delete(recursive: true);

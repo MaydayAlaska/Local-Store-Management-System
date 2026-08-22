@@ -170,7 +170,6 @@ class _CashPageState extends State<CashPage> {
     if (existing != null) {
       setState(() {
         _customer = existing;
-        _giftCard = null;
         _searchStatus = _itEn(
           'Cliente associato: ${existing.displayName} (${existing.customerCodeDisplay}).',
           'Customer linked: ${existing.displayName} (${existing.customerCodeDisplay}).',
@@ -187,7 +186,6 @@ class _CashPageState extends State<CashPage> {
     if (!mounted || created == null) return;
     setState(() {
       _customer = created;
-      _giftCard = null;
       _searchStatus = _itEn(
         'Nuovo cliente associato: ${created.displayName} (${created.customerCodeDisplay}).',
         'New customer linked: ${created.displayName} (${created.customerCodeDisplay}).',
@@ -203,7 +201,6 @@ class _CashPageState extends State<CashPage> {
     if (!mounted || customer == null) return;
     setState(() {
       _customer = customer;
-      _giftCard = null;
       _searchStatus = _itEn(
         'Cliente associato: ${customer.displayName} (${customer.customerCodeDisplay}).',
         'Customer linked: ${customer.displayName} (${customer.customerCodeDisplay}).',
@@ -213,53 +210,46 @@ class _CashPageState extends State<CashPage> {
 
   Future<void> _addGiftCardPurchase() async {
     final customer = _customer;
-    if (customer == null) {
-      return _cartMessage(_itEn(
-        'Associa prima un cliente per acquistare un buono regalo.',
-        'Link a customer before purchasing a gift card.',
-      ));
-    }
-
     final draft = await showGiftCardPurchaseDialog(
       context,
-      customerName: customer.displayName,
+      customerName: customer?.displayName,
     );
     if (!mounted || draft == null) return;
 
+    final associateCustomer = customer != null && draft.associateCustomer;
     final line = _CashLine.giftCard(
       giftCardLineId: _nextGiftCardLineId++,
       unitPriceCents: draft.valueCents,
       expiresAtUtc: draft.expiresAtUtc,
+      customerId: associateCustomer ? customer.id : null,
+      customerName: associateCustomer ? customer.displayName : null,
     );
     setState(() {
       _cart.add(line);
+      final ownerText = associateCustomer
+          ? _itEn(
+              ' Associato a ${customer.displayName}.',
+              ' Associated with ${customer.displayName}.',
+            )
+          : _itEn(' Nessun cliente associato.', ' No associated customer.');
       _cartStatus = draft.expiresAtUtc == null
           ? _itEn(
-              'Buono regalo da ${formatMoney(draft.valueCents)} aggiunto al carrello senza scadenza.',
-              'Gift card for ${formatMoney(draft.valueCents)} added to the cart with no expiration.',
+              'Buono regalo da ${formatMoney(draft.valueCents)} aggiunto al carrello senza scadenza.$ownerText',
+              'Gift card for ${formatMoney(draft.valueCents)} added to the cart with no expiration.$ownerText',
             )
           : _itEn(
-              'Buono regalo da ${formatMoney(draft.valueCents)} aggiunto al carrello. Scadenza: ${_dateText(draft.expiresAtUtc!)}.',
-              'Gift card for ${formatMoney(draft.valueCents)} added to the cart. Expires: ${_dateText(draft.expiresAtUtc!)}.',
+              'Buono regalo da ${formatMoney(draft.valueCents)} aggiunto al carrello. Scadenza: ${_dateText(draft.expiresAtUtc!)}.$ownerText',
+              'Gift card for ${formatMoney(draft.valueCents)} added to the cart. Expires: ${_dateText(draft.expiresAtUtc!)}.$ownerText',
             );
     });
   }
 
   Future<void> _pickGiftCard() async {
-    final customer = _customer;
-    if (customer == null) {
-      return _cartMessage(_itEn(
-        'Associa prima un cliente per usare un buono regalo.',
-        'Link a customer before using a gift card.',
-      ));
-    }
-
-    final cards =
-        widget.services.customers.availableGiftCardsForCustomer(customer.id);
+    final cards = widget.services.customers.availableGiftCards();
     if (cards.isEmpty) {
       return _cartMessage(_itEn(
-        'Il cliente non ha buoni regalo validi con credito residuo.',
-        'The customer has no valid gift cards with remaining credit.',
+        'Non ci sono buoni regalo validi con credito residuo.',
+        'There are no valid gift cards with remaining credit.',
       ));
     }
 
@@ -268,14 +258,23 @@ class _CashPageState extends State<CashPage> {
       builder: (dialogContext) => AlertDialog(
         title: Text(_itEn('Seleziona buono regalo', 'Select gift card')),
         content: SizedBox(
-          width: 560,
-          height: (cards.length * 88.0).clamp(170.0, 440.0).toDouble(),
+          width: 600,
+          height: (cards.length * 98.0).clamp(180.0, 460.0).toDouble(),
           child: ListView.separated(
             itemCount: cards.length,
             separatorBuilder: (_, _) => const Divider(height: 1),
             itemBuilder: (context, index) {
               final card = cards[index];
               final expiration = card.expirationDateDisplay;
+              final owner = card.customerId == null
+                  ? null
+                  : widget.services.customers.getById(card.customerId!);
+              final ownerText = owner == null
+                  ? _itEn('Nessun cliente associato', 'No associated customer')
+                  : _itEn(
+                      'Cliente: ${owner.displayName} (${owner.customerCodeDisplay})',
+                      'Customer: ${owner.displayName} (${owner.customerCodeDisplay})',
+                    );
               return ListTile(
                 leading: const Icon(Icons.card_giftcard_outlined),
                 title: Text(
@@ -286,7 +285,8 @@ class _CashPageState extends State<CashPage> {
                   '${_itEn('Valore totale', 'Total value')}: ${card.totalDisplay} · '
                   '${_itEn('Speso', 'Spent')}: ${card.spentDisplay}\n'
                   '${_itEn('Acquistato', 'Purchased')}: ${card.purchasedDateDisplay} · '
-                  '${expiration == null ? _itEn('Nessuna scadenza', 'No expiration') : '${_itEn('Scadenza', 'Expires')}: $expiration'}',
+                  '${expiration == null ? _itEn('Nessuna scadenza', 'No expiration') : '${_itEn('Scadenza', 'Expires')}: $expiration'}\n'
+                  '$ownerText',
                 ),
                 trailing: Text(
                   '${_itEn('Residuo', 'Remaining')}\n${card.remainingDisplay}',
@@ -307,32 +307,62 @@ class _CashPageState extends State<CashPage> {
       ),
     );
     if (!mounted || selected == null) return;
+
+    final owner = selected.customerId == null
+        ? null
+        : widget.services.customers.getById(selected.customerId!);
+    if (owner != null && _customer?.id != owner.id) {
+      final associate = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: Text(_itEn('Buono associato a un cliente', 'Gift card linked to a customer')),
+          content: Text(
+            _itEn(
+              'Il buono ${selected.code} è associato a ${owner.displayName} (${owner.customerCodeDisplay}). Vuoi associare questo cliente anche all’ordine?',
+              'Gift card ${selected.code} is linked to ${owner.displayName} (${owner.customerCodeDisplay}). Do you want to link this customer to the order as well?',
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: Text(AppStrings.t('cancel')),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: Text(_itEn('Usa senza associare', 'Use without linking')),
+            ),
+            FilledButton.icon(
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              icon: const Icon(Icons.person_add_alt_1),
+              label: Text(_itEn('Associa cliente', 'Link customer')),
+            ),
+          ],
+        ),
+      );
+      if (!mounted || associate == null) return;
+      if (associate) {
+        setState(() => _customer = owner);
+      }
+    }
+
     setState(() {
       _giftCard = selected;
       _cartStatus = _itEn(
-        'Buono ${selected.code} aggiunto al carrello. Credito residuo: ${selected.remainingDisplay}.',
-        'Gift card ${selected.code} added to the cart. Remaining credit: ${selected.remainingDisplay}.',
+        'Buono ${selected.code} selezionato. Credito residuo: ${selected.remainingDisplay}.',
+        'Gift card ${selected.code} selected. Remaining credit: ${selected.remainingDisplay}.',
       );
     });
   }
 
   void _removeCustomer() {
-    final pendingGiftCards =
-        _cart.where((line) => line.isGiftCardPurchase).length;
+    final customer = _customer;
+    if (customer == null) return;
     setState(() {
       _customer = null;
-      _giftCard = null;
-      _cart.removeWhere((line) => line.isGiftCardPurchase);
-      _normalizeDiscounts();
-      _cartStatus = pendingGiftCards > 0
-          ? _itEn(
-              'Cliente rimosso. Sono stati rimossi anche $pendingGiftCards buoni regalo in acquisto e l’eventuale buono usato come pagamento.',
-              'Customer removed. $pendingGiftCards gift-card purchases and any gift card used as payment were removed too.',
-            )
-          : _itEn(
-              'Cliente rimosso dal carrello. L’eventuale buono regalo è stato rimosso.',
-              'Customer removed from the cart. Any selected gift card was removed too.',
-            );
+      _cartStatus = _itEn(
+        'Cliente ${customer.displayName} rimosso dall’ordine. I buoni regalo nel carrello e l’eventuale buono usato come pagamento restano invariati.',
+        'Customer ${customer.displayName} removed from the order. Gift cards in the cart and any gift card used as payment remain unchanged.',
+      );
     });
   }
 
@@ -811,8 +841,6 @@ class _CashPageState extends State<CashPage> {
     final count = _cart.fold<int>(0, (sum, line) => sum + line.quantity);
     final vatPercent = widget.services.settings.load().vatPercent;
     final vatCents = calculateVatCents(_finalTotalCents, vatPercent);
-    final availableGiftCards =
-        widget.services.customers.availableGiftCardsForCash(_customer?.id);
     final fiscalCode = _customer?.fiscalCode?.trim();
 
     return HidBarcodeListener(
@@ -984,6 +1012,12 @@ class _CashPageState extends State<CashPage> {
                           ),
                         ),
                         TextButton.icon(
+                          onPressed: _pickGiftCard,
+                          icon: const Icon(Icons.redeem_outlined),
+                          label: Text(_itEn('Usa buono', 'Use gift card')),
+                        ),
+                        const SizedBox(width: 4),
+                        TextButton.icon(
                           onPressed: _cart.isEmpty &&
                                   _fixedDiscounts.isEmpty &&
                                   _customer == null &&
@@ -1045,40 +1079,6 @@ class _CashPageState extends State<CashPage> {
                             ),
                           ],
                         ]),
-                        if (_customer != null) ...[
-                          const SizedBox(height: 8),
-                          Row(children: [
-                            const Icon(Icons.card_giftcard_outlined, size: 20),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: Text(
-                                _giftCard == null
-                                    ? _itEn(
-                                        '${availableGiftCards.length} buoni validi con credito residuo',
-                                        '${availableGiftCards.length} valid gift cards with remaining credit',
-                                      )
-                                    : '${_giftCard!.code} · ${_itEn('residuo', 'remaining')} ${_giftCard!.remainingDisplay}',
-                              ),
-                            ),
-                            OutlinedButton.icon(
-                              onPressed: _addGiftCardPurchase,
-                              icon: const Icon(Icons.add_card_outlined),
-                              label: Text(_itEn('Nuovo buono', 'New gift card')),
-                            ),
-                            const SizedBox(width: 6),
-                            OutlinedButton.icon(
-                              onPressed: availableGiftCards.isEmpty
-                                  ? null
-                                  : _pickGiftCard,
-                              icon: const Icon(Icons.redeem_outlined),
-                              label: Text(
-                                _giftCard == null
-                                    ? _itEn('Usa buono', 'Use gift card')
-                                    : _itEn('Cambia', 'Change'),
-                              ),
-                            ),
-                          ]),
-                        ],
                       ]),
                     ),
                     const Divider(height: 1),

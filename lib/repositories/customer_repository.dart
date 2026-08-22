@@ -535,6 +535,18 @@ class CustomerRepository {
     return rows.map(_giftCardFromRow).toList();
   }
 
+  List<GiftCard> availableGiftCards([int limit = 500]) {
+    final now = DateTime.now().toUtc().toIso8601String();
+    final rows = database.db.select('''
+      SELECT * FROM gift_cards
+      WHERE spent_value_cents < total_value_cents
+        AND (expires_at_utc IS NULL OR expires_at_utc > ?)
+      ORDER BY created_at_utc DESC, id DESC
+      LIMIT ?;
+    ''', [now, limit.clamp(1, 5000)]);
+    return rows.map(_giftCardFromRow).toList();
+  }
+
   List<GiftCard> availableGiftCardsForCash(int? customerId, [int limit = 500]) {
     final now = DateTime.now().toUtc().toIso8601String();
     final rows = database.db.select('''
@@ -1008,10 +1020,6 @@ class CustomerRepository {
         );
         if (cards.isEmpty) throw StateError('Il buono regalo selezionato non esiste più.');
         final card = cards.first;
-        final ownerId = card['customer_id'] as int?;
-        if (ownerId != null && ownerId != draft.customerId) {
-          throw StateError('Il buono regalo è associato a un altro cliente.');
-        }
         final expirationText = card['expires_at_utc'] as String?;
         if (expirationText != null &&
             DateTime.now().toUtc().isAfter(DateTime.parse(expirationText).toUtc())) {

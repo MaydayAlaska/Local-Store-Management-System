@@ -135,8 +135,8 @@ class _CustomersPageState extends State<CustomersPage> {
     }
     if (giftCards.isNotEmpty) {
       details.add(_itEn(
-        'Verranno eliminati definitivamente anche ${giftCards.length} buoni regalo associati. Il credito residuo complessivo di ${formatMoney(remainingGiftValue)} verrà perso.',
-        '${giftCards.length} linked gift cards will also be permanently deleted. Their total remaining credit of ${formatMoney(remainingGiftValue)} will be lost.',
+        'I ${giftCards.length} buoni regalo associati non verranno eliminati: verrà rimossa soltanto l’associazione al cliente. Il credito residuo complessivo di ${formatMoney(remainingGiftValue)} resterà disponibile.',
+        'The ${giftCards.length} linked gift cards will not be deleted: only their customer association will be removed. Their total remaining credit of ${formatMoney(remainingGiftValue)} will remain available.',
       ));
     }
     details.add(_itEn(
@@ -314,6 +314,16 @@ class _CustomersPageState extends State<CustomersPage> {
   }
 }
 
+class _CustomerGiftCardDraft {
+  const _CustomerGiftCardDraft({
+    required this.valueCents,
+    required this.expiresAtUtc,
+  });
+
+  final int valueCents;
+  final DateTime? expiresAtUtc;
+}
+
 class _CustomerDetail extends StatefulWidget {
   const _CustomerDetail({
     super.key,
@@ -348,92 +358,158 @@ class _CustomerDetailState extends State<_CustomerDetail> {
 
   Future<void> _createGiftCard() async {
     final valueController = TextEditingController();
+    DateTime? expirationDate;
     String? error;
-    final cents = await showDialog<int>(
+
+    String dateText(DateTime value) =>
+        '${value.day.toString().padLeft(2, '0')}/${value.month.toString().padLeft(2, '0')}/${value.year}';
+    int valueCents() {
+      final parsed = double.tryParse(
+        valueController.text.trim().replaceAll(',', '.'),
+      );
+      return parsed == null ? 0 : (parsed * 100).round();
+    }
+
+    final draft = await showDialog<_CustomerGiftCardDraft>(
       context: context,
       builder: (dialogContext) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title: Text(_itEn('Nuovo buono regalo', 'New gift card')),
-          content: SizedBox(
-            width: 420,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Text(
-                  _itEn(
-                    'Il buono verrà associato a ${widget.customer.displayName}. Il valore speso partirà da zero.',
-                    'The gift card will be linked to ${widget.customer.displayName}. Its spent value will start at zero.',
+        builder: (context, setDialogState) {
+          Future<void> pickExpiration() async {
+            final now = DateTime.now();
+            final selected = await showDatePicker(
+              context: dialogContext,
+              initialDate: expirationDate ?? now.add(const Duration(days: 365)),
+              firstDate: DateTime(now.year, now.month, now.day),
+              lastDate: DateTime(now.year + 20, 12, 31),
+            );
+            if (selected == null) return;
+            setDialogState(() => expirationDate = selected);
+          }
+
+          void submit() {
+            final cents = valueCents();
+            if (cents <= 0) {
+              setDialogState(() => error = _itEn(
+                    'Inserisci un valore maggiore di zero.',
+                    'Enter a value greater than zero.',
+                  ));
+              return;
+            }
+
+            DateTime? expiresAtUtc;
+            if (expirationDate != null) {
+              final value = expirationDate!;
+              expiresAtUtc = DateTime(
+                value.year,
+                value.month,
+                value.day,
+                23,
+                59,
+                59,
+                999,
+              ).toUtc();
+            }
+            Navigator.of(dialogContext).pop(
+              _CustomerGiftCardDraft(
+                valueCents: cents,
+                expiresAtUtc: expiresAtUtc,
+              ),
+            );
+          }
+
+          return AlertDialog(
+            title: Text(_itEn('Nuovo buono regalo', 'New gift card')),
+            content: SizedBox(
+              width: 440,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(
+                    _itEn(
+                      'Il buono verrà associato a ${widget.customer.displayName}. Il valore speso partirà da zero.',
+                      'The gift card will be linked to ${widget.customer.displayName}. Its spent value will start at zero.',
+                    ),
                   ),
-                ),
-                const SizedBox(height: 14),
-                TextField(
-                  controller: valueController,
-                  autofocus: true,
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  decoration: InputDecoration(
-                    border: const OutlineInputBorder(),
-                    labelText: _itEn('Valore totale', 'Total value'),
-                    prefixText: '€ ',
-                    errorText: error,
+                  const SizedBox(height: 14),
+                  TextField(
+                    controller: valueController,
+                    autofocus: true,
+                    keyboardType:
+                        const TextInputType.numberWithOptions(decimal: true),
+                    decoration: InputDecoration(
+                      border: const OutlineInputBorder(),
+                      labelText: _itEn('Valore totale', 'Total value'),
+                      prefixText: '€ ',
+                      errorText: error,
+                    ),
+                    onChanged: (_) {
+                      if (error != null) setDialogState(() => error = null);
+                    },
+                    onSubmitted: (_) => submit(),
                   ),
-                  onChanged: (_) {
-                    if (error != null) setDialogState(() => error = null);
-                  },
-                  onSubmitted: (_) {
-                    final parsed = double.tryParse(
-                      valueController.text.trim().replaceAll(',', '.'),
-                    );
-                    final valueCents = parsed == null ? 0 : (parsed * 100).round();
-                    if (valueCents <= 0) {
-                      setDialogState(() => error = _itEn(
-                            'Inserisci un valore maggiore di zero.',
-                            'Enter a value greater than zero.',
-                          ));
-                      return;
-                    }
-                    Navigator.of(dialogContext).pop(valueCents);
-                  },
-                ),
-              ],
+                  const SizedBox(height: 14),
+                  Text(
+                    _itEn('Scadenza (facoltativa)', 'Expiration (optional)'),
+                    style: Theme.of(context).textTheme.labelLarge,
+                  ),
+                  const SizedBox(height: 6),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: pickExpiration,
+                          icon: const Icon(Icons.event_outlined),
+                          label: Text(
+                            expirationDate == null
+                                ? _itEn('Nessuna scadenza', 'No expiration')
+                                : dateText(expirationDate!),
+                          ),
+                        ),
+                      ),
+                      if (expirationDate != null) ...[
+                        const SizedBox(width: 6),
+                        IconButton(
+                          tooltip: _itEn('Rimuovi scadenza', 'Remove expiration'),
+                          onPressed: () =>
+                              setDialogState(() => expirationDate = null),
+                          icon: const Icon(Icons.close),
+                        ),
+                      ],
+                    ],
+                  ),
+                ],
+              ),
             ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(),
-              child: Text(AppStrings.t('cancel')),
-            ),
-            FilledButton.icon(
-              onPressed: () {
-                final parsed = double.tryParse(
-                  valueController.text.trim().replaceAll(',', '.'),
-                );
-                final valueCents = parsed == null ? 0 : (parsed * 100).round();
-                if (valueCents <= 0) {
-                  setDialogState(() => error = _itEn(
-                        'Inserisci un valore maggiore di zero.',
-                        'Enter a value greater than zero.',
-                      ));
-                  return;
-                }
-                Navigator.of(dialogContext).pop(valueCents);
-              },
-              icon: const Icon(Icons.card_giftcard),
-              label: Text(_itEn('Crea buono', 'Create gift card')),
-            ),
-          ],
-        ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(dialogContext).pop(),
+                child: Text(AppStrings.t('cancel')),
+              ),
+              FilledButton.icon(
+                onPressed: submit,
+                icon: const Icon(Icons.card_giftcard),
+                label: Text(_itEn('Crea buono', 'Create gift card')),
+              ),
+            ],
+          );
+        },
       ),
     );
     valueController.dispose();
-    if (cents == null || !mounted) return;
+    if (draft == null || !mounted) return;
 
     try {
-      final card = widget.repository.createGiftCard(widget.customer.id, cents);
+      final card = widget.repository.createGiftCard(
+        widget.customer.id,
+        draft.valueCents,
+        expiresAtUtc: draft.expiresAtUtc,
+      );
       if (!mounted) return;
+      final expiration = card.expirationDateDisplay;
       setState(() => _giftStatus = _itEn(
-            'Buono ${card.code} creato con valore ${card.totalDisplay}.',
-            'Gift card ${card.code} created with value ${card.totalDisplay}.',
+            'Buono ${card.code} creato con valore ${card.totalDisplay}. ${expiration == null ? 'Nessuna scadenza.' : 'Scadenza: $expiration.'}',
+            'Gift card ${card.code} created with value ${card.totalDisplay}. ${expiration == null ? 'No expiration.' : 'Expires: $expiration.'}',
           ));
     } catch (error) {
       if (!mounted) return;
