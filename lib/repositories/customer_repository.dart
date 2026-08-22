@@ -296,7 +296,6 @@ class CustomerRepository {
       );
     }
   }
-
   int? _findAvailableGiftCardPurchaseOrder({
     required int customerId,
     required int totalValueCents,
@@ -374,10 +373,11 @@ class CustomerRepository {
     final value = fiscalCode.trim().toUpperCase();
     if (value.isEmpty) return null;
     final rows = database.db.select(
-      'SELECT * FROM customers WHERE fiscal_code=? COLLATE NOCASE LIMIT 1;',
+      'SELECT id FROM customers WHERE fiscal_code=? COLLATE NOCASE LIMIT 1;',
       [value],
     );
-    return rows.isEmpty ? null : _customerFromRow(rows.first);
+    if (rows.isEmpty) return null;
+    return getById(rows.first['id'] as int);
   }
 
   Customer save(CustomerDraft draft) {
@@ -560,13 +560,15 @@ class CustomerRepository {
         totalValueCents: totalValueCents,
         giftCardCreatedAtUtc: now,
       );
+      final id = _nextAvailableGiftCardId();
       final code = _reserveUniqueGiftCardCode(nowUtc);
       db.execute('''
         INSERT INTO gift_cards (
-          code, customer_id, total_value_cents, spent_value_cents,
+          id, code, customer_id, total_value_cents, spent_value_cents,
           expires_at_utc, purchase_order_id, created_at_utc, updated_at_utc)
-        VALUES (?, ?, ?, 0, ?, ?, ?, ?);
+        VALUES (?, ?, ?, ?, 0, ?, ?, ?, ?);
       ''', [
+        id,
         code,
         customerId,
         totalValueCents,
@@ -575,7 +577,6 @@ class CustomerRepository {
         now,
         now,
       ]);
-      final id = db.lastInsertRowId;
       db.execute('COMMIT;');
       return getGiftCard(id)!;
     } catch (_) {
@@ -1194,6 +1195,21 @@ class CustomerRepository {
     );
     for (final row in rows) {
       final current = row['customer_code'] as int;
+      if (current < candidate) continue;
+      if (current == candidate) {
+        candidate++;
+        continue;
+      }
+      break;
+    }
+    return candidate;
+  }
+
+  int _nextAvailableGiftCardId() {
+    var candidate = 1;
+    final rows = database.db.select('SELECT id FROM gift_cards ORDER BY id;');
+    for (final row in rows) {
+      final current = row['id'] as int;
       if (current < candidate) continue;
       if (current == candidate) {
         candidate++;
