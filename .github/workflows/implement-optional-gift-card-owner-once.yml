@@ -1,9 +1,10 @@
-name: Implement optional gift card ownership once
+name: Implement gift card cash flow fixes
 
 on:
   push:
     branches: [Flutter]
     paths:
+      - '.github/implement_optional_gift_card_owner.py'
       - '.github/workflows/implement-optional-gift-card-owner-once.yml'
 
 permissions:
@@ -47,9 +48,7 @@ jobs:
           set -euo pipefail
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add -- lib/models/customer.dart lib/repositories/customer_repository.dart lib/pages/cash_page.dart lib/pages/gift_card_purchase_dialog.dart lib/pages/gift_card_editor_dialog.dart lib/pages/gift_cards_page.dart test/customer_repository_test.dart test/gift_card_cleanup_test.dart
+          git add -- lib/pages/customers_page.dart lib/pages/cash_page.dart lib/repositories/customer_repository.dart test/customer_repository_test.dart
           git diff --cached --check
-          git commit -m 'Make gift card customer association optional'
+          git commit -m 'Refine gift card creation and payment flow'
           git push origin HEAD:Flutter
-
-# trigger 9
