@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 
 import '../core/app_paths.dart';
@@ -9,6 +11,7 @@ import '../widgets/hid_barcode_listener.dart';
 import 'product_editor_dialog.dart';
 
 enum _ScanMode { search, incoming, outgoing }
+enum _ProductViewMode { list, grid }
 
 class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key, required this.services, required this.isActive});
@@ -23,6 +26,7 @@ class _DashboardPageState extends State<DashboardPage> {
   final _search = TextEditingController();
   final _focus = FocusNode();
   _ScanMode _mode = _ScanMode.search;
+  _ProductViewMode _productViewMode = _ProductViewMode.list;
   late String _status;
   String? _scannedCode;
   ProductVariant? _scannedProduct;
@@ -305,6 +309,9 @@ class _DashboardPageState extends State<DashboardPage> {
     final stock = widget.services.stock.getTotalStock();
     final results = _results;
     final missing = _scannedCodeIsMissing;
+    final variantImages = !missing && _productViewMode == _ProductViewMode.grid
+        ? widget.services.variantImages.getMany(results.map((item) => item.id))
+        : const <int, Uint8List>{};
 
     return HidBarcodeListener(
       enabled: widget.isActive,
@@ -355,23 +362,60 @@ class _DashboardPageState extends State<DashboardPage> {
                   setState(() => _mode = value.first),
             ),
             const SizedBox(height: 12),
-            TextField(
-              controller: _search,
-              focusNode: _focus,
-              onChanged: _manualSearchChanged,
-              onSubmitted: _submit,
-              decoration: InputDecoration(
-                border: const OutlineInputBorder(),
-                prefixIcon: const Icon(Icons.qr_code_scanner),
-                labelText: _itEn(
-                  'Scansiona barcode/SKU o cerca per nome',
-                  'Scan barcode/SKU or search by name',
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _search,
+                    focusNode: _focus,
+                    onChanged: _manualSearchChanged,
+                    onSubmitted: _submit,
+                    decoration: InputDecoration(
+                      border: const OutlineInputBorder(),
+                      prefixIcon: const Icon(Icons.qr_code_scanner),
+                      labelText: _itEn(
+                        'Scansiona barcode/SKU o cerca per nome',
+                        'Scan barcode/SKU or search by name',
+                      ),
+                      hintText: _itEn(
+                        'Puoi scansionare anche senza cliccare questo campo',
+                        'You can scan without clicking this field',
+                      ),
+                    ),
+                  ),
                 ),
-                hintText: _itEn(
-                  'Puoi scansionare anche senza cliccare questo campo',
-                  'You can scan without clicking this field',
+                const SizedBox(width: 8),
+                SegmentedButton<_ProductViewMode>(
+                  segments: [
+                    ButtonSegment<_ProductViewMode>(
+                      value: _ProductViewMode.list,
+                      icon: const Icon(Icons.view_list_rounded),
+                      tooltip: _itEn(
+                        'Visualizzazione elenco',
+                        'List view',
+                      ),
+                    ),
+                    ButtonSegment<_ProductViewMode>(
+                      value: _ProductViewMode.grid,
+                      icon: const Icon(Icons.grid_view_rounded),
+                      tooltip: _itEn(
+                        'Visualizzazione anteprima',
+                        'Preview grid view',
+                      ),
+                    ),
+                  ],
+                  selected: {_productViewMode},
+                  showSelectedIcon: false,
+                  style: SegmentedButton.styleFrom(
+                    minimumSize: const Size(44, 48),
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    visualDensity: VisualDensity.compact,
+                  ),
+                  onSelectionChanged: (value) => setState(
+                    () => _productViewMode = value.first,
+                  ),
                 ),
-              ),
+              ],
             ),
             const SizedBox(height: 8),
             Text(_status),
@@ -402,26 +446,58 @@ class _DashboardPageState extends State<DashboardPage> {
                         ? Center(
                             child: Text(AppStrings.t('no_product_found')),
                           )
-                        : ListView.separated(
-                            itemCount: results.length,
-                            separatorBuilder: (_, _) =>
-                                const Divider(height: 1),
-                            itemBuilder: (context, index) {
-                              final item = results[index];
-                              return ListTile(
-                                leading: CircleAvatar(
-                                  child: Text('${item.stockQuantity}'),
-                                ),
-                                title: Text(item.name),
-                                subtitle: Text(
-                                  '${item.variantDisplay} · SKU ${item.sku} · '
-                                  '${item.barcode ?? _itEn('nessun barcode', 'no barcode')}',
-                                ),
-                                trailing: Text(item.salePriceDisplay),
-                                onTap: () => _editProduct(item.productId),
-                              );
-                            },
-                          ),
+                        : _productViewMode == _ProductViewMode.list
+                            ? ListView.separated(
+                                itemCount: results.length,
+                                separatorBuilder: (_, _) =>
+                                    const Divider(height: 1),
+                                itemBuilder: (context, index) {
+                                  final item = results[index];
+                                  return ListTile(
+                                    leading: CircleAvatar(
+                                      child: Text('${item.stockQuantity}'),
+                                    ),
+                                    title: Text(item.name),
+                                    subtitle: Text(
+                                      '${item.variantDisplay} · SKU ${item.sku} · '
+                                      '${item.barcode ?? _itEn('nessun barcode', 'no barcode')}',
+                                    ),
+                                    trailing: Text(item.salePriceDisplay),
+                                    onTap: () => _editProduct(item.productId),
+                                  );
+                                },
+                              )
+                            : LayoutBuilder(
+                                builder: (context, constraints) {
+                                  final calculated =
+                                      (constraints.maxWidth / 210).floor();
+                                  final columns = calculated < 2
+                                      ? 2
+                                      : calculated > 6
+                                          ? 6
+                                          : calculated;
+                                  return GridView.builder(
+                                    padding: const EdgeInsets.all(10),
+                                    gridDelegate:
+                                        SliverGridDelegateWithFixedCrossAxisCount(
+                                      crossAxisCount: columns,
+                                      crossAxisSpacing: 10,
+                                      mainAxisSpacing: 10,
+                                      childAspectRatio: 0.88,
+                                    ),
+                                    itemCount: results.length,
+                                    itemBuilder: (context, index) {
+                                      final product = results[index];
+                                      return _DashboardProductGridTile(
+                                        product: product,
+                                        imageBytes: variantImages[product.id],
+                                        onTap: () =>
+                                            _editProduct(product.productId),
+                                      );
+                                    },
+                                  );
+                                },
+                              ),
               ),
             ),
             const SizedBox(height: 8),
@@ -437,6 +513,126 @@ class _DashboardPageState extends State<DashboardPage> {
 }
 
 enum _BarcodeAction { newProduct, existingProduct }
+
+class _DashboardProductGridTile extends StatelessWidget {
+  const _DashboardProductGridTile({
+    required this.product,
+    required this.imageBytes,
+    required this.onTap,
+  });
+
+  final ProductVariant product;
+  final Uint8List? imageBytes;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Card(
+      margin: EdgeInsets.zero,
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Expanded(
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  imageBytes == null
+                      ? Container(
+                          color: theme.colorScheme.surfaceContainerHighest,
+                          alignment: Alignment.center,
+                          child: Icon(
+                            Icons.image_outlined,
+                            size: 52,
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                        )
+                      : Image.memory(
+                          imageBytes!,
+                          fit: BoxFit.cover,
+                          gaplessPlayback: true,
+                        ),
+                  Positioned(
+                    right: 8,
+                    bottom: 8,
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.surface.withValues(alpha: 0.88),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
+                        child: Text(
+                          product.salePriceDisplay,
+                          style: theme.textTheme.labelLarge?.copyWith(
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    product.name,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    product.variantDisplay,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.bodySmall,
+                  ),
+                  const SizedBox(height: 5),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          'SKU ${product.sku}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.labelSmall,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Icon(
+                        Icons.inventory_2_outlined,
+                        size: 14,
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                      const SizedBox(width: 3),
+                      Text(
+                        '${product.stockQuantity}',
+                        style: theme.textTheme.labelMedium,
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
 
 class _MetricCard extends StatelessWidget {
   const _MetricCard({required this.label, required this.value, required this.icon});
