@@ -23,6 +23,15 @@ jobs:
           set -euo pipefail
           gh run list --repo "$GITHUB_REPOSITORY" --workflow implement-optional-gift-card-owner-once.yml --branch Flutter --limit 3 --json databaseId,url,status,conclusion,headSha,createdAt,updatedAt > result.json
           CONTENT="$(base64 -w0 result.json)"
-          gh api --method PUT "repos/$GITHUB_REPOSITORY/contents/.github/optional-gift-card-owner-probe.json" \
-            -f message='Record optional gift card implementation probe' \
-            -f content="$CONTENT" -f branch='Flutter' >/dev/null
+          EXISTING_SHA="$(gh api "repos/$GITHUB_REPOSITORY/contents/.github/optional-gift-card-owner-probe.json?ref=Flutter" --jq .sha 2>/dev/null || true)"
+          if [ -n "$EXISTING_SHA" ]; then
+            gh api --method PUT "repos/$GITHUB_REPOSITORY/contents/.github/optional-gift-card-owner-probe.json" \
+              -f message='Record optional gift card implementation probe' \
+              -f content="$CONTENT" -f branch='Flutter' -f sha="$EXISTING_SHA" >/dev/null
+          else
+            gh api --method PUT "repos/$GITHUB_REPOSITORY/contents/.github/optional-gift-card-owner-probe.json" \
+              -f message='Record optional gift card implementation probe' \
+              -f content="$CONTENT" -f branch='Flutter' >/dev/null
+          fi
+
+# refresh 2
