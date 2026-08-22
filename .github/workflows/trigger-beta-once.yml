@@ -1,0 +1,43 @@
+name: Trigger beta build once
+
+on:
+  push:
+    branches:
+      - Flutter
+    paths:
+      - '.github/workflows/trigger-beta-once.yml'
+
+permissions:
+  actions: write
+  contents: write
+
+jobs:
+  dispatch:
+    name: Dispatch beta pipeline
+    runs-on: ubuntu-latest
+    steps:
+      - name: Dispatch and track build workflow
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh workflow run build.yml --repo "$GITHUB_REPOSITORY" --ref Flutter
+          sleep 10
+          RUN_ID="$(gh run list --repo "$GITHUB_REPOSITORY" --workflow build.yml --branch Flutter --event workflow_dispatch --limit 1 --json databaseId --jq '.[0].databaseId')"
+          if [ -z "$RUN_ID" ] || [ "$RUN_ID" = "null" ]; then
+            echo 'Impossibile individuare la pipeline beta appena avviata.' >&2
+            exit 1
+          fi
+          echo "Pipeline beta: $RUN_ID"
+          set +e
+          gh run watch "$RUN_ID" --repo "$GITHUB_REPOSITORY" --exit-status
+          WATCH_EXIT=$?
+          set -e
+          FINAL="$(gh run view "$RUN_ID" --repo "$GITHUB_REPOSITORY" --json databaseId,url,status,conclusion,headSha,createdAt,updatedAt)"
+          CONTENT="$(printf '%s\n' "$FINAL" | base64 -w0)"
+          gh api --method PUT "repos/$GITHUB_REPOSITORY/contents/.github/beta-run-0.2.1-b1.json" \
+            -f message='Record beta 0.2.1-b1 pipeline result' \
+            -f content="$CONTENT" \
+            -f branch='Flutter' >/dev/null
+          exit "$WATCH_EXIT"
