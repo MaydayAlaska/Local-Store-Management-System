@@ -1,10 +1,7 @@
 name: Build and package Flutter desktop app
 
 on:
-  push:
-    branches: [Flutter, main]
-  pull_request:
-    branches: [Flutter, main]
+  workflow_dispatch:
 
 concurrency:
   group: flutter-build-package-${{ github.event_name }}-${{ github.ref }}
@@ -670,7 +667,7 @@ jobs:
 
   release-beta:
     name: Publish Flutter beta assets
-    if: github.event_name == 'push' && github.ref == 'refs/heads/Flutter'
+    if: github.ref == 'refs/heads/Flutter'
     needs: [package-windows, package-macos, package-linux]
     runs-on: ubuntu-latest
     permissions:
@@ -704,11 +701,11 @@ jobs:
           fi
           gh release create "$TAG" dist/* --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --prerelease --latest=false \
             --title "Local Store Management v${VERSION} BETA (${GITHUB_SHA::7})" \
-            --notes 'Versione BETA generata automaticamente dal branch Flutter. Include Windows x64/ARM64, macOS Intel/Apple Silicon in formato DMG e Linux x64/ARM64 in formato AppImage e DEB. Le versioni validate vengono poi promosse su main.'
+            --notes 'Versione BETA generata manualmente dal branch Flutter. Include Windows x64/ARM64, macOS Intel/Apple Silicon in formato DMG e Linux x64/ARM64 in formato AppImage e DEB. Le versioni validate vengono poi promosse su main.'
 
   release-main:
     name: Publish main release assets
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/main'
     needs: [package-windows, package-macos, package-linux]
     runs-on: ubuntu-latest
     permissions:
