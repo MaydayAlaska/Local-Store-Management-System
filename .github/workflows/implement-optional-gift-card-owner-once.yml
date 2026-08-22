@@ -37,8 +37,6 @@ jobs:
           lines = [line[10:] if line.startswith('          ') else line for line in block.splitlines()]
           script = '\n'.join(lines) + '\n'
 
-          # regex_once replacement arguments contain Dart SQL triple-single quotes.
-          # Convert only the outer Python replacement strings to triple-double quotes.
           cursor = 0
           while True:
               call = script.find('\nregex_once(', cursor)
@@ -49,11 +47,11 @@ jobs:
               if opening < 0 or (next_call >= 0 and opening > next_call):
                   raise SystemExit(f'Cannot find replacement opening for regex_once at {call}')
               script = script[:opening] + script[opening:].replace("'''", '\"\"\"', 1)
-              closing = script.find("\n    ''',\n)", opening + 1)
+              closing = script.find("''',\n)", opening + 1)
               if closing < 0:
                   raise SystemExit(f'Cannot find replacement closing for regex_once at {call}')
               script = script[:closing] + script[closing:].replace("'''", '\"\"\"', 1)
-              cursor = closing + 8
+              cursor = closing + 6
 
           Path('/tmp/implement_optional_gift_card_owner.py').write_text(script)
           subprocess.run(['python3', '-m', 'py_compile', '/tmp/implement_optional_gift_card_owner.py'], check=True)
@@ -92,4 +90,4 @@ jobs:
           git commit -m 'Make gift card customer association optional'
           git push origin HEAD:Flutter
 
-# trigger 4
+# trigger 5
