@@ -1,0 +1,243 @@
+name: One-shot gift card UI refinement
+
+on:
+  push:
+    branches:
+      - Flutter
+    paths:
+      - '.github/workflows/tmp-apply-gift-card-ui.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: Flutter
+          fetch-depth: 0
+
+      - name: Apply UI fixes
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          def replace_once(path, old, new):
+              p = Path(path)
+              text = p.read_text()
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f'{path}: expected exactly one match, found {count}')
+              p.write_text(text.replace(old, new, 1))
+
+          replace_once(
+              'lib/pages/customers_page.dart',
+              "import 'customer_editor_dialog.dart';\nimport 'order_dialog.dart';",
+              "import 'customer_editor_dialog.dart';\nimport 'gift_card_editor_dialog.dart';\nimport 'order_dialog.dart';",
+          )
+
+          marker = "  Future<void> _deleteGiftCard(GiftCard card) async {"
+          edit_method = """  Future<void> _editGiftCard(GiftCard card) async {
+            final draft = await showGiftCardEditorDialog(
+              context,
+              repository: widget.repository,
+              card: card,
+            );
+            if (!mounted || draft == null) return;
+
+            try {
+              final updated = widget.repository.updateGiftCard(
+                card.id,
+                customerId: draft.customerId,
+                expiresAtUtc: draft.expiresAtUtc,
+              );
+              if (!mounted) return;
+              setState(() => _giftStatus = _itEn(
+                    'Buono ${updated.code} aggiornato.',
+                    'Gift card ${updated.code} updated.',
+                  ));
+            } catch (error) {
+              if (!mounted) return;
+              setState(() => _giftStatus = _itEn(
+                    'Impossibile aggiornare il buono: $error',
+                    'Unable to update the gift card: $error',
+                  ));
+            }
+          }
+
+"""
+          replace_once('lib/pages/customers_page.dart', marker, edit_method + marker)
+
+          replace_once(
+              'lib/pages/customers_page.dart',
+              """                      IconButton(
+                        tooltip: _itEn('Elimina buono', 'Delete gift card'),
+                        onPressed: () => _deleteGiftCard(card),
+                        icon: const Icon(Icons.delete_outline),
+                      ),""",
+              """                      IconButton(
+                        tooltip: _itEn('Modifica buono', 'Edit gift card'),
+                        onPressed: () => _editGiftCard(card),
+                        icon: const Icon(Icons.edit_outlined),
+                      ),
+                      IconButton(
+                        tooltip: _itEn('Elimina buono', 'Delete gift card'),
+                        onPressed: () => _deleteGiftCard(card),
+                        icon: const Icon(Icons.delete_outline),
+                      ),""",
+          )
+
+          replace_once(
+              'lib/pages/gift_cards_page.dart',
+              """                          trailing: PopupMenuButton<String>(
+                            tooltip: _t('Azioni buono', 'Gift card actions'),
+                            onSelected: (value) {
+                              if (value == 'edit') {
+                                _editGiftCard(card);
+                              } else if (value == 'delete') {
+                                _deleteGiftCard(card, customer);
+                              }
+                            },
+                            itemBuilder: (context) => [
+                              PopupMenuItem(
+                                value: 'edit',
+                                child: ListTile(
+                                  contentPadding: EdgeInsets.zero,
+                                  leading: const Icon(Icons.edit_outlined),
+                                  title: Text(_t('Modifica', 'Edit')),
+                                ),
+                              ),
+                              PopupMenuItem(
+                                value: 'delete',
+                                child: ListTile(
+                                  contentPadding: EdgeInsets.zero,
+                                  leading: Icon(
+                                    Icons.delete_outline,
+                                    color: Theme.of(context).colorScheme.error,
+                                  ),
+                                  title: Text(_t('Elimina', 'Delete')),
+                                ),
+                              ),
+                            ],
+                          ),""",
+              """                          trailing: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              IconButton(
+                                tooltip: _t('Modifica buono', 'Edit gift card'),
+                                onPressed: () => _editGiftCard(card),
+                                icon: const Icon(Icons.edit_outlined),
+                              ),
+                              IconButton(
+                                tooltip: _t('Elimina buono', 'Delete gift card'),
+                                onPressed: () => _deleteGiftCard(card, customer),
+                                icon: const Icon(Icons.delete_outline),
+                              ),
+                            ],
+                          ),""",
+          )
+
+          replace_once(
+              'lib/pages/gift_card_editor_dialog.dart',
+              """                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        customer == null
+                            ? t('Nessun cliente associato', 'No associated customer')
+                            : '${customer!.displayName} (${customer!.customerCodeDisplay})',
+                      ),
+                    ),
+                    OutlinedButton.icon(
+                      onPressed: pickCustomer,
+                      icon: const Icon(Icons.person_search_outlined),
+                      label: Text(
+                        customer == null ? t('Associa', 'Assign') : t('Cambia', 'Change'),
+                      ),
+                    ),
+                    if (customer != null) ...[
+                      const SizedBox(width: 6),
+                      IconButton.outlined(
+                        tooltip: t('Rimuovi associazione', 'Remove association'),
+                        onPressed: () => setDialogState(() => customer = null),
+                        icon: const Icon(Icons.person_remove_outlined),
+                      ),
+                    ],
+                  ],
+                ),""",
+              """                Text(
+                  customer == null
+                      ? t('Nessun cliente associato', 'No associated customer')
+                      : '${customer!.displayName} (${customer!.customerCodeDisplay})',
+                ),
+                const SizedBox(height: 8),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    alignment: WrapAlignment.end,
+                    children: [
+                      OutlinedButton.icon(
+                        onPressed: pickCustomer,
+                        icon: const Icon(Icons.person_search_outlined),
+                        label: Text(
+                          customer == null
+                              ? t('Associa', 'Assign')
+                              : t('Cambia', 'Change'),
+                        ),
+                      ),
+                      if (customer != null)
+                        OutlinedButton.icon(
+                          onPressed: () => setDialogState(() => customer = null),
+                          icon: const Icon(Icons.person_remove_outlined),
+                          label: Text(
+                            t(
+                              'Rimuovi cliente associato',
+                              'Remove associated customer',
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),""",
+          )
+          PY
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Resolve packages
+        run: flutter pub get
+
+      - name: Format
+        run: dart format lib/pages/customers_page.dart lib/pages/gift_cards_page.dart lib/pages/gift_card_editor_dialog.dart
+
+      - name: Analyze
+        run: flutter analyze --no-fatal-infos
+
+      - name: Tests
+        run: flutter test
+
+      - name: Commit implementation and remove one-shot workflow
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git rm -- .github/workflows/tmp-apply-gift-card-ui.yml
+          git add -- lib/pages/customers_page.dart lib/pages/gift_cards_page.dart lib/pages/gift_card_editor_dialog.dart
+          git diff --cached --check
+          git commit -m 'Refine gift card action buttons'
+          git push origin HEAD:Flutter
+
+      - name: Remove obsolete temporary branch
+        if: always()
+        shell: bash
+        run: git push origin --delete tmp-gift-card-ui-actions-20260823 || true
