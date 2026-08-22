@@ -73,10 +73,8 @@ class _GiftCardManagementDialogState
               'Permanently delete selected gift cards?',
             )),
             content: Text(_itEn(
-              'Verranno eliminati definitivamente $count buoni regalo dal database. '
-                  'I loro codici resteranno riservati in modo permanente e non potranno essere riutilizzati.',
-              '$count gift cards will be permanently deleted from the database. '
-                  'Their codes will remain permanently reserved and cannot be reused.',
+              'Verranno eliminati definitivamente $count buoni regalo dal database.',
+              '$count gift cards will be permanently deleted from the database.',
             )),
             actions: [
               TextButton(
@@ -107,8 +105,8 @@ class _GiftCardManagementDialogState
       setState(() {
         _deletedTotal += deleted;
         _status = _itEn(
-          '$deleted buoni regalo eliminati definitivamente. I codici restano riservati.',
-          '$deleted gift cards permanently deleted. Their codes remain reserved.',
+          '$deleted buoni regalo eliminati definitivamente.',
+          '$deleted gift cards permanently deleted.',
         );
       });
     } catch (error) {
@@ -225,10 +223,8 @@ class _GiftCardManagementDialogState
             const SizedBox(height: 8),
             Text(
               _itEn(
-                'L’eliminazione è fisica e definitiva: i buoni verranno rimossi dalla tabella gift_cards. '
-                    'Il solo codice esadecimale resterà nel registro permanente dei codici emessi.',
-                'Deletion is physical and permanent: gift cards are removed from the gift_cards table. '
-                    'Only the hexadecimal code remains in the permanent issued-code registry.',
+                'L’eliminazione è fisica e definitiva: i buoni e i relativi dati verranno rimossi dalla tabella gift_cards.',
+                'Deletion is physical and permanent: gift cards and their data are removed from the gift_cards table.',
               ),
               style: theme.textTheme.bodySmall,
             ),
