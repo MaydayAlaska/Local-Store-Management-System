@@ -41,7 +41,7 @@ class _CashPageState extends State<CashPage> {
   int _nextGenericLineId = 1;
   int _nextGiftCardLineId = 1;
   int _keypadPriceCents = 0;
-  bool _showKeypad = true;
+  bool _showKeypad = false;
   _ProductViewMode _productViewMode = _ProductViewMode.list;
   late String _searchStatus;
   late String _cartStatus;
