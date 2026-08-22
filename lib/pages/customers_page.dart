@@ -10,7 +10,6 @@ import '../services/birth_place_service.dart';
 import '../services/fiscal_code_service.dart';
 import '../widgets/hid_barcode_listener.dart';
 import 'customer_editor_dialog.dart';
-import 'gift_card_management_dialog.dart';
 import 'order_dialog.dart';
 
 class CustomersPage extends StatefulWidget {
@@ -191,22 +190,6 @@ class _CustomersPageState extends State<CustomersPage> {
     }
   }
 
-  Future<void> _manageGiftCards() async {
-    final deleted = await showGiftCardManagementDialog(
-      context,
-      repository: widget.services.customers,
-    );
-    if (!mounted || deleted == null) return;
-    setState(() {
-      if (deleted > 0) {
-        _status = _itEn(
-          '$deleted buoni regalo eliminati definitivamente.',
-          '$deleted gift cards permanently deleted.',
-        );
-      }
-    });
-  }
-
   Future<void> _openOrder(int orderId) async {
     await showSalesOrderDialog(
       context,
@@ -233,12 +216,6 @@ class _CustomersPageState extends State<CustomersPage> {
                 style: Theme.of(context).textTheme.headlineMedium,
               ),
             ),
-            OutlinedButton.icon(
-              onPressed: _manageGiftCards,
-              icon: const Icon(Icons.card_giftcard_outlined),
-              label: Text(_itEn('Gestisci buoni', 'Manage gift cards')),
-            ),
-            const SizedBox(width: 8),
             FilledButton.icon(
               onPressed: _newCustomer,
               icon: const Icon(Icons.person_add_alt_1),
