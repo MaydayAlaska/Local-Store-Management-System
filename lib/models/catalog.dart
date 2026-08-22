@@ -65,6 +65,7 @@ class ProductVariant {
 
   String get cartVariantSizeDisplay {
     final parts = <String>[];
+    if (category?.trim().isNotEmpty == true) parts.add(category!.trim());
     if (variant?.trim().isNotEmpty == true) parts.add(variant!.trim());
     if (size?.trim().isNotEmpty == true) {
       parts.add('${AppStrings.t('size')} ${size!.trim()}');
@@ -91,7 +92,16 @@ class ProductVariant {
     return '$base - ${details.join(' - ')}';
   }
 
-  String get variantDisplay => cartVariantSizeDisplay;
+  String get variantDisplay {
+    final parts = <String>[];
+    if (variant?.trim().isNotEmpty == true) parts.add(variant!.trim());
+    if (size?.trim().isNotEmpty == true) {
+      parts.add('${AppStrings.t('size')} ${size!.trim()}');
+    }
+    return parts.isEmpty
+        ? AppStrings.pair('Variante base', 'Base variant')
+        : parts.join(' · ');
+  }
 }
 
 class ProductSummary {
