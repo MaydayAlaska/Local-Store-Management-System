@@ -18,6 +18,6 @@ Le versioni BETA usano sempre il formato `X.Y.Z-bN`, per esempio `0.1.9-b1`. Lo 
 - Quando una Beta viene promossa, `main` riceve la versione stabile senza suffisso e `Flutter` avanza alla prima Beta del ciclo successivo.
 - `avalonia` contiene la precedente implementazione Avalonia ed è un ramo storico/alternativo.
 
-Versione stabile corrente su `main`: `0.1.7`.
+Versione stabile corrente su `main`: `0.1.9`.
 
 Versione BETA corrente su `Flutter`: `0.1.9-b1`.
