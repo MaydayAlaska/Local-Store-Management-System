@@ -359,10 +359,9 @@ void main() {
       );
       expect(
         service.db.select(
-          'SELECT code FROM gift_card_code_registry WHERE code=? LIMIT 1;',
-          [card.code],
+          "SELECT name FROM sqlite_master WHERE type='table' AND name='gift_card_code_registry';",
         ),
-        hasLength(1),
+        isEmpty,
       );
     } finally {
       service.dispose();
@@ -370,7 +369,7 @@ void main() {
     }
   });
 
-  test('deleting a customer deletes gift cards, preserves codes and releases customer code', () async {
+  test('deleting a customer deletes gift cards and releases customer code', () async {
     final temp = await Directory.systemTemp.createTemp(
       'lsms-flutter-customer-gifts-delete-',
     );
@@ -394,10 +393,9 @@ void main() {
       expect(repository.getGiftCard(card.id), isNull);
       expect(
         service.db.select(
-          'SELECT code FROM gift_card_code_registry WHERE code=? LIMIT 1;',
-          [card.code],
+          "SELECT name FROM sqlite_master WHERE type='table' AND name='gift_card_code_registry';",
         ),
-        hasLength(1),
+        isEmpty,
       );
 
       final replacement = repository.save(const CustomerDraft(
