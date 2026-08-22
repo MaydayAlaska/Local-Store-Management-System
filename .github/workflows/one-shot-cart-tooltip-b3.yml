@@ -1,6 +1,9 @@
 name: One-shot cart tooltip b3 fix
 
 on:
+  pull_request:
+    branches: [Flutter]
+    types: [opened]
   push:
     branches: [Flutter]
     paths:
