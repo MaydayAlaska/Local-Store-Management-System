@@ -6,7 +6,7 @@ import 'package:local_store_management/models/customer.dart';
 import 'package:local_store_management/repositories/customer_repository.dart';
 
 void main() {
-  test('new gift cards use purchase timestamp codes', () async {
+  test('new gift cards use unique eight-character hexadecimal codes', () async {
     final temp = await Directory.systemTemp.createTemp(
       'lsms-flutter-gift-card-code-',
     );
@@ -20,21 +20,18 @@ void main() {
         lastName: 'Rossi',
       ));
 
-      final card = repository.createGiftCard(customer.id, 5000);
+      final codes = <String>{};
+      for (var i = 0; i < 250; i++) {
+        final card = repository.createGiftCard(customer.id, 5000);
+        expect(card.code, matches(RegExp(r'^[0-9A-F]{8}$')));
+        expect(codes.add(card.code), isTrue);
+      }
 
-      expect(
-        card.code,
-        matches(RegExp(r'^GIFT-\d{8}-\d{6}-\d{6}$')),
-      );
-      final localPurchase = card.createdAtUtc.toLocal();
-      String two(int value) => value.toString().padLeft(2, '0');
-      final timestamp = '${localPurchase.year}'
-          '${two(localPurchase.month)}'
-          '${two(localPurchase.day)}-'
-          '${two(localPurchase.hour)}'
-          '${two(localPurchase.minute)}'
-          '${two(localPurchase.second)}';
-      expect(card.code, startsWith('GIFT-$timestamp-'));
+      expect(codes, hasLength(250));
+      final registryCount = service.db.select(
+        'SELECT COUNT(*) AS count FROM gift_card_code_registry;',
+      ).first['count'] as int;
+      expect(registryCount, 250);
     } finally {
       service.dispose();
       await temp.delete(recursive: true);
