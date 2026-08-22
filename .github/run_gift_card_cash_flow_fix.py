@@ -10,8 +10,7 @@ if source.count(old_regex) != 1:
     raise SystemExit('Unable to patch regex_once replacement handling')
 fixed = source.replace(old_regex, new_regex, 1)
 
-# The helper source itself is Python: Dart's literal \n must therefore be
-# represented as \\n in the generated Python replacement string.
+# Double the three Dart newline escapes before Python parses the helper.
 for old, new in (
     ("${card.spentDisplay}\\n'", "${card.spentDisplay}\\\\n'"),
     ("$expiration'}\\n'", "$expiration'}\\\\n'"),
