@@ -2,7 +2,7 @@
 
 Gestionale desktop **offline** per negozi, sviluppato in **Flutter/Dart** con database locale **SQLite**.
 
-La versione stabile corrente è **0.1.7** sul branch `main`.
+La versione stabile corrente è **0.1.9** sul branch `main`.
 
 Il branch `Flutter` resta il canale **BETA/TEST** per lo sviluppo delle versioni successive. I canali OTA STABLE e BETA sono separati: una build stabile riceve solo release stabili e una build Beta riceve solo prerelease Beta.
 
@@ -19,11 +19,49 @@ Le release stabili vengono pubblicate su GitHub con tag `v<versione>` e includon
 | Linux | x86_64 | `.AppImage`, `.deb` |
 | Linux | ARM64 | `.AppImage`, `.deb` |
 
+## Novità della 0.1.9
+
+La **0.1.9** promuove in stabile le modifiche validate nel ciclo Beta successivo alla 0.1.7.
+
+### Immagini per variante e nuova griglia in Cassa
+
+Ogni variante di articolo può avere una **propria immagine**. L'immagine viene gestita direttamente nell'editor del prodotto, viene ridimensionata automaticamente quando necessario e viene salvata nel database insieme ai dati della variante.
+
+Nella schermata **Cassa** l'elenco prodotti può essere visualizzato in due modalità:
+
+- **elenco**, che mantiene la visualizzazione compatta già esistente;
+- **anteprima a griglia**, con immagine della variante, nome prodotto, variante, SKU, prezzo e giacenza.
+
+A destra della barra di ricerca è presente un selettore con le icone **elenco** e **griglia**, così da passare immediatamente da una modalità all'altra senza interrompere la scansione o la ricerca.
+
+Lo schema SQLite usa ora `PRAGMA user_version = 4` e include la tabella `variant_images`, collegata alle singole varianti.
+
+### Identità e icone Linux
+
+La distribuzione Linux usa in modo coerente l'application ID **`com.maydayalaska.local_store_management`**.
+
+- il file desktop installato è `com.maydayalaska.local_store_management.desktop`;
+- `Name` resta **Local Store Management System**;
+- il runner Flutter Linux viene verificato e configurato con lo stesso `APPLICATION_ID`;
+- il riferimento AppStream `launchable` punta allo stesso desktop ID;
+- GNOME/Wayland può associare correttamente la finestra alla voce applicazione invece di mostrare il nome tecnico con un'icona generica;
+- `StartupWMClass=local_store_management` resta disponibile come associazione per X11.
+
+Le icone Linux vengono generate dalla sorgente ufficiale dell'app nelle dimensioni **16, 32, 48, 64, 128 e 256 px** e installate nella gerarchia `hicolor` con il nome dell'application ID.
+
+L'**AppImage** contiene inoltre il desktop file e l'icona alla radice dell'AppDir, con `.DirIcon` collegato all'icona da 256 px. Il pacchetto **DEB** installa desktop file, icone multi-risoluzione e metadati AppStream e aggiorna, quando disponibili, le cache desktop e icone dopo installazione o rimozione.
+
+La CI controlla esplicitamente che desktop ID, AppStream e application ID del runner restino allineati.
+
+### Aggiornamenti OTA e interfaccia
+
+I canali STABLE e BETA restano completamente separati. Nelle Impostazioni la build stabile mostra solo il canale STABILE senza esporre il nome del branch, mentre le build Beta continuano a identificare il proprio canale di test.
+
 ## Funzioni principali
 
-- catalogo prodotti e varianti con SKU, barcode multipli, prezzi e giacenze;
+- catalogo prodotti e varianti con SKU, barcode multipli, prezzi, giacenze e immagine opzionale per variante;
 - magazzino con movimenti di carico/scarico;
-- cassa con scanner HID, ricerca prodotti, tastierino numerico, sconti, articoli generici e cliente associato;
+- cassa con scanner HID, ricerca prodotti, visualizzazione elenco/griglia con anteprime, tastierino numerico, sconti, articoli generici e cliente associato;
 - clienti con codice identificativo interno, codice fiscale facoltativo e storico acquisti;
 - gestione ordini e vendite, annullamento con ripristino della merce ed eliminazione dello storico;
 - buoni regalo associati ai clienti, con utilizzo parziale o totale, valore residuo e scadenza facoltativa;
@@ -34,13 +72,13 @@ Le release stabili vengono pubblicate su GitHub con tag `v<versione>` e includon
 - aggiornamenti OTA separati tra canale STABLE e canale BETA;
 - una sola istanza operativa dell'applicazione alla volta.
 
-## Novità della 0.1.7
+## Base stabile 0.1.7
 
-La **0.1.7** promuove in stabile il ciclo di sviluppo `0.1.7-b1` → `0.1.7-b6`.
+La **0.1.7** ha promosso in stabile il ciclo di sviluppo `0.1.7-b1` → `0.1.7-b6`.
 
 ### Buoni regalo
 
-I buoni regalo possono ora avere una **data di scadenza facoltativa**. La scadenza può essere impostata durante l'acquisto e successivamente modificata o rimossa dalla scheda cliente.
+I buoni regalo possono avere una **data di scadenza facoltativa**, impostabile durante l'acquisto e successivamente modificabile o rimovibile dalla scheda cliente.
 
 I nuovi buoni ricevono un codice univoco basato sul timestamp dell'acquisto, nel formato `GIFT-YYYYMMDD-HHMMSS-######`. I codici dei buoni già esistenti non vengono modificati.
 
@@ -48,7 +86,7 @@ Il valore dei buoni usa la valuta configurata nell'applicazione. Il calcolo IVA/
 
 ### IVA / VAT in Cassa
 
-L'IVA viene scorporata correttamente dal totale già comprensivo di imposta con la formula:
+L'IVA viene scorporata dal totale già comprensivo di imposta con la formula:
 
 ```text
 IVA = totale × aliquota / (100 + aliquota)
@@ -58,19 +96,17 @@ Per esempio, con aliquota 22% e totale 100,00, l'IVA inclusa è 18,03.
 
 ### Istanza singola
 
-L'applicazione consente una sola istanza operativa alla volta. La prima istanza riserva un canale IPC locale esclusivo; un secondo avvio non apre un nuovo database o una seconda finestra, ma richiama la finestra già esistente, la ripristina se minimizzata, la porta in primo piano e termina subito.
+L'applicazione consente una sola istanza operativa alla volta. La prima istanza riserva un canale IPC locale esclusivo; un secondo avvio richiama la finestra già esistente, la ripristina se minimizzata, la porta in primo piano e termina subito.
 
 La protezione è coperta da un test automatico che verifica anche la possibilità di riaprire normalmente l'applicazione dopo la chiusura della prima istanza.
 
 ### Icona applicazione
 
-L'icona predefinita è condivisa dalla distribuzione desktop. Su Windows viene generato un **ICO multi-risoluzione** per applicazione, collegamenti e installer; macOS e i pacchetti Linux utilizzano la stessa sorgente grafica. AppImage e pacchetti DEB installano l'icona nel formato previsto dal desktop Linux.
+L'icona predefinita è condivisa dalla distribuzione desktop. Su Windows viene generato un **ICO multi-risoluzione** per applicazione, collegamenti e installer; macOS e Linux usano la stessa sorgente grafica.
 
 ### Traduzioni
 
-Le traduzioni sono separate dal codice dell'applicazione e vengono caricate da file dedicati. Questo rende più semplice aggiungere nuove lingue senza inserire direttamente tutte le stringhe nel programma.
-
-I nomi delle lingue vengono sempre mostrati nella loro forma nativa, per esempio **Italiano** e **English**.
+Le traduzioni sono separate dal codice dell'applicazione e vengono caricate da file dedicati. I nomi delle lingue vengono sempre mostrati nella loro forma nativa, per esempio **Italiano** e **English**.
 
 ## Aggiornamenti OTA
 
@@ -81,7 +117,7 @@ Sono presenti due canali indipendenti:
 
 All'avvio l'app controlla gli aggiornamenti. Un aggiornamento viene proposto solo quando la versione online è realmente superiore a quella installata; un commit differente da solo non è sufficiente.
 
-L'updater seleziona automaticamente sistema operativo e architettura senza incrociare x64 e ARM64. Su Windows avvia il nuovo installer, su macOS scarica e apre il DMG, mentre su Linux l'aggiornamento automatico è disponibile quando l'applicazione è stata avviata da AppImage. I pacchetti `.deb` vengono comunque pubblicati per l'installazione manuale.
+L'updater seleziona automaticamente sistema operativo e architettura senza incrociare x64 e ARM64. Su Windows avvia il nuovo installer, su macOS scarica e apre il DMG, mentre su Linux l'aggiornamento automatico è disponibile quando l'applicazione è stata avviata da AppImage. I pacchetti `.deb` vengono pubblicati per l'installazione manuale.
 
 ## Etichette e stampanti
 
@@ -113,7 +149,7 @@ I dati restano localmente in:
 Documenti/Local Store Management System/
 ```
 
-Lo schema SQLite corrente usa `PRAGMA user_version = 3`. Le migrazioni vengono applicate automaticamente per mantenere compatibili anche i database creati dalle versioni precedenti.
+Lo schema SQLite corrente usa `PRAGMA user_version = 4`. Le migrazioni vengono applicate automaticamente per mantenere compatibili anche i database creati dalle versioni precedenti.
 
 Il dataset dei codici luogo utilizzato per il codice fiscale viene verificato dalla CI rispetto alla fonte aggiornata prima della compilazione delle release.
 
@@ -148,7 +184,7 @@ flutter analyze --no-fatal-infos
 flutter test
 ```
 
-La CI verifica analisi statica, test automatici, coerenza della versione applicativa, dataset dei codici luogo e metadati Linux prima di compilare i pacchetti desktop.
+La CI verifica analisi statica, test automatici, coerenza della versione applicativa, dataset dei codici luogo, identità desktop Linux e metadati AppStream prima di compilare i pacchetti.
 
 ## CI e release
 

@@ -2,7 +2,7 @@
 
 Il progetto usa versioni stabili nel formato `X.Y.Z`, senza build metadata con `+`.
 
-Le versioni BETA usano sempre il formato `X.Y.Z-bN`, per esempio `0.1.8-b1`. Lo stesso formato viene utilizzato nel `pubspec.yaml`, nell'interfaccia, nelle release e nei nomi dei pacchetti.
+Le versioni BETA usano sempre il formato `X.Y.Z-bN`, per esempio `0.1.9-b1`. Lo stesso formato viene utilizzato nel `pubspec.yaml`, nell'interfaccia, nelle release e nei nomi dei pacchetti.
 
 - `main` contiene le versioni stabili e pubblica tag leggibili `vX.Y.Z`.
 - `Flutter` è il branch BETA/TEST principale: le nuove modifiche vengono validate qui prima della promozione su `main`.
@@ -14,8 +14,10 @@ Le versioni BETA usano sempre il formato `X.Y.Z-bN`, per esempio `0.1.8-b1`. Lo 
 - `pubspec.yaml` e `UpdateService.currentVersion` devono sempre contenere la stessa versione; la CI verifica automaticamente questa coerenza.
 - L'OTA confronta le versioni in modo monotono: un aggiornamento viene proposto solo quando la versione online è realmente successiva a quella installata. Un commit differente, da solo, non è sufficiente.
 - A parità di `X.Y.Z`, una release stabile è semanticamente successiva a qualunque Beta della stessa versione, ma i canali STABLE e BETA non vengono mai incrociati dall'OTA.
-- Durante un ciclo Beta si incrementa `bN`: per esempio `0.1.8-b1` → `0.1.8-b2` → `0.1.8-b3`.
-- Quando una Beta viene promossa, `main` riceve la versione stabile senza suffisso e `Flutter` può avanzare alla prima Beta del ciclo successivo.
+- Durante un ciclo Beta si incrementa `bN`: `0.1.9-b1` → `0.1.9-b2` → `0.1.9-b3` e così via.
+- Quando una Beta viene promossa, `main` riceve la versione stabile senza suffisso e `Flutter` avanza alla prima Beta del ciclo successivo.
 - `avalonia` contiene la precedente implementazione Avalonia ed è un ramo storico/alternativo.
 
-Versione stabile promossa con questo ciclo: `0.1.7`.
+Versione stabile corrente su `main`: `0.1.9`.
+
+Versione BETA corrente su `Flutter`: `0.1.9-b1`.

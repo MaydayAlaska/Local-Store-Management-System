@@ -1,4 +1,8 @@
+import 'dart:typed_data';
+
+import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
+import 'package:image/image.dart' as img;
 
 import '../core/app_runtime.dart';
 import '../core/formatters.dart';
@@ -72,7 +76,12 @@ class _ProductEditorDialogState extends State<ProductEditorDialog> {
     if (product != null) {
       _variants = widget.services.products
           .getVariants(product.id)
-          .map(_VariantForm.fromDraft)
+          .map((draft) => _VariantForm.fromDraft(
+                draft,
+                draft.id == null
+                    ? null
+                    : widget.services.variantImages.get(draft.id!),
+              ))
           .toList();
       if (scannedBarcode?.isNotEmpty == true &&
           !_variants.any((variant) => variant.containsBarcode(scannedBarcode!))) {
@@ -145,7 +154,17 @@ class _ProductEditorDialogState extends State<ProductEditorDialog> {
         isActive: _active,
         variants: _variants.map((v) => v.toDraft()).toList(),
       );
-      widget.services.products.save(draft);
+      final productId = widget.services.products.save(draft);
+      for (final form in _variants) {
+        final saved = widget.services.products.findByBarcode(form.sku.text.trim());
+        if (saved == null || saved.productId != productId) {
+          throw StateError(_itEn(
+            'Impossibile associare l’immagine alla variante ${form.sku.text.trim()}.',
+            'Unable to link the image to variant ${form.sku.text.trim()}.',
+          ));
+        }
+        widget.services.variantImages.set(saved.id, form.imageBytes);
+      }
       Navigator.of(context).pop(true);
     } catch (error) {
       setState(() => _error = error
@@ -313,6 +332,14 @@ class _ProductEditorDialogState extends State<ProductEditorDialog> {
                 ),
                 style: Theme.of(context).textTheme.bodySmall,
               ),
+              const SizedBox(height: 2),
+              Text(
+                _itEn(
+                  'Ogni variante può avere una propria immagine, usata nella visualizzazione a griglia della Cassa.',
+                  'Each variant can have its own image, used by the Cash grid view.',
+                ),
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
               const SizedBox(height: 16),
               Row(children: [
                 Expanded(
@@ -401,6 +428,11 @@ class _VariantEditor extends StatefulWidget {
 }
 
 class _VariantEditorState extends State<_VariantEditor> {
+  static const _imageTypes = XTypeGroup(
+    label: 'Images',
+    extensions: ['jpg', 'jpeg', 'png', 'webp'],
+  );
+
   String _itEn(String it, String en) => AppStrings.pair(it, en);
 
   void _evaluateVariantPurchaseFormula() {
@@ -431,9 +463,47 @@ class _VariantEditorState extends State<_VariantEditor> {
     );
   }
 
+  Future<void> _pickImage() async {
+    try {
+      final file = await openFile(acceptedTypeGroups: const [_imageTypes]);
+      if (file == null) return;
+      final raw = await file.readAsBytes();
+      final decoded = img.decodeImage(raw);
+      if (decoded == null) {
+        throw StateError(_itEn(
+          'Il file selezionato non è un’immagine valida.',
+          'The selected file is not a valid image.',
+        ));
+      }
+
+      var processed = decoded;
+      if (decoded.width > 1200 || decoded.height > 1200) {
+        processed = decoded.width >= decoded.height
+            ? img.copyResize(decoded, width: 1200)
+            : img.copyResize(decoded, height: 1200);
+      }
+      final encoded = Uint8List.fromList(img.encodePng(processed, level: 6));
+      if (!mounted) return;
+      setState(() => widget.form.imageBytes = encoded);
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            error
+                .toString()
+                .replaceFirst('Bad state: ', '')
+                .replaceFirst('FormatException: ', ''),
+          ),
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final currency = AppRuntime.currencySymbol;
+    final imageBytes = widget.form.imageBytes;
     return Card(
       margin: EdgeInsets.zero,
       clipBehavior: Clip.antiAlias,
@@ -574,6 +644,76 @@ class _VariantEditorState extends State<_VariantEditor> {
             const SizedBox(width: 12),
             Text('${AppStrings.t('quantity')}: ${widget.form.stock}'),
           ]),
+          const SizedBox(height: 12),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SizedBox(
+                width: 180,
+                height: 120,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(10),
+                  child: imageBytes == null
+                      ? Container(
+                          color: Theme.of(context)
+                              .colorScheme
+                              .surfaceContainerHighest,
+                          alignment: Alignment.center,
+                          child: const Icon(Icons.image_outlined, size: 42),
+                        )
+                      : Image.memory(
+                          imageBytes,
+                          fit: BoxFit.cover,
+                          gaplessPlayback: true,
+                        ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      _itEn('Immagine variante', 'Variant image'),
+                      style: Theme.of(context)
+                          .textTheme
+                          .titleSmall
+                          ?.copyWith(fontWeight: FontWeight.w700),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      _itEn(
+                        'JPG, PNG o WebP. Le immagini grandi vengono ridimensionate automaticamente.',
+                        'JPG, PNG or WebP. Large images are resized automatically.',
+                      ),
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                    const SizedBox(height: 10),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        OutlinedButton.icon(
+                          onPressed: _pickImage,
+                          icon: const Icon(Icons.photo_library_outlined),
+                          label: Text(imageBytes == null
+                              ? _itEn('Scegli immagine', 'Choose image')
+                              : _itEn('Cambia immagine', 'Change image')),
+                        ),
+                        if (imageBytes != null)
+                          TextButton.icon(
+                            onPressed: () =>
+                                setState(() => widget.form.imageBytes = null),
+                            icon: const Icon(Icons.delete_outline),
+                            label: Text(_itEn('Rimuovi', 'Remove')),
+                          ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ],
       ),
     );
@@ -589,6 +729,7 @@ class _VariantForm {
     String purchase = '',
     String sale = '',
     String barcodes = '',
+    this.imageBytes,
     this.active = true,
     this.stock = 0,
     this.expanded = false,
@@ -599,7 +740,11 @@ class _VariantForm {
         sale = TextEditingController(text: sale),
         barcodes = TextEditingController(text: barcodes);
 
-  factory _VariantForm.fromDraft(ProductVariantDraft draft) => _VariantForm(
+  factory _VariantForm.fromDraft(
+    ProductVariantDraft draft,
+    Uint8List? imageBytes,
+  ) =>
+      _VariantForm(
         id: draft.id,
         sku: draft.sku,
         variant: draft.variant ?? '',
@@ -607,6 +752,7 @@ class _VariantForm {
         purchase: _moneyValue(draft.purchasePriceCents),
         sale: _moneyValue(draft.salePriceCents),
         barcodes: draft.barcodes.join('\n'),
+        imageBytes: imageBytes,
         active: draft.isActive,
         stock: draft.stockQuantity,
       );
@@ -618,6 +764,7 @@ class _VariantForm {
   final TextEditingController purchase;
   final TextEditingController sale;
   final TextEditingController barcodes;
+  Uint8List? imageBytes;
   bool active;
   final int stock;
   bool expanded;

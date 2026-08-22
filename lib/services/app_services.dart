@@ -3,6 +3,7 @@ import '../repositories/customer_repository.dart';
 import '../repositories/lookup_repository.dart';
 import '../repositories/product_repository.dart';
 import '../repositories/stock_repository.dart';
+import '../repositories/variant_image_repository.dart';
 import 'application_icon_service.dart';
 import 'backup_service.dart';
 import 'database_location_service.dart';
@@ -17,6 +18,7 @@ class AppServices {
     DatabaseLocationService? databaseLocation,
   })  : databaseLocation = databaseLocation ?? DatabaseLocationService(),
         products = ProductRepository(database),
+        variantImages = VariantImageRepository(database),
         lookups = LookupRepository(database),
         stock = StockRepository(database),
         customers = CustomerRepository(database),
@@ -31,6 +33,7 @@ class AppServices {
   final DatabaseService database;
   final DatabaseLocationService databaseLocation;
   final ProductRepository products;
+  final VariantImageRepository variantImages;
   final LookupRepository lookups;
   final StockRepository stock;
   final CustomerRepository customers;

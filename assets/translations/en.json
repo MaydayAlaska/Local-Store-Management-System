@@ -86,7 +86,7 @@
     "no_inventory_rows": "No items match the selected filters.",
     "settings_saved": "Settings saved.",
     "beta_channel": "Update channel: BETA (beta-latest), Flutter branch. BETA builds only receive other BETA builds.",
-    "stable_channel": "Update channel: STABLE, main branch. Stable builds only receive stable releases.",
+    "stable_channel": "Update channel: STABLE. Stable builds only receive stable releases.",
     "dev_channel": "Development build: update checks are available, OTA installation requires a published release.",
     "images": "Images",
     "scan_search": "Scan product or search",
