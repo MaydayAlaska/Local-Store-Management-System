@@ -149,8 +149,12 @@ class _ShellPageState extends State<ShellPage> {
                         )
                       else
                         Icon(
-                          error ? Icons.error_outline_rounded : Icons.cloud_done_outlined,
-                          color: error ? theme.colorScheme.error : theme.colorScheme.primary,
+                          error
+                              ? Icons.error_outline_rounded
+                              : Icons.cloud_done_outlined,
+                          color: error
+                              ? theme.colorScheme.error
+                              : theme.colorScheme.primary,
                         ),
                       const SizedBox(width: 12),
                       Expanded(
@@ -158,9 +162,19 @@ class _ShellPageState extends State<ShellPage> {
                           mainAxisSize: MainAxisSize.min,
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(title, style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700)),
+                            Text(
+                              title,
+                              style: theme.textTheme.titleSmall?.copyWith(
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
                             const SizedBox(height: 4),
-                            Text(message, maxLines: 3, overflow: TextOverflow.ellipsis, style: theme.textTheme.bodySmall),
+                            Text(
+                              message,
+                              maxLines: 3,
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.textTheme.bodySmall,
+                            ),
                           ],
                         ),
                       ),
@@ -183,7 +197,10 @@ class _ShellPageState extends State<ShellPage> {
     _birthPlaceNotification = entry;
     overlay.insert(entry);
     if (!loading) {
-      _birthPlaceNotificationTimer = Timer(const Duration(seconds: 6), _dismissBirthPlaceNotification);
+      _birthPlaceNotificationTimer = Timer(
+        const Duration(seconds: 6),
+        _dismissBirthPlaceNotification,
+      );
     }
   }
 
@@ -220,18 +237,37 @@ class _ShellPageState extends State<ShellPage> {
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Icon(Icons.system_update_alt_rounded, color: theme.colorScheme.primary),
+                        Icon(
+                          Icons.system_update_alt_rounded,
+                          color: theme.colorScheme.primary,
+                        ),
                         const SizedBox(width: 12),
                         Expanded(
                           child: Column(
                             mainAxisSize: MainAxisSize.min,
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(AppStrings.t('update_available'), style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700)),
+                              Text(
+                                AppStrings.t('update_available'),
+                                style: theme.textTheme.titleSmall?.copyWith(
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
                               const SizedBox(height: 4),
-                              Text(update.message, maxLines: 3, overflow: TextOverflow.ellipsis, style: theme.textTheme.bodySmall),
+                              Text(
+                                update.message,
+                                maxLines: 3,
+                                overflow: TextOverflow.ellipsis,
+                                style: theme.textTheme.bodySmall,
+                              ),
                               const SizedBox(height: 6),
-                              Text(AppStrings.t('open_settings_update'), style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.primary, fontWeight: FontWeight.w600)),
+                              Text(
+                                AppStrings.t('open_settings_update'),
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  color: theme.colorScheme.primary,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
                             ],
                           ),
                         ),
@@ -253,7 +289,10 @@ class _ShellPageState extends State<ShellPage> {
     );
     _updateNotification = entry;
     overlay.insert(entry);
-    _updateNotificationTimer = Timer(const Duration(seconds: 15), _dismissUpdateNotification);
+    _updateNotificationTimer = Timer(
+      const Duration(seconds: 15),
+      _dismissUpdateNotification,
+    );
   }
 
   void _dismissUpdateNotification() {
@@ -274,28 +313,87 @@ class _ShellPageState extends State<ShellPage> {
   }
 
   List<_NavItem> _navItems() => [
-        _NavItem(Icons.dashboard_outlined, Icons.dashboard, AppStrings.t('dashboard')),
-        _NavItem(Icons.point_of_sale_outlined, Icons.point_of_sale, AppStrings.t('cash')),
-        _NavItem(Icons.receipt_long_outlined, Icons.receipt_long, AppStrings.t('sales')),
-        _NavItem(Icons.people_outline, Icons.people, AppStrings.t('customers')),
-        _NavItem(Icons.label_outline, Icons.label, AppStrings.t('labels')),
-        _NavItem(Icons.inventory_2_outlined, Icons.inventory_2, AppStrings.t('products')),
-        _NavItem(Icons.warehouse_outlined, Icons.warehouse, AppStrings.t('stock')),
-        _NavItem(Icons.category_outlined, Icons.category, AppStrings.t('lookups')),
-        _NavItem(Icons.archive_outlined, Icons.archive, AppStrings.t('export')),
-        _NavItem(Icons.settings_outlined, Icons.settings, AppStrings.t('settings')),
+        _NavItem(
+          Icons.dashboard_outlined,
+          Icons.dashboard,
+          AppStrings.t('dashboard'),
+        ),
+        _NavItem(
+          Icons.point_of_sale_outlined,
+          Icons.point_of_sale,
+          AppStrings.t('cash'),
+        ),
+        _NavItem(
+          Icons.receipt_long_outlined,
+          Icons.receipt_long,
+          AppStrings.t('sales'),
+        ),
+        _NavItem(
+          Icons.people_outline,
+          Icons.people,
+          AppStrings.t('customers'),
+        ),
+        _NavItem(
+          Icons.label_outline,
+          Icons.label,
+          AppStrings.t('labels'),
+        ),
+        _NavItem(
+          Icons.inventory_2_outlined,
+          Icons.inventory_2,
+          AppStrings.t('products'),
+        ),
+        _NavItem(
+          Icons.warehouse_outlined,
+          Icons.warehouse,
+          AppStrings.t('stock'),
+        ),
+        _NavItem(
+          Icons.category_outlined,
+          Icons.category,
+          AppStrings.t('lookups'),
+        ),
+        _NavItem(
+          Icons.archive_outlined,
+          Icons.archive,
+          AppStrings.t('export'),
+        ),
+        _NavItem(
+          Icons.settings_outlined,
+          Icons.settings,
+          AppStrings.t('settings'),
+        ),
       ];
 
   List<Widget> _pages() => <Widget>[
-        DashboardPage(services: widget.services, isActive: _index == 0),
-        CashPage(services: widget.services, isActive: _index == 1),
+        DashboardPage(
+          services: widget.services,
+          isActive: _index == 0,
+        ),
+        CashPage(
+          services: widget.services,
+          isActive: _index == 1,
+        ),
         OrdersPage(services: widget.services),
-        CustomersPage(services: widget.services, isActive: _index == 3),
-        LabelsPage(services: widget.services, settings: widget.settings, isActive: _index == 4),
+        CustomersPage(
+          services: widget.services,
+          isActive: _index == 3,
+        ),
+        LabelsPage(
+          services: widget.services,
+          settings: widget.settings,
+          isActive: _index == 4,
+        ),
         ProductsPage(services: widget.services),
-        StockPage(services: widget.services, isActive: _index == 6),
+        StockPage(
+          services: widget.services,
+          isActive: _index == 6,
+        ),
         LookupsPage(services: widget.services),
-        ExportPage(services: widget.services, settings: widget.settings),
+        ExportPage(
+          services: widget.services,
+          settings: widget.settings,
+        ),
         SettingsPage(
           services: widget.services,
           current: widget.settings,
@@ -326,7 +424,9 @@ class _ShellPageState extends State<ShellPage> {
           child: SizedBox(
             width: layout.navigationExtent,
             child: ScrollConfiguration(
-              behavior: ScrollConfiguration.of(context).copyWith(scrollbars: false),
+              behavior: ScrollConfiguration.of(
+                context,
+              ).copyWith(scrollbars: false),
               child: NavigationRail(
                 minWidth: layout.navigationExtent,
                 minExtendedWidth: layout.navigationExtent,
@@ -334,8 +434,25 @@ class _ShellPageState extends State<ShellPage> {
                 onDestinationSelected: _selectPage,
                 labelType: NavigationRailLabelType.all,
                 scrollable: true,
-                leading: _MenuBrand(settings: widget.settings, services: widget.services, compact: layout.compactBrand),
-                destinations: items.map((item) => NavigationRailDestination(icon: Icon(item.icon), selectedIcon: Icon(item.selectedIcon), label: Text(item.label))).toList(growable: false),
+                leading: _MenuBrand(
+                  settings: widget.settings,
+                  services: widget.services,
+                  compact: layout.compactBrand,
+                ),
+                destinations: items
+                    .map(
+                      (item) => NavigationRailDestination(
+                        icon: Icon(item.icon),
+                        selectedIcon: Icon(item.selectedIcon),
+                        label: Text(
+                          item.label,
+                          textAlign: TextAlign.center,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    )
+                    .toList(growable: false),
               ),
             ),
           ),
@@ -355,38 +472,68 @@ class _ShellPageState extends State<ShellPage> {
           width: layout.navigationExtent,
           child: GlassSurface(
             borderRadius: BorderRadius.circular(layout.panelRadius),
-            padding: EdgeInsets.symmetric(horizontal: layout.dense ? 8 : 10, vertical: 10),
+            padding: EdgeInsets.symmetric(
+              horizontal: layout.dense ? 8 : 10,
+              vertical: 10,
+            ),
             child: Column(
               children: [
-                _MenuBrand(settings: widget.settings, services: widget.services, compact: layout.compactBrand),
+                _MenuBrand(
+                  settings: widget.settings,
+                  services: widget.services,
+                  compact: layout.compactBrand,
+                ),
                 Expanded(
                   child: ListView.separated(
                     padding: EdgeInsets.zero,
                     itemCount: items.length,
-                    separatorBuilder: (_, __) => SizedBox(height: layout.dense ? 2 : 5),
+                    separatorBuilder: (_, __) =>
+                        SizedBox(height: layout.dense ? 2 : 5),
                     itemBuilder: (context, index) {
                       final item = items[index];
                       final selected = index == _index;
                       return Material(
-                        color: selected ? theme.colorScheme.primary.withValues(alpha: 0.16) : Colors.transparent,
-                        borderRadius: BorderRadius.circular(layout.navItemRadius),
+                        color: selected
+                            ? theme.colorScheme.primary.withValues(alpha: 0.16)
+                            : Colors.transparent,
+                        borderRadius: BorderRadius.circular(
+                          layout.navItemRadius,
+                        ),
                         child: InkWell(
-                          borderRadius: BorderRadius.circular(layout.navItemRadius),
+                          borderRadius: BorderRadius.circular(
+                            layout.navItemRadius,
+                          ),
                           onTap: () => _selectPage(index),
                           child: Padding(
-                            padding: EdgeInsets.symmetric(horizontal: layout.dense ? 10 : 12, vertical: layout.dense ? 9 : 11),
+                            padding: EdgeInsets.symmetric(
+                              horizontal: layout.dense ? 10 : 12,
+                              vertical: layout.dense ? 9 : 11,
+                            ),
                             child: Row(
                               children: [
-                                Icon(selected ? item.selectedIcon : item.icon, size: 20, color: selected ? theme.colorScheme.primary : theme.colorScheme.onSurfaceVariant),
+                                Icon(
+                                  selected
+                                      ? item.selectedIcon
+                                      : item.icon,
+                                  size: 20,
+                                  color: selected
+                                      ? theme.colorScheme.primary
+                                      : theme.colorScheme.onSurfaceVariant,
+                                ),
                                 const SizedBox(width: 10),
                                 Expanded(
                                   child: Text(
                                     item.label,
+                                    textAlign: TextAlign.center,
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
                                     style: TextStyle(
-                                      color: selected ? theme.colorScheme.primary : theme.colorScheme.onSurface,
-                                      fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                                      color: selected
+                                          ? theme.colorScheme.primary
+                                          : theme.colorScheme.onSurface,
+                                      fontWeight: selected
+                                          ? FontWeight.w700
+                                          : FontWeight.w500,
                                     ),
                                   ),
                                 ),
@@ -421,26 +568,41 @@ class _ShellPageState extends State<ShellPage> {
             radius: layout.navItemRadius,
             onTap: () => _selectPage(i),
           ),
-          if (i != items.length - 1) SizedBox(width: layout.dense ? 2 : 5),
+          if (i != items.length - 1)
+            SizedBox(width: layout.dense ? 2 : 5),
         ],
       ],
     );
     return GlassSurface(
       borderRadius: BorderRadius.circular(layout.panelRadius),
-      padding: EdgeInsets.symmetric(horizontal: layout.dense ? 6 : 10, vertical: layout.dense ? 5 : 8),
+      padding: EdgeInsets.symmetric(
+        horizontal: layout.dense ? 6 : 10,
+        vertical: layout.dense ? 5 : 8,
+      ),
       child: SizedBox(
         height: layout.navigationExtent,
         child: Row(
           mainAxisSize: dock ? MainAxisSize.min : MainAxisSize.max,
           children: [
             if (!dock) ...[
-              _HorizontalBrand(settings: widget.settings, services: widget.services),
+              _HorizontalBrand(
+                settings: widget.settings,
+                services: widget.services,
+              ),
               SizedBox(width: layout.shellGap),
             ],
             if (dock)
-              SingleChildScrollView(scrollDirection: Axis.horizontal, child: row)
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: row,
+              )
             else
-              Expanded(child: SingleChildScrollView(scrollDirection: Axis.horizontal, child: row)),
+              Expanded(
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: row,
+                ),
+              ),
           ],
         ),
       ),
@@ -462,7 +624,10 @@ class _ShellPageState extends State<ShellPage> {
           Align(
             alignment: Alignment.bottomCenter,
             child: ConstrainedBox(
-              constraints: BoxConstraints(maxWidth: MediaQuery.sizeOf(context).width - (layout.shellPadding * 2)),
+              constraints: BoxConstraints(
+                maxWidth: MediaQuery.sizeOf(context).width -
+                    (layout.shellPadding * 2),
+              ),
               child: _horizontalNav(layout, dock: true),
             ),
           ),
@@ -506,7 +671,13 @@ class _NavItem {
 }
 
 class _HorizontalNavButton extends StatelessWidget {
-  const _HorizontalNavButton({required this.item, required this.selected, required this.compact, required this.radius, required this.onTap});
+  const _HorizontalNavButton({
+    required this.item,
+    required this.selected,
+    required this.compact,
+    required this.radius,
+    required this.onTap,
+  });
   final _NavItem item;
   final bool selected;
   final bool compact;
@@ -518,24 +689,49 @@ class _HorizontalNavButton extends StatelessWidget {
     final theme = Theme.of(context);
     final tokens = UiStyleTokens.of(context);
     return Material(
-      color: selected ? theme.colorScheme.primary.withValues(alpha: 0.18) : Colors.transparent,
+      color: selected
+          ? theme.colorScheme.primary.withValues(alpha: 0.18)
+          : Colors.transparent,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(radius),
-        side: selected ? BorderSide(color: theme.colorScheme.primary.withValues(alpha: 0.45)) : BorderSide.none,
+        side: selected
+            ? BorderSide(
+                color: theme.colorScheme.primary.withValues(alpha: 0.45),
+              )
+            : BorderSide.none,
       ),
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(radius),
         hoverColor: tokens.captionHover,
         child: Padding(
-          padding: EdgeInsets.symmetric(horizontal: compact ? 10 : 14, vertical: compact ? 8 : 10),
+          padding: EdgeInsets.symmetric(
+            horizontal: compact ? 10 : 14,
+            vertical: compact ? 8 : 10,
+          ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(selected ? item.selectedIcon : item.icon, size: 19, color: selected ? theme.colorScheme.primary : theme.colorScheme.onSurfaceVariant),
+              Icon(
+                selected ? item.selectedIcon : item.icon,
+                size: 19,
+                color: selected
+                    ? theme.colorScheme.primary
+                    : theme.colorScheme.onSurfaceVariant,
+              ),
               if (!compact) ...[
                 const SizedBox(width: 7),
-                Text(item.label, style: TextStyle(color: selected ? theme.colorScheme.primary : theme.colorScheme.onSurface, fontWeight: selected ? FontWeight.w700 : FontWeight.w500)),
+                Text(
+                  item.label,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: selected
+                        ? theme.colorScheme.primary
+                        : theme.colorScheme.onSurface,
+                    fontWeight:
+                        selected ? FontWeight.w700 : FontWeight.w500,
+                  ),
+                ),
               ],
             ],
           ),
@@ -546,7 +742,10 @@ class _HorizontalNavButton extends StatelessWidget {
 }
 
 class _HorizontalBrand extends StatelessWidget {
-  const _HorizontalBrand({required this.settings, required this.services});
+  const _HorizontalBrand({
+    required this.settings,
+    required this.services,
+  });
   final AppSettings settings;
   final AppServices services;
 
@@ -559,12 +758,25 @@ class _HorizontalBrand extends StatelessWidget {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        if (showLogo) Image.file(File(logo), key: ValueKey(logo), width: 30, height: 30, fit: BoxFit.contain, gaplessPlayback: false),
+        if (showLogo)
+          Image.file(
+            File(logo),
+            key: ValueKey(logo),
+            width: 30,
+            height: 30,
+            fit: BoxFit.contain,
+            gaplessPlayback: false,
+          ),
         if (showLogo && showName) const SizedBox(width: 8),
         if (showName)
           ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 160),
-            child: Text(settings.shopName, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w700)),
+            child: Text(
+              settings.shopName,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontWeight: FontWeight.w700),
+            ),
           ),
       ],
     );
@@ -572,7 +784,11 @@ class _HorizontalBrand extends StatelessWidget {
 }
 
 class _MenuBrand extends StatelessWidget {
-  const _MenuBrand({required this.settings, required this.services, this.compact = false});
+  const _MenuBrand({
+    required this.settings,
+    required this.services,
+    this.compact = false,
+  });
   final AppSettings settings;
   final AppServices services;
   final bool compact;
@@ -584,10 +800,21 @@ class _MenuBrand extends StatelessWidget {
     final showName = settings.showShopNameInMenu;
     if (!showLogo && !showName) return SizedBox(height: compact ? 8 : 12);
     return Padding(
-      padding: EdgeInsets.only(bottom: compact ? 8 : 14, top: compact ? 4 : 8),
+      padding: EdgeInsets.only(
+        bottom: compact ? 8 : 14,
+        top: compact ? 4 : 8,
+      ),
       child: Column(
         children: [
-          if (showLogo) Image.file(File(logo), key: ValueKey(logo), width: compact ? 46 : 84, height: compact ? 46 : 84, fit: BoxFit.contain, gaplessPlayback: false),
+          if (showLogo)
+            Image.file(
+              File(logo),
+              key: ValueKey(logo),
+              width: compact ? 46 : 84,
+              height: compact ? 46 : 84,
+              fit: BoxFit.contain,
+              gaplessPlayback: false,
+            ),
           if (showLogo && showName) SizedBox(height: compact ? 5 : 9),
           if (showName)
             Text(
@@ -595,7 +822,10 @@ class _MenuBrand extends StatelessWidget {
               textAlign: TextAlign.center,
               maxLines: compact ? 1 : 2,
               overflow: TextOverflow.ellipsis,
-              style: TextStyle(fontWeight: FontWeight.w700, fontSize: compact ? 11 : null),
+              style: TextStyle(
+                fontWeight: FontWeight.w700,
+                fontSize: compact ? 11 : null,
+              ),
             ),
         ],
       ),
