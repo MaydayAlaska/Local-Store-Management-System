@@ -6,7 +6,7 @@ import 'package:local_store_management/models/customer.dart';
 import 'package:local_store_management/repositories/customer_repository.dart';
 
 void main() {
-  test('deleting a gift card physically removes it and keeps its code reserved', () async {
+  test('deleting a gift card physically removes it, preserves its code and frees its id', () async {
     final temp = await Directory.systemTemp.createTemp(
       'lsms-flutter-gift-card-hard-delete-',
     );
@@ -20,10 +20,15 @@ void main() {
         lastName: 'Rossi',
       ));
       final card = repository.createGiftCard(customer.id, 5000);
+      final secondCard = repository.createGiftCard(customer.id, 3000);
+      expect(secondCard.id, card.id + 1);
 
       expect(repository.deleteGiftCard(card.id), isTrue);
       expect(repository.getGiftCard(card.id), isNull);
-      expect(repository.giftCardsForCustomer(customer.id), isEmpty);
+      expect(
+        repository.giftCardsForCustomer(customer.id).map((item) => item.id),
+        contains(secondCard.id),
+      );
       expect(
         service.db.select(
           'SELECT code FROM gift_cards WHERE id=? LIMIT 1;',
@@ -40,6 +45,15 @@ void main() {
         [card.code],
       );
       expect(registry, hasLength(1));
+
+      final replacement = repository.createGiftCard(customer.id, 2500);
+      expect(
+        replacement.id,
+        card.id,
+        reason: 'Il primo ID libero deve essere riutilizzato anche se esistono ID più alti.',
+      );
+      expect(replacement.code, isNot(card.code));
+      expect(repository.getGiftCard(secondCard.id)?.code, secondCard.code);
     } finally {
       service.dispose();
       await temp.delete(recursive: true);
