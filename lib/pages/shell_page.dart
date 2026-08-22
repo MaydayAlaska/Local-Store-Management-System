@@ -16,6 +16,7 @@ import 'cash_page.dart';
 import 'customers_page.dart';
 import 'dashboard_page.dart';
 import 'export_page.dart';
+import 'gift_cards_page.dart';
 import 'labels_page.dart';
 import 'lookups_page.dart';
 import 'orders_page.dart';
@@ -40,7 +41,7 @@ class ShellPage extends StatefulWidget {
 }
 
 class _ShellPageState extends State<ShellPage> {
-  static const _settingsIndex = 9;
+  static const _settingsIndex = 10;
 
   int _index = 0;
   UpdateCheckResult? _startupUpdate;
@@ -334,6 +335,11 @@ class _ShellPageState extends State<ShellPage> {
           AppStrings.t('customers'),
         ),
         _NavItem(
+          Icons.card_giftcard_outlined,
+          Icons.card_giftcard,
+          AppStrings.pair('Buoni regalo', 'Gift cards'),
+        ),
+        _NavItem(
           Icons.label_outline,
           Icons.label,
           AppStrings.t('labels'),
@@ -379,15 +385,16 @@ class _ShellPageState extends State<ShellPage> {
           services: widget.services,
           isActive: _index == 3,
         ),
+        GiftCardsPage(services: widget.services),
         LabelsPage(
           services: widget.services,
           settings: widget.settings,
-          isActive: _index == 4,
+          isActive: _index == 5,
         ),
         ProductsPage(services: widget.services),
         StockPage(
           services: widget.services,
-          isActive: _index == 6,
+          isActive: _index == 7,
         ),
         LookupsPage(services: widget.services),
         ExportPage(
