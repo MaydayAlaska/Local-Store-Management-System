@@ -288,7 +288,7 @@ void main() {
     },
   );
 
-  test('gift cards are customer-bound and soft deletion preserves order snapshots', () async {
+  test('gift cards are customer-bound and physical deletion preserves order snapshots', () async {
     final temp = await Directory.systemTemp.createTemp(
       'lsms-flutter-gift-card-delete-',
     );
@@ -344,18 +344,26 @@ void main() {
       expect(repository.getGiftCard(card.id), isNull);
 
       final preserved = repository.getOrder(order.id)!.summary;
-      expect(preserved.giftCardId, card.id);
+      expect(preserved.giftCardId, isNull);
       expect(preserved.giftCardCode, card.code);
       expect(preserved.giftCardAppliedCents, 1000);
       expect(preserved.amountDueCents, 0);
       expect(repository.searchOrders(card.code).single.id, order.id);
 
-      final tombstone = service.db.select(
-        'SELECT deleted_at_utc FROM gift_cards WHERE id=? LIMIT 1;',
-        [card.id],
+      expect(
+        service.db.select(
+          'SELECT id FROM gift_cards WHERE id=? LIMIT 1;',
+          [card.id],
+        ),
+        isEmpty,
       );
-      expect(tombstone, hasLength(1));
-      expect(tombstone.first['deleted_at_utc'], isNotNull);
+      expect(
+        service.db.select(
+          'SELECT code FROM gift_card_code_registry WHERE code=? LIMIT 1;',
+          [card.code],
+        ),
+        hasLength(1),
+      );
     } finally {
       service.dispose();
       await temp.delete(recursive: true);
