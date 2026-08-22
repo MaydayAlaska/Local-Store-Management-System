@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:path/path.dart' as p;
 
@@ -21,6 +22,7 @@ class UiStyleRegistry {
 
   static final Map<String, AppUiStyle> _external = {};
   static final Map<String, String> _invalidPacks = {};
+  static final ValueNotifier<int> revision = ValueNotifier<int>(0);
 
   static List<AppUiStyle> get all {
     final styles = <String, AppUiStyle>{fallbackId: _fallback, ..._external};
@@ -69,6 +71,7 @@ class UiStyleRegistry {
     _invalidPacks
       ..clear()
       ..addAll(invalid);
+    revision.value += 1;
   }
 
   static bool hasStyle(String? id) {
