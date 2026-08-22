@@ -177,7 +177,7 @@ void main() {
         ));
         final card = repository.createGiftCard(customer.id, 10000);
 
-        expect(card.code, matches(RegExp(r'^GIFT-\d{8}-\d{6}-\d{6}$')));
+        expect(card.code, matches(RegExp(r'^[0-9A-F]{8}$')));
         expect(card.totalValueCents, 10000);
         expect(card.spentValueCents, 0);
         expect(card.remainingValueCents, 10000);
@@ -288,7 +288,7 @@ void main() {
     },
   );
 
-  test('gift cards are customer-bound and deletion preserves order snapshots', () async {
+  test('gift cards are customer-bound and soft deletion preserves order snapshots', () async {
     final temp = await Directory.systemTemp.createTemp(
       'lsms-flutter-gift-card-delete-',
     );
@@ -344,18 +344,25 @@ void main() {
       expect(repository.getGiftCard(card.id), isNull);
 
       final preserved = repository.getOrder(order.id)!.summary;
-      expect(preserved.giftCardId, isNull);
+      expect(preserved.giftCardId, card.id);
       expect(preserved.giftCardCode, card.code);
       expect(preserved.giftCardAppliedCents, 1000);
       expect(preserved.amountDueCents, 0);
       expect(repository.searchOrders(card.code).single.id, order.id);
+
+      final tombstone = service.db.select(
+        'SELECT deleted_at_utc FROM gift_cards WHERE id=? LIMIT 1;',
+        [card.id],
+      );
+      expect(tombstone, hasLength(1));
+      expect(tombstone.first['deleted_at_utc'], isNotNull);
     } finally {
       service.dispose();
       await temp.delete(recursive: true);
     }
   });
 
-  test('deleting a customer deletes gift cards and releases customer code', () async {
+  test('deleting a customer deletes gift cards, preserves codes and releases customer code', () async {
     final temp = await Directory.systemTemp.createTemp(
       'lsms-flutter-customer-gifts-delete-',
     );
@@ -377,6 +384,13 @@ void main() {
 
       expect(repository.deleteCustomer(first.id), isTrue);
       expect(repository.getGiftCard(card.id), isNull);
+      expect(
+        service.db.select(
+          'SELECT code FROM gift_card_code_registry WHERE code=? LIMIT 1;',
+          [card.code],
+        ),
+        hasLength(1),
+      );
 
       final replacement = repository.save(const CustomerDraft(
         firstName: 'Anna',
