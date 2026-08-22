@@ -1,3 +1,4 @@
+import 'dart:math';
 import 'dart:typed_data';
 
 import '../core/database_service.dart';
@@ -7,6 +8,8 @@ class CustomerRepository {
   CustomerRepository(this.database) {
     _ensureSchema();
   }
+
+  static final Random _giftCardRandom = Random.secure();
 
   final DatabaseService database;
 
@@ -27,9 +30,14 @@ class CustomerRepository {
           CHECK(spent_value_cents >= 0 AND spent_value_cents <= total_value_cents),
         expires_at_utc TEXT,
         purchase_order_id INTEGER,
+        deleted_at_utc TEXT,
         created_at_utc TEXT NOT NULL,
         updated_at_utc TEXT NOT NULL,
         FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE CASCADE
+      );
+      CREATE TABLE IF NOT EXISTS gift_card_code_registry (
+        code TEXT PRIMARY KEY COLLATE NOCASE,
+        issued_at_utc TEXT NOT NULL
       );
       CREATE TABLE IF NOT EXISTS sales_orders (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -86,6 +94,7 @@ class CustomerRepository {
 
     _ensureColumn('gift_cards', 'expires_at_utc', 'TEXT');
     _ensureColumn('gift_cards', 'purchase_order_id', 'INTEGER');
+    _ensureColumn('gift_cards', 'deleted_at_utc', 'TEXT');
     _ensureColumn('sales_orders', 'customer_code', 'INTEGER');
     _ensureColumn('sales_orders', 'customer_display_name', 'TEXT');
     _ensureColumn('sales_orders', 'customer_fiscal_code', 'TEXT');
@@ -108,6 +117,10 @@ class CustomerRepository {
         ON sales_orders(gift_card_id, created_at_utc DESC, id DESC);
       CREATE INDEX IF NOT EXISTS ix_gift_cards_purchase_order
         ON gift_cards(purchase_order_id);
+      CREATE INDEX IF NOT EXISTS ix_gift_cards_cleanup
+        ON gift_cards(deleted_at_utc, created_at_utc, expires_at_utc);
+      INSERT OR IGNORE INTO gift_card_code_registry (code, issued_at_utc)
+        SELECT code, created_at_utc FROM gift_cards;
     ''');
     _backfillCustomerSnapshots();
     _backfillGiftCardPurchaseOrders();
@@ -217,6 +230,7 @@ class CustomerRepository {
       SELECT id, customer_id, total_value_cents, created_at_utc
       FROM gift_cards
       WHERE purchase_order_id IS NULL
+        AND deleted_at_utc IS NULL
       ORDER BY created_at_utc, id;
     ''');
     for (final row in rows) {
@@ -254,6 +268,7 @@ class CustomerRepository {
           FROM gift_cards linked
           WHERE linked.purchase_order_id=so.id
             AND linked.total_value_cents=?
+            AND linked.deleted_at_utc IS NULL
         )
       ORDER BY
         ABS((julianday(so.created_at_utc) - julianday(?)) * 86400.0),
@@ -412,6 +427,12 @@ class CustomerRepository {
       final customerCode = row['customer_code'] as int;
       final fiscalCode = row['fiscal_code'] as String?;
       db.execute('''
+        INSERT OR IGNORE INTO gift_card_code_registry (code, issued_at_utc)
+        SELECT code, created_at_utc
+        FROM gift_cards
+        WHERE customer_id=?;
+      ''', [customerId]);
+      db.execute('''
         UPDATE sales_orders
         SET customer_display_name = CASE
               WHEN customer_display_name IS NULL OR TRIM(customer_display_name) = '' THEN ?
@@ -438,6 +459,7 @@ class CustomerRepository {
     final rows = database.db.select('''
       SELECT * FROM gift_cards
       WHERE customer_id=?
+        AND deleted_at_utc IS NULL
       ORDER BY created_at_utc DESC, id DESC
       LIMIT ?;
     ''', [customerId, limit.clamp(1, 5000)]);
@@ -449,6 +471,7 @@ class CustomerRepository {
     final rows = database.db.select('''
       SELECT * FROM gift_cards
       WHERE customer_id=?
+        AND deleted_at_utc IS NULL
         AND spent_value_cents < total_value_cents
         AND (expires_at_utc IS NULL OR expires_at_utc > ?)
       ORDER BY created_at_utc DESC, id DESC
@@ -459,7 +482,7 @@ class CustomerRepository {
 
   GiftCard? getGiftCard(int giftCardId) {
     final rows = database.db.select(
-      'SELECT * FROM gift_cards WHERE id=? LIMIT 1;',
+      'SELECT * FROM gift_cards WHERE id=? AND deleted_at_utc IS NULL LIMIT 1;',
       [giftCardId],
     );
     return rows.isEmpty ? null : _giftCardFromRow(rows.first);
@@ -490,7 +513,7 @@ class CustomerRepository {
         totalValueCents: totalValueCents,
         giftCardCreatedAtUtc: now,
       );
-      final code = _newUniqueGiftCardCode(nowUtc);
+      final code = _reserveUniqueGiftCardCode(nowUtc);
       db.execute('''
         INSERT INTO gift_cards (
           code, customer_id, total_value_cents, spent_value_cents,
@@ -516,7 +539,7 @@ class CustomerRepository {
 
   SalesOrderSummary? purchaseOrderForGiftCard(int giftCardId) {
     final rows = database.db.select(
-      'SELECT purchase_order_id FROM gift_cards WHERE id=? LIMIT 1;',
+      'SELECT purchase_order_id FROM gift_cards WHERE id=? AND deleted_at_utc IS NULL LIMIT 1;',
       [giftCardId],
     );
     if (rows.isEmpty) return null;
@@ -531,6 +554,7 @@ class CustomerRepository {
       FROM gift_cards gc
       JOIN sales_orders so ON so.id=gc.purchase_order_id
       WHERE gc.id=?
+        AND gc.deleted_at_utc IS NULL
       LIMIT 1;
     ''', [giftCardId]);
     if (rows.isEmpty || rows.first['receipt_blob'] == null) return null;
@@ -543,8 +567,95 @@ class CustomerRepository {
   }
 
   bool deleteGiftCard(int giftCardId) {
-    database.db.execute('DELETE FROM gift_cards WHERE id=?;', [giftCardId]);
+    final now = DateTime.now().toUtc().toIso8601String();
+    database.db.execute('''
+      UPDATE gift_cards
+      SET deleted_at_utc=?, updated_at_utc=?
+      WHERE id=? AND deleted_at_utc IS NULL;
+    ''', [now, now, giftCardId]);
     return database.db.updatedRows > 0;
+  }
+
+  int countGiftCardsForCleanup({
+    int? olderThanYears,
+    bool exhausted = false,
+    bool expired = false,
+    DateTime? nowUtc,
+  }) {
+    final args = <Object?>[];
+    final where = _giftCardCleanupWhere(
+      olderThanYears: olderThanYears,
+      exhausted: exhausted,
+      expired: expired,
+      nowUtc: (nowUtc ?? DateTime.now()).toUtc(),
+      args: args,
+    );
+    if (where == null) return 0;
+    return database.db.select(
+      'SELECT COUNT(*) AS count FROM gift_cards WHERE $where;',
+      args,
+    ).first['count'] as int;
+  }
+
+  int deleteGiftCardsForCleanup({
+    int? olderThanYears,
+    bool exhausted = false,
+    bool expired = false,
+    DateTime? nowUtc,
+  }) {
+    final now = (nowUtc ?? DateTime.now()).toUtc();
+    final args = <Object?>[];
+    final where = _giftCardCleanupWhere(
+      olderThanYears: olderThanYears,
+      exhausted: exhausted,
+      expired: expired,
+      nowUtc: now,
+      args: args,
+    );
+    if (where == null) return 0;
+    final nowText = now.toIso8601String();
+    database.db.execute('''
+      UPDATE gift_cards
+      SET deleted_at_utc=?, updated_at_utc=?
+      WHERE $where;
+    ''', [nowText, nowText, ...args]);
+    return database.db.updatedRows;
+  }
+
+  String? _giftCardCleanupWhere({
+    required int? olderThanYears,
+    required bool exhausted,
+    required bool expired,
+    required DateTime nowUtc,
+    required List<Object?> args,
+  }) {
+    final conditions = <String>[];
+    if (olderThanYears != null) {
+      if (olderThanYears <= 0) {
+        throw ArgumentError('Il numero di anni deve essere maggiore di zero.');
+      }
+      final cutoff = DateTime.utc(
+        nowUtc.year - olderThanYears,
+        nowUtc.month,
+        nowUtc.day,
+        nowUtc.hour,
+        nowUtc.minute,
+        nowUtc.second,
+        nowUtc.millisecond,
+        nowUtc.microsecond,
+      );
+      conditions.add('created_at_utc < ?');
+      args.add(cutoff.toIso8601String());
+    }
+    if (exhausted) {
+      conditions.add('spent_value_cents >= total_value_cents');
+    }
+    if (expired) {
+      conditions.add('(expires_at_utc IS NOT NULL AND expires_at_utc <= ?)');
+      args.add(nowUtc.toIso8601String());
+    }
+    if (conditions.isEmpty) return null;
+    return 'deleted_at_utc IS NULL AND (${conditions.join(' OR ')})';
   }
 
   List<SalesOrderSummary> ordersForCustomer(int customerId, [int limit = 500]) {
@@ -778,7 +889,7 @@ class CustomerRepository {
           throw ArgumentError('Il buono regalo supera il totale della vendita.');
         }
         final cards = db.select(
-          'SELECT * FROM gift_cards WHERE id=? LIMIT 1;',
+          'SELECT * FROM gift_cards WHERE id=? AND deleted_at_utc IS NULL LIMIT 1;',
           [draft.giftCardId],
         );
         if (cards.isEmpty) throw StateError('Il buono regalo selezionato non esiste più.');
@@ -879,7 +990,7 @@ class CustomerRepository {
         db.execute('''
           UPDATE gift_cards
           SET spent_value_cents = spent_value_cents + ?, updated_at_utc = ?
-          WHERE id=?;
+          WHERE id=? AND deleted_at_utc IS NULL;
         ''', [draft.giftCardAppliedCents, nowText, draft.giftCardId]);
         if (db.updatedRows != 1) {
           throw StateError('Impossibile aggiornare il buono regalo.');
@@ -1028,13 +1139,6 @@ class CustomerRepository {
     return rows.isEmpty ? 1 : (rows.first['seq'] as int) + 1;
   }
 
-  int _nextGiftCardSerial() {
-    final rows = database.db.select(
-      "SELECT seq FROM sqlite_sequence WHERE name='gift_cards' LIMIT 1;",
-    );
-    return rows.isEmpty ? 1 : (rows.first['seq'] as int) + 1;
-  }
-
   String _newUniqueOrderNumber(DateTime utc) {
     var serial = _nextOrderSerial();
     while (true) {
@@ -1048,17 +1152,17 @@ class CustomerRepository {
     }
   }
 
-  String _newUniqueGiftCardCode(DateTime utc) {
-    var serial = _nextGiftCardSerial();
-    while (true) {
-      final candidate = _newGiftCardCode(utc, serial);
-      final exists = database.db.select(
-        'SELECT 1 FROM gift_cards WHERE code=? COLLATE NOCASE LIMIT 1;',
-        [candidate],
-      ).isNotEmpty;
-      if (!exists) return candidate;
-      serial++;
+  String _reserveUniqueGiftCardCode(DateTime issuedAtUtc) {
+    final issuedAt = issuedAtUtc.toUtc().toIso8601String();
+    for (var attempt = 0; attempt < 1024; attempt++) {
+      final candidate = _newGiftCardCode();
+      database.db.execute('''
+        INSERT OR IGNORE INTO gift_card_code_registry (code, issued_at_utc)
+        VALUES (?, ?);
+      ''', [candidate, issuedAt]);
+      if (database.db.updatedRows == 1) return candidate;
     }
+    throw StateError('Impossibile generare un codice univoco per il buono regalo.');
   }
 
   static String _dateOnly(DateTime value) =>
@@ -1071,11 +1175,13 @@ class CustomerRepository {
     return 'ORD-${local.year}${two(local.month)}${two(local.day)}-${two(local.hour)}${two(local.minute)}${two(local.second)}-$suffix';
   }
 
-  static String _newGiftCardCode(DateTime utc, int serial) {
-    final local = utc.toLocal();
-    String two(int value) => value.toString().padLeft(2, '0');
-    final suffix = serial.toString().padLeft(6, '0');
-    return 'GIFT-${local.year}${two(local.month)}${two(local.day)}-${two(local.hour)}${two(local.minute)}${two(local.second)}-$suffix';
+  static String _newGiftCardCode() {
+    const digits = '0123456789ABCDEF';
+    return List.generate(
+      8,
+      (_) => digits[_giftCardRandom.nextInt(digits.length)],
+      growable: false,
+    ).join();
   }
 
   static String? _optional(String? value) =>
