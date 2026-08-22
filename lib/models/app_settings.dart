@@ -185,7 +185,12 @@ class AppSettings {
 
   static const supportedCurrencies = ['EUR', 'USD', 'GBP', 'CHF'];
   static const supportedThemeModes = ['system', 'light', 'dark'];
-  static const supportedUiStyles = ['glassmorphism'];
+
+  static bool isSafeUiStyleId(String? value) {
+    final normalized = value?.trim().toLowerCase();
+    return normalized != null &&
+        RegExp(r'^[a-z0-9][a-z0-9_-]{0,63}$').hasMatch(normalized);
+  }
 
   static const defaults = AppSettings(shopName: 'Negozio');
 
@@ -253,9 +258,7 @@ class AppSettings {
       currencyCode: supportedCurrencies.contains(currency) ? currency! : 'EUR',
       vatPercent: rawVatPercent.clamp(0, 100).toDouble(),
       themeMode: supportedThemeModes.contains(theme) ? theme! : 'system',
-      uiStyle: supportedUiStyles.contains(uiStyle)
-          ? uiStyle!
-          : defaults.uiStyle,
+      uiStyle: isSafeUiStyleId(uiStyle) ? uiStyle! : defaults.uiStyle,
       languageCode:
           language?.isNotEmpty == true ? language! : defaults.languageCode,
     );
