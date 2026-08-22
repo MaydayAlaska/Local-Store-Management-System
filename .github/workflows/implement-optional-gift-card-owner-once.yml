@@ -18,6 +18,25 @@ jobs:
         with:
           ref: Flutter
 
+      - name: Record run id
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          printf '%s\n' "$GITHUB_RUN_ID" > /tmp/gift-card-cash-flow-run.txt
+          CONTENT="$(base64 -w0 /tmp/gift-card-cash-flow-run.txt)"
+          EXISTING_SHA="$(gh api "repos/$GITHUB_REPOSITORY/contents/.github/gift-card-cash-flow-run.txt?ref=Flutter" --jq .sha 2>/dev/null || true)"
+          if [ -n "$EXISTING_SHA" ]; then
+            gh api --method PUT "repos/$GITHUB_REPOSITORY/contents/.github/gift-card-cash-flow-run.txt" \
+              -f message='Record gift card cash flow workflow run' \
+              -f content="$CONTENT" -f branch='Flutter' -f sha="$EXISTING_SHA" >/dev/null
+          else
+            gh api --method PUT "repos/$GITHUB_REPOSITORY/contents/.github/gift-card-cash-flow-run.txt" \
+              -f message='Record gift card cash flow workflow run' \
+              -f content="$CONTENT" -f branch='Flutter' >/dev/null
+          fi
+
       - name: Apply implementation
         run: python3 .github/implement_optional_gift_card_owner.py
 
@@ -51,4 +70,6 @@ jobs:
           git add -- lib/pages/customers_page.dart lib/pages/cash_page.dart lib/repositories/customer_repository.dart test/customer_repository_test.dart
           git diff --cached --check
           git commit -m 'Refine gift card creation and payment flow'
+          git fetch origin Flutter
+          git rebase origin/Flutter
           git push origin HEAD:Flutter
