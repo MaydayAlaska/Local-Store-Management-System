@@ -1060,6 +1060,7 @@ class _CashPageState extends State<CashPage> {
                           ? Center(child: Text(AppStrings.t('empty_cart')))
                           : ListView(children: [
                               ..._cart.map((line) => _CartTile(
+                                    key: ValueKey(line.key),
                                     line: line,
                                     imageBytes: line.variantId == null
                                         ? null
@@ -1633,6 +1634,7 @@ class _CashKeypad extends StatelessWidget {
 
 class _CartTile extends StatefulWidget {
   const _CartTile({
+    super.key,
     required this.line,
     required this.imageBytes,
     required this.onDecrease,
@@ -1653,11 +1655,41 @@ class _CartTile extends StatefulWidget {
 }
 
 class _CartTileState extends State<_CartTile> {
-  bool _hoveringArticle = false;
+  final LayerLink _previewLink = LayerLink();
+  OverlayEntry? _previewOverlay;
+
+  void _showPreview() {
+    final bytes = widget.imageBytes;
+    if (bytes == null || _previewOverlay != null || !mounted) return;
+
+    final entry = OverlayEntry(
+      builder: (_) => CompositedTransformFollower(
+        link: _previewLink,
+        showWhenUnlinked: false,
+        targetAnchor: Alignment.centerLeft,
+        followerAnchor: Alignment.centerRight,
+        offset: const Offset(-10, 0),
+        child: IgnorePointer(
+          child: Material(
+            type: MaterialType.transparency,
+            child: _CartImageHoverPreview(imageBytes: bytes),
+          ),
+        ),
+      ),
+    );
+    _previewOverlay = entry;
+    Overlay.of(context, rootOverlay: true).insert(entry);
+  }
+
+  void _hidePreview() {
+    _previewOverlay?.remove();
+    _previewOverlay = null;
+  }
 
   Future<void> _showLargeImage() async {
     final bytes = widget.imageBytes;
     if (bytes == null) return;
+    _hidePreview();
     await showDialog<void>(
       context: context,
       builder: (dialogContext) {
@@ -1692,72 +1724,54 @@ class _CartTileState extends State<_CartTile> {
   }
 
   @override
+  void dispose() {
+    _hidePreview();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final line = widget.line;
     final bytes = widget.imageBytes;
     final theme = Theme.of(context);
+    final articleDetails = IntrinsicWidth(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            line.cartTitle,
+            style: theme.textTheme.titleSmall?.copyWith(
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          Text(line.cartSubtitle),
+        ],
+      ),
+    );
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       child: Row(children: [
-        Expanded(
-          child: MouseRegion(
-            onEnter: bytes == null
-                ? null
-                : (_) => setState(() => _hoveringArticle = true),
-            onExit: bytes == null
-                ? null
-                : (_) => setState(() => _hoveringArticle = false),
-            child: Row(
-              mainAxisSize: MainAxisSize.max,
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        line.cartTitle,
-                        style: theme.textTheme.titleSmall?.copyWith(
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      Text(line.cartSubtitle),
-                    ],
-                  ),
-                ),
-                if (_hoveringArticle && bytes != null) ...[
-                  const SizedBox(width: 8),
-                  Tooltip(
-                    message: AppStrings.pair(
-                      'Clicca per ingrandire',
-                      'Click to enlarge',
-                    ),
-                    child: InkWell(
-                      onTap: _showLargeImage,
-                      borderRadius: BorderRadius.circular(8),
-                      child: Container(
-                        width: 64,
-                        height: 64,
-                        clipBehavior: Clip.antiAlias,
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(8),
-                          color: theme.colorScheme.surfaceContainerHighest,
-                          border: Border.all(
-                            color: theme.colorScheme.outlineVariant,
-                          ),
-                        ),
-                        child: Image.memory(
-                          bytes,
-                          fit: BoxFit.contain,
-                          gaplessPlayback: true,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ],
+        Flexible(
+          fit: FlexFit.loose,
+          child: CompositedTransformTarget(
+            link: _previewLink,
+            child: MouseRegion(
+              cursor: bytes == null
+                  ? MouseCursor.defer
+                  : SystemMouseCursors.click,
+              onEnter: bytes == null ? null : (_) => _showPreview(),
+              onExit: bytes == null ? null : (_) => _hidePreview(),
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: bytes == null ? null : _showLargeImage,
+                child: articleDetails,
+              ),
             ),
           ),
         ),
+        const Spacer(),
         IconButton(
           onPressed: line.isGiftCardPurchase ? null : widget.onDecrease,
           icon: const Icon(Icons.remove_circle_outline),
@@ -1802,6 +1816,65 @@ class _CartTileState extends State<_CartTile> {
       ]),
     );
   }
+}
+
+class _CartImageHoverPreview extends StatelessWidget {
+  const _CartImageHoverPreview({required this.imageBytes});
+
+  final Uint8List imageBytes;
+
+  @override
+  Widget build(BuildContext context) => Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 190,
+            height: 190,
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: const Color(0x22000000)),
+              boxShadow: const [
+                BoxShadow(
+                  color: Color(0x33000000),
+                  blurRadius: 18,
+                  offset: Offset(0, 6),
+                ),
+              ],
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: Image.memory(
+                imageBytes,
+                fit: BoxFit.contain,
+                gaplessPlayback: true,
+              ),
+            ),
+          ),
+          CustomPaint(
+            size: const Size(14, 28),
+            painter: const _CartPreviewArrowPainter(),
+          ),
+        ],
+      );
+}
+
+class _CartPreviewArrowPainter extends CustomPainter {
+  const _CartPreviewArrowPainter();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final path = Path()
+      ..moveTo(0, 0)
+      ..lineTo(size.width, size.height / 2)
+      ..lineTo(0, size.height)
+      ..close();
+    canvas.drawPath(path, Paint()..color = Colors.white);
+  }
+
+  @override
+  bool shouldRepaint(covariant _CartPreviewArrowPainter oldDelegate) => false;
 }
 
 class _CashLine {
