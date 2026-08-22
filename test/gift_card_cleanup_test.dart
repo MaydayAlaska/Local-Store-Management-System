@@ -76,7 +76,7 @@ void main() {
 
       final oldCard = repository.createGiftCard(customer.id, 1000);
       final exhaustedCard = repository.createGiftCard(customer.id, 2000);
-      final expiredCard = repository.createGiftCard(
+      repository.createGiftCard(
         customer.id,
         3000,
         expiresAtUtc: now.subtract(const Duration(days: 1)),
