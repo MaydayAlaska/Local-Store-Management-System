@@ -136,8 +136,8 @@ class _CustomersPageState extends State<CustomersPage> {
     }
     if (giftCards.isNotEmpty) {
       details.add(_itEn(
-        'Verranno eliminati anche ${giftCards.length} buoni regalo associati. Il credito residuo complessivo di ${formatMoney(remainingGiftValue)} verrà perso. I codici dei buoni resteranno comunque riservati e non saranno riutilizzati.',
-        '${giftCards.length} linked gift cards will also be deleted. Their total remaining credit of ${formatMoney(remainingGiftValue)} will be lost. Their codes will remain reserved and will not be reused.',
+        'Verranno eliminati definitivamente anche ${giftCards.length} buoni regalo associati. Il credito residuo complessivo di ${formatMoney(remainingGiftValue)} verrà perso.',
+        '${giftCards.length} linked gift cards will also be permanently deleted. Their total remaining credit of ${formatMoney(remainingGiftValue)} will be lost.',
       ));
     }
     details.add(_itEn(
@@ -200,8 +200,8 @@ class _CustomersPageState extends State<CustomersPage> {
     setState(() {
       if (deleted > 0) {
         _status = _itEn(
-          '$deleted buoni regalo eliminati dalla gestione attiva. I relativi codici restano riservati.',
-          '$deleted gift cards removed from active management. Their codes remain reserved.',
+          '$deleted buoni regalo eliminati definitivamente.',
+          '$deleted gift cards permanently deleted.',
         );
       }
     });
@@ -474,8 +474,8 @@ class _CustomerDetailState extends State<_CustomerDetail> {
             title: Text(_itEn('Elimina buono regalo', 'Delete gift card')),
             content: Text(
               _itEn(
-                'Eliminare ${card.code} dalla gestione attiva? Il credito residuo di ${card.remainingDisplay} verrà perso. Gli ordini storici conserveranno il codice e l’importo del buono eventualmente utilizzato. Il codice ${card.code} resterà riservato e non potrà essere riutilizzato.',
-                'Remove ${card.code} from active management? Its remaining credit of ${card.remainingDisplay} will be lost. Historical orders will keep the gift card code and any amount that was used. Code ${card.code} will remain reserved and cannot be reused.',
+                'Eliminare definitivamente ${card.code}? Il credito residuo di ${card.remainingDisplay} verrà perso. Gli ordini storici conserveranno il codice e l’importo del buono eventualmente utilizzato.',
+                'Permanently delete ${card.code}? Its remaining credit of ${card.remainingDisplay} will be lost. Historical orders will keep the gift card code and any amount that was used.',
               ),
             ),
             actions: [
@@ -501,8 +501,8 @@ class _CustomerDetailState extends State<_CustomerDetail> {
     if (!mounted) return;
     setState(() => _giftStatus = deleted
         ? _itEn(
-            'Buono ${card.code} eliminato dalla gestione attiva. Il codice resta riservato.',
-            'Gift card ${card.code} removed from active management. Its code remains reserved.',
+            'Buono ${card.code} eliminato definitivamente.',
+            'Gift card ${card.code} permanently deleted.',
           )
         : _itEn('Il buono non esiste più.', 'The gift card no longer exists.'));
   }
