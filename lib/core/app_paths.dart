@@ -15,6 +15,7 @@ class AppPaths {
   static late final String backupsDirectory;
   static late final String logsDirectory;
   static late final String translationsDirectory;
+  static late final String stylesDirectory;
 
   static Future<void> initialize() async {
     final override = Platform.environment['LSMS_DATA_DIRECTORY_OVERRIDE']?.trim();
@@ -38,11 +39,13 @@ class AppPaths {
     backupsDirectory = p.join(dataDirectory, 'Backups');
     logsDirectory = p.join(dataDirectory, 'Logs');
     translationsDirectory = p.join(dataDirectory, 'Translations');
+    stylesDirectory = p.join(dataDirectory, 'Styles');
 
     await Directory(assetsDirectory).create(recursive: true);
     await Directory(backupsDirectory).create(recursive: true);
     await Directory(logsDirectory).create(recursive: true);
     await Directory(translationsDirectory).create(recursive: true);
+    await Directory(stylesDirectory).create(recursive: true);
 
     if (!await File(databasePath).exists()) {
       await _tryDelete('$databasePath-wal');
@@ -94,7 +97,7 @@ class AppPaths {
     String destination,
   ) async {
     final sourceFile = File(source);
-    if (await sourceFile.exists() && !await File(destination).exists()) {
+    if (await sourceFile.exists() && !await File(destination).existsSync()) {
       await sourceFile.copy(destination);
     }
   }
