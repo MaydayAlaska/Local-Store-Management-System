@@ -3,6 +3,7 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 
 import '../l10n/app_strings.dart';
+import '../theme/ui_style_registry.dart';
 import '../theme/ui_style_tokens.dart';
 
 class GlassDropdownItem<T> {
@@ -47,11 +48,14 @@ class _GlassDropdownState<T> extends State<GlassDropdown<T>> {
   OverlayEntry? _entry;
   late List<GlassDropdownItem<T>> _items;
   bool _refreshingLanguages = false;
+  bool _refreshingStyles = false;
 
   bool get _enabled =>
       widget.enabled && widget.onChanged != null && _items.isNotEmpty;
 
   bool get _isLanguagePicker => widget.labelText == AppStrings.t('language');
+  bool get _isStylePicker =>
+      widget.labelText == AppStrings.pair('Stile', 'Style');
 
   @override
   void initState() {
@@ -126,6 +130,57 @@ class _GlassDropdownState<T> extends State<GlassDropdown<T>> {
       );
     } finally {
       if (mounted) setState(() => _refreshingLanguages = false);
+    }
+  }
+
+  Future<void> _refreshStyles() async {
+    if (_refreshingStyles) return;
+    setState(() => _refreshingStyles = true);
+    try {
+      await UiStyleRegistry.reload();
+      if (!mounted) return;
+
+      _items = UiStyleRegistry.all
+          .map(
+            (style) => GlassDropdownItem<T>(
+              value: style.id as T,
+              label: style.label,
+            ),
+          )
+          .toList(growable: false);
+
+      final selectedStillExists =
+          _items.any((item) => item.value == widget.value);
+      if (!selectedStillExists) {
+        widget.onChanged?.call(UiStyleRegistry.fallbackId as T);
+      }
+      setState(() {});
+
+      final invalidCount = UiStyleRegistry.invalidPacks.length;
+      ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+        SnackBar(
+          content: Text(
+            invalidCount == 0
+                ? AppStrings.pair(
+                    'Stili ricaricati: ${UiStyleRegistry.all.length} disponibili.',
+                    'Styles reloaded: ${UiStyleRegistry.all.length} available.',
+                  )
+                : AppStrings.pair(
+                    'Stili ricaricati. $invalidCount pacchetti non validi sono stati ignorati.',
+                    'Styles reloaded. $invalidCount invalid packs were ignored.',
+                  ),
+          ),
+        ),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+        SnackBar(
+          content: Text('${AppStrings.t('error')}: $error'),
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _refreshingStyles = false);
     }
   }
 
@@ -307,16 +362,23 @@ class _GlassDropdownState<T> extends State<GlassDropdown<T>> {
   @override
   Widget build(BuildContext context) {
     final dropdown = _buildDropdown(context);
-    if (!_isLanguagePicker) return dropdown;
+    if (!_isLanguagePicker && !_isStylePicker) return dropdown;
+
+    final refreshing =
+        _isLanguagePicker ? _refreshingLanguages : _refreshingStyles;
+    final refresh = _isLanguagePicker ? _refreshLanguages : _refreshStyles;
+    final tooltip = _isLanguagePicker
+        ? AppStrings.pair('Aggiorna lingue', 'Refresh languages')
+        : AppStrings.pair('Ricarica stili', 'Reload styles');
 
     return Row(
       children: [
         Expanded(child: dropdown),
         const SizedBox(width: 8),
         IconButton.outlined(
-          tooltip: AppStrings.pair('Aggiorna lingue', 'Refresh languages'),
-          onPressed: _refreshingLanguages ? null : _refreshLanguages,
-          icon: _refreshingLanguages
+          tooltip: tooltip,
+          onPressed: refreshing ? null : refresh,
+          icon: refreshing
               ? const SizedBox(
                   width: 18,
                   height: 18,
