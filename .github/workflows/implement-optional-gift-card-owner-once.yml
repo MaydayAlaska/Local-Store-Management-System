@@ -18,13 +18,17 @@ jobs:
           ref: Flutter
 
       - name: Extract and run implementation payload
+        env:
+          GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
+          set -euo pipefail
+          gh api "repos/$GITHUB_REPOSITORY/contents/.github/workflows/implement-optional-gift-card-owner-once.yml?ref=b9d55032d07c4746fedc0158514f185115336792" --jq .content | base64 -d > /tmp/original-workflow.txt
           python3 - <<'PY'
           from pathlib import Path
           import subprocess
 
-          payload = Path('.github/implement-optional-gift-card-owner-payload.txt').read_text()
+          payload = Path('/tmp/original-workflow.txt').read_text()
           start_marker = "          python3 - <<'PY'\n"
           end_marker = "\n          PY\n\n      - name: Setup Flutter"
           start = payload.index(start_marker) + len(start_marker)
@@ -68,4 +72,4 @@ jobs:
           git commit -m 'Make gift card customer association optional'
           git push origin HEAD:Flutter
 
-# trigger 2
+# trigger 3
