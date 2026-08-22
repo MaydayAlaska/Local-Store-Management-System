@@ -1,0 +1,227 @@
+name: One-shot UI style modularization b5
+
+on:
+  push:
+    branches: [Flutter]
+    paths:
+      - '.github/workflows/one-shot-ui-style-b5.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: Flutter
+          fetch-depth: 0
+
+      - name: Apply style registry integration
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          def replace_once(path, old, new):
+              p = Path(path)
+              text = p.read_text()
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f'{path}: expected one match, found {count}')
+              p.write_text(text.replace(old, new, 1))
+
+          # Settings: registry-driven style picker.
+          path = Path('lib/pages/settings_page.dart')
+          text = path.read_text()
+          marker = "import '../services/update_service.dart';\n"
+          if "../theme/ui_style_registry.dart" not in text:
+              if marker not in text:
+                  raise SystemExit('settings_page.dart: import marker missing')
+              text = text.replace(
+                  marker,
+                  marker + "import '../theme/ui_style_registry.dart';\n",
+                  1,
+              )
+          old = """                          items: const [
+                            GlassDropdownItem(
+                              value: 'glassmorphism',
+                              label: 'Glassmorphism',
+                            ),
+                          ],
+                          onChanged: (value) => setState(
+                            () => _uiStyle = value ?? 'glassmorphism',
+                          ),
+"""
+          new = """                          items: [
+                            for (final style in UiStyleRegistry.all)
+                              GlassDropdownItem(
+                                value: style.id,
+                                label: style.label,
+                              ),
+                          ],
+                          onChanged: (value) => setState(
+                            () => _uiStyle =
+                                value ?? UiStyleRegistry.fallbackId,
+                          ),
+"""
+          if text.count(old) != 1:
+              raise SystemExit('settings_page.dart: style picker block mismatch')
+          path.write_text(text.replace(old, new, 1))
+
+          # Shell: use semantic surface roles instead of style-specific opacity values.
+          p = Path('lib/pages/shell_page.dart')
+          text = p.read_text()
+          old_notification = """              child: GlassSurface(
+                blur: 30,
+                opacity: isDark ? 0.18 : 0.58,
+                borderRadius: BorderRadius.circular(18),
+"""
+          new_notification = """              child: GlassSurface(
+                blur: 30,
+                role: GlassSurfaceRole.notification,
+                borderRadius: BorderRadius.circular(18),
+"""
+          count = text.count(old_notification)
+          if count != 2:
+              raise SystemExit(f'shell_page.dart: expected 2 notification surfaces, found {count}')
+          text = text.replace(old_notification, new_notification)
+          old_content = """                      child: GlassSurface(
+                        opacity: Theme.of(context).brightness == Brightness.dark
+                            ? 0.055
+                            : 0.24,
+                        borderRadius: BorderRadius.circular(24),
+"""
+          new_content = """                      child: GlassSurface(
+                        role: GlassSurfaceRole.content,
+                        borderRadius: BorderRadius.circular(24),
+"""
+          if text.count(old_content) != 1:
+              raise SystemExit('shell_page.dart: content surface block mismatch')
+          text = text.replace(old_content, new_content, 1)
+          # isDark was used only for the opacity after these replacements inside overlay builders.
+          text = text.replace("        final isDark = theme.brightness == Brightness.dark;\n", "")
+          p.write_text(text)
+
+          # Cash tooltip: consume style tokens instead of embedded Glassmorphism colors.
+          p = Path('lib/pages/cash_page.dart')
+          text = p.read_text()
+          marker = "import '../services/fiscal_code_service.dart';\n"
+          if "../theme/ui_style_tokens.dart" not in text:
+              if marker not in text:
+                  raise SystemExit('cash_page.dart: import marker missing')
+              text = text.replace(
+                  marker,
+                  marker + "import '../theme/ui_style_tokens.dart';\n",
+                  1,
+              )
+          old_vars = """    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final background = theme.canvasColor;
+    final border = isDark
+        ? const Color(0x38FFFFFF)
+        : const Color(0xA8FFFFFF);
+    final shadow = Colors.black.withValues(alpha: isDark ? 0.42 : 0.18);
+"""
+          new_vars = """    final theme = Theme.of(context);
+    final tokens = UiStyleTokens.of(context);
+    final background = tokens.tooltipSurface;
+    final border = tokens.tooltipBorder;
+    final shadow = tokens.tooltipShadow;
+"""
+          if text.count(old_vars) != 1:
+              raise SystemExit('cash_page.dart: tooltip variables mismatch')
+          text = text.replace(old_vars, new_vars, 1)
+          old_image_bg = """          color: theme.colorScheme.surfaceContainerHighest
+              .withValues(alpha: isDark ? 0.34 : 0.46),
+"""
+          new_image_bg = """          color: tokens.imagePreviewSurface,
+"""
+          if text.count(old_image_bg) != 1:
+              raise SystemExit('cash_page.dart: tooltip image background mismatch')
+          text = text.replace(old_image_bg, new_image_bg, 1)
+          p.write_text(text)
+
+          # Version b5.
+          replace_once('pubspec.yaml', 'version: 0.2.0-b4', 'version: 0.2.0-b5')
+          replace_once(
+              'lib/services/update_service.dart',
+              "static const currentVersion = '0.2.0-b4';",
+              "static const currentVersion = '0.2.0-b5';",
+          )
+
+          # Registry tests: settings model and runtime style registry must stay aligned.
+          Path('test/ui_style_registry_test.dart').write_text("""import 'package:flutter/material.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:local_store_management/models/app_settings.dart';
+import 'package:local_store_management/theme/ui_style_registry.dart';
+import 'package:local_store_management/theme/ui_style_tokens.dart';
+
+void main() {
+  test('style registry matches settings supported styles', () {
+    expect(
+      UiStyleRegistry.all.map((style) => style.id).toList(),
+      AppSettings.supportedUiStyles,
+    );
+  });
+
+  test('glassmorphism installs style tokens in light and dark themes', () {
+    final style = UiStyleRegistry.resolve('glassmorphism');
+    final light = style.lightTheme();
+    final dark = style.darkTheme();
+
+    expect(light.brightness, Brightness.light);
+    expect(dark.brightness, Brightness.dark);
+    expect(light.extension<UiStyleTokens>(), isNotNull);
+    expect(dark.extension<UiStyleTokens>(), isNotNull);
+  });
+
+  test('unknown style falls back to registered default', () {
+    expect(UiStyleRegistry.resolve('unknown-style').id, UiStyleRegistry.fallbackId);
+  });
+}
+""")
+
+          # Old monolithic theme is no longer part of the architecture.
+          old_theme = Path('lib/theme/glass_theme.dart')
+          if old_theme.exists():
+              old_theme.unlink()
+
+          # One-shot workflow removes itself from the resulting branch.
+          Path('.github/workflows/one-shot-ui-style-b5.yml').unlink()
+          PY
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Validate refactor
+        shell: bash
+        run: |
+          set -euo pipefail
+          dart format \
+            lib/app.dart \
+            lib/theme \
+            lib/widgets/glass.dart \
+            lib/widgets/glass_dropdown.dart \
+            lib/widgets/app_title_bar.dart \
+            lib/pages/settings_page.dart \
+            lib/pages/shell_page.dart \
+            lib/pages/cash_page.dart \
+            test/ui_style_registry_test.dart
+          flutter pub get
+          flutter analyze --no-fatal-infos
+          flutter test test/app_settings_test.dart test/ui_style_registry_test.dart
+
+      - name: Commit modular UI style
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit -m 'Modularize UI styles for 0.2.0-b5'
+          git push origin HEAD:Flutter
