@@ -1655,30 +1655,58 @@ class _CartTile extends StatefulWidget {
 }
 
 class _CartTileState extends State<_CartTile> {
-  final LayerLink _previewLink = LayerLink();
+  final GlobalKey _articleKey = GlobalKey();
   OverlayEntry? _previewOverlay;
 
   void _showPreview() {
     final bytes = widget.imageBytes;
     if (bytes == null || _previewOverlay != null || !mounted) return;
 
+    final overlay = Overlay.of(context, rootOverlay: true);
+    final targetBox =
+        _articleKey.currentContext?.findRenderObject() as RenderBox?;
+    final overlayBox = overlay.context.findRenderObject() as RenderBox?;
+    if (targetBox == null || overlayBox == null) return;
+
+    final targetTopLeft =
+        targetBox.localToGlobal(Offset.zero, ancestor: overlayBox);
+    const previewBodySize = 190.0;
+    const arrowWidth = 12.0;
+    const previewWidth = previewBodySize + arrowWidth;
+    const previewHeight = previewBodySize;
+    const gap = 10.0;
+    const edgePadding = 8.0;
+
+    final showLeft = targetTopLeft.dx >= previewWidth + gap + edgePadding;
+    final rawLeft = showLeft
+        ? targetTopLeft.dx - previewWidth - gap
+        : targetTopLeft.dx + targetBox.size.width + gap;
+    final maxLeft = overlayBox.size.width - previewWidth - edgePadding;
+    final left = rawLeft.clamp(edgePadding, maxLeft).toDouble();
+
+    final rawTop = targetTopLeft.dy +
+        (targetBox.size.height / 2) -
+        (previewHeight / 2);
+    final maxTop = overlayBox.size.height - previewHeight - edgePadding;
+    final top = rawTop.clamp(edgePadding, maxTop).toDouble();
+
     final entry = OverlayEntry(
-      builder: (_) => CompositedTransformFollower(
-        link: _previewLink,
-        showWhenUnlinked: false,
-        targetAnchor: Alignment.centerLeft,
-        followerAnchor: Alignment.centerRight,
-        offset: const Offset(-10, 0),
+      builder: (_) => Positioned(
+        left: left,
+        top: top,
         child: IgnorePointer(
           child: Material(
             type: MaterialType.transparency,
-            child: _CartImageHoverPreview(imageBytes: bytes),
+            child: _CartImageHoverPreview(
+              imageBytes: bytes,
+              arrowOnRight: showLeft,
+            ),
           ),
         ),
       ),
     );
     _previewOverlay = entry;
-    Overlay.of(context, rootOverlay: true).insert(entry);
+    overlay.insert(entry);
   }
 
   void _hidePreview() {
@@ -1724,6 +1752,12 @@ class _CartTileState extends State<_CartTile> {
   }
 
   @override
+  void didUpdateWidget(covariant _CartTile oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.imageBytes != widget.imageBytes) _hidePreview();
+  }
+
+  @override
   void dispose() {
     _hidePreview();
     super.dispose();
@@ -1755,19 +1789,17 @@ class _CartTileState extends State<_CartTile> {
       child: Row(children: [
         Flexible(
           fit: FlexFit.loose,
-          child: CompositedTransformTarget(
-            link: _previewLink,
-            child: MouseRegion(
-              cursor: bytes == null
-                  ? MouseCursor.defer
-                  : SystemMouseCursors.click,
-              onEnter: bytes == null ? null : (_) => _showPreview(),
-              onExit: bytes == null ? null : (_) => _hidePreview(),
-              child: GestureDetector(
-                behavior: HitTestBehavior.opaque,
-                onTap: bytes == null ? null : _showLargeImage,
-                child: articleDetails,
-              ),
+          child: MouseRegion(
+            key: _articleKey,
+            cursor: bytes == null
+                ? MouseCursor.defer
+                : SystemMouseCursors.click,
+            onEnter: bytes == null ? null : (_) => _showPreview(),
+            onExit: bytes == null ? null : (_) => _hidePreview(),
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: bytes == null ? null : _showLargeImage,
+              child: articleDetails,
             ),
           ),
         ),
@@ -1819,62 +1851,117 @@ class _CartTileState extends State<_CartTile> {
 }
 
 class _CartImageHoverPreview extends StatelessWidget {
-  const _CartImageHoverPreview({required this.imageBytes});
+  const _CartImageHoverPreview({
+    required this.imageBytes,
+    required this.arrowOnRight,
+  });
 
   final Uint8List imageBytes;
+  final bool arrowOnRight;
 
   @override
-  Widget build(BuildContext context) => Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 190,
-            height: 190,
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(18),
-              border: Border.all(color: const Color(0x22000000)),
-              boxShadow: const [
-                BoxShadow(
-                  color: Color(0x33000000),
-                  blurRadius: 18,
-                  offset: Offset(0, 6),
-                ),
-              ],
-            ),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(12),
-              child: Image.memory(
-                imageBytes,
-                fit: BoxFit.contain,
-                gaplessPlayback: true,
-              ),
-            ),
-          ),
-          CustomPaint(
-            size: const Size(14, 28),
-            painter: const _CartPreviewArrowPainter(),
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final background = theme.canvasColor;
+    final border = isDark
+        ? const Color(0x38FFFFFF)
+        : const Color(0xA8FFFFFF);
+    final shadow = Colors.black.withValues(alpha: isDark ? 0.42 : 0.18);
+
+    final body = Container(
+      width: 190,
+      height: 190,
+      padding: const EdgeInsets.all(8),
+      decoration: BoxDecoration(
+        color: background,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: border),
+        boxShadow: [
+          BoxShadow(
+            color: shadow,
+            blurRadius: 18,
+            offset: const Offset(0, 6),
           ),
         ],
-      );
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(14),
+        child: ColoredBox(
+          color: theme.colorScheme.surfaceContainerHighest
+              .withValues(alpha: isDark ? 0.34 : 0.46),
+          child: Image.memory(
+            imageBytes,
+            fit: BoxFit.contain,
+            gaplessPlayback: true,
+          ),
+        ),
+      ),
+    );
+
+    final arrow = CustomPaint(
+      size: const Size(12, 28),
+      painter: _CartPreviewArrowPainter(
+        fillColor: background,
+        borderColor: border,
+        shadowColor: shadow,
+        pointsRight: arrowOnRight,
+      ),
+    );
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: arrowOnRight ? [body, arrow] : [arrow, body],
+    );
+  }
 }
 
 class _CartPreviewArrowPainter extends CustomPainter {
-  const _CartPreviewArrowPainter();
+  const _CartPreviewArrowPainter({
+    required this.fillColor,
+    required this.borderColor,
+    required this.shadowColor,
+    required this.pointsRight,
+  });
+
+  final Color fillColor;
+  final Color borderColor;
+  final Color shadowColor;
+  final bool pointsRight;
 
   @override
   void paint(Canvas canvas, Size size) {
-    final path = Path()
-      ..moveTo(0, 0)
-      ..lineTo(size.width, size.height / 2)
-      ..lineTo(0, size.height)
-      ..close();
-    canvas.drawPath(path, Paint()..color = Colors.white);
+    final path = Path();
+    if (pointsRight) {
+      path
+        ..moveTo(0, 0)
+        ..lineTo(size.width, size.height / 2)
+        ..lineTo(0, size.height);
+    } else {
+      path
+        ..moveTo(size.width, 0)
+        ..lineTo(0, size.height / 2)
+        ..lineTo(size.width, size.height);
+    }
+    path.close();
+
+    canvas.drawShadow(path, shadowColor, 5, true);
+    canvas.drawPath(path, Paint()..color = fillColor);
+    canvas.drawPath(
+      path,
+      Paint()
+        ..color = borderColor
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1,
+    );
   }
 
   @override
-  bool shouldRepaint(covariant _CartPreviewArrowPainter oldDelegate) => false;
+  bool shouldRepaint(covariant _CartPreviewArrowPainter oldDelegate) =>
+      fillColor != oldDelegate.fillColor ||
+      borderColor != oldDelegate.borderColor ||
+      shadowColor != oldDelegate.shadowColor ||
+      pointsRight != oldDelegate.pointsRight;
 }
 
 class _CashLine {
