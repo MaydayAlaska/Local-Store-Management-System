@@ -17,60 +17,8 @@ jobs:
         with:
           ref: Flutter
 
-      - name: Extract and run implementation payload
-        env:
-          GH_TOKEN: ${{ github.token }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          gh api "repos/$GITHUB_REPOSITORY/contents/.github/workflows/implement-optional-gift-card-owner-once.yml?ref=b9d55032d07c4746fedc0158514f185115336792" --jq .content | base64 -d > /tmp/original-workflow.txt
-          python3 - <<'PY'
-          from pathlib import Path
-          import subprocess
-
-          payload = Path('/tmp/original-workflow.txt').read_text()
-          start_marker = "          python3 - <<'PY'\n"
-          end_marker = "\n          PY\n\n      - name: Setup Flutter"
-          start = payload.index(start_marker) + len(start_marker)
-          end = payload.index(end_marker, start)
-          block = payload[start:end]
-          lines = [line[10:] if line.startswith('          ') else line for line in block.splitlines()]
-          script = '\n'.join(lines) + '\n'
-
-          cursor = 0
-          while True:
-              call = script.find('\nregex_once(', cursor)
-              if call < 0:
-                  break
-              opening = script.find("\n    '''", call)
-              next_call = script.find('\nregex_once(', call + 1)
-              if opening < 0 or (next_call >= 0 and opening > next_call):
-                  raise SystemExit(f'Cannot find replacement opening for regex_once at {call}')
-              script = script[:opening] + script[opening:].replace("'''", '\"\"\"', 1)
-              closing = script.find("''',\n)", opening + 1)
-              if closing < 0:
-                  raise SystemExit(f'Cannot find replacement closing for regex_once at {call}')
-              script = script[:closing] + script[closing:].replace("'''", '\"\"\"', 1)
-              cursor = closing + 6
-
-          marker = "'''  List<GiftCard> giftCards([int limit = 5000]) {"
-          opening = script.find(marker)
-          if opening < 0:
-              raise SystemExit('Cannot find giftCards replacement opening')
-          script = script[:opening] + script[opening:].replace("'''", '\"\"\"', 1)
-          closing = script.find("''',\n)", opening + 1)
-          if closing < 0:
-              raise SystemExit('Cannot find giftCards replacement closing')
-          script = script[:closing] + script[closing:].replace("'''", '\"\"\"', 1)
-
-          # Some exact fragments intentionally occur more than once; replace_once still
-          # changes only the first occurrence, but should fail only when none exist.
-          script = script.replace('if count != 1:', 'if count < 1:', 1)
-
-          Path('/tmp/implement_optional_gift_card_owner.py').write_text(script)
-          subprocess.run(['python3', '-m', 'py_compile', '/tmp/implement_optional_gift_card_owner.py'], check=True)
-          subprocess.run(['python3', '/tmp/implement_optional_gift_card_owner.py'], check=True)
-          PY
+      - name: Apply implementation
+        run: python3 .github/implement_optional_gift_card_owner.py
 
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
@@ -104,4 +52,4 @@ jobs:
           git commit -m 'Make gift card customer association optional'
           git push origin HEAD:Flutter
 
-# trigger 7
+# trigger 8
