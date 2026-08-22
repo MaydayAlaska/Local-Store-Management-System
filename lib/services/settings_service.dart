@@ -33,6 +33,7 @@ class SettingsService {
     required String currencyCode,
     required double vatPercent,
     required String themeMode,
+    String? uiStyle,
     required String languageCode,
     List<LabelPrinterProfile>? labelPrinterProfiles,
     List<FiscalRegisterProfile>? fiscalRegisterProfiles,
@@ -63,6 +64,10 @@ class SettingsService {
         AppSettings.supportedThemeModes.contains(themeMode.toLowerCase())
             ? themeMode.toLowerCase()
             : AppSettings.defaults.themeMode;
+    final requestedUiStyle = uiStyle?.trim().toLowerCase();
+    final normalizedUiStyle = AppSettings.supportedUiStyles.contains(requestedUiStyle)
+        ? requestedUiStyle!
+        : current.uiStyle;
     final requestedLanguage = AppStrings.normalizeLanguageCode(languageCode);
     final normalizedLanguage = AppStrings.hasLanguage(requestedLanguage)
         ? requestedLanguage
@@ -85,6 +90,7 @@ class SettingsService {
       currencyCode: normalizedCurrency,
       vatPercent: normalizedVatPercent,
       themeMode: normalizedTheme,
+      uiStyle: normalizedUiStyle,
       languageCode: normalizedLanguage,
     );
     _writeSettings(settings);
@@ -111,6 +117,7 @@ class SettingsService {
       currencyCode: current.currencyCode,
       vatPercent: current.vatPercent,
       themeMode: current.themeMode,
+      uiStyle: current.uiStyle,
       languageCode: current.languageCode,
     );
     _writeSettings(settings);

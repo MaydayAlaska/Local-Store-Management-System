@@ -13,6 +13,7 @@ void main() {
     expect(settings.currencyCode, 'EUR');
     expect(settings.vatPercent, 22);
     expect(settings.themeMode, 'system');
+    expect(settings.uiStyle, 'glassmorphism');
     expect(settings.languageCode, 'it');
   });
 
@@ -22,6 +23,7 @@ void main() {
       currencyCode: 'USD',
       vatPercent: 10.5,
       themeMode: 'dark',
+      uiStyle: 'glassmorphism',
       languageCode: 'en',
     );
 
@@ -29,6 +31,7 @@ void main() {
     expect(restored.currencyCode, 'USD');
     expect(restored.vatPercent, 10.5);
     expect(restored.themeMode, 'dark');
+    expect(restored.uiStyle, 'glassmorphism');
     expect(restored.languageCode, 'en');
   });
 

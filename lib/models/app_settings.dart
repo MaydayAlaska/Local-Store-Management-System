@@ -164,6 +164,7 @@ class AppSettings {
     this.currencyCode = 'EUR',
     this.vatPercent = 22,
     this.themeMode = 'system',
+    this.uiStyle = 'glassmorphism',
     this.languageCode = 'it',
   });
 
@@ -179,10 +180,12 @@ class AppSettings {
   final String currencyCode;
   final double vatPercent;
   final String themeMode;
+  final String uiStyle;
   final String languageCode;
 
   static const supportedCurrencies = ['EUR', 'USD', 'GBP', 'CHF'];
   static const supportedThemeModes = ['system', 'light', 'dark'];
+  static const supportedUiStyles = ['glassmorphism'];
 
   static const defaults = AppSettings(shopName: 'Negozio');
 
@@ -191,6 +194,7 @@ class AppSettings {
     final rawVatPercent =
         (json['VatPercent'] as num?)?.toDouble() ?? defaults.vatPercent;
     final theme = (json['ThemeMode'] as String?)?.trim().toLowerCase();
+    final uiStyle = (json['UiStyle'] as String?)?.trim().toLowerCase();
     final language = (json['LanguageCode'] as String?)
         ?.trim()
         .replaceAll('_', '-')
@@ -249,6 +253,9 @@ class AppSettings {
       currencyCode: supportedCurrencies.contains(currency) ? currency! : 'EUR',
       vatPercent: rawVatPercent.clamp(0, 100).toDouble(),
       themeMode: supportedThemeModes.contains(theme) ? theme! : 'system',
+      uiStyle: supportedUiStyles.contains(uiStyle)
+          ? uiStyle!
+          : defaults.uiStyle,
       languageCode:
           language?.isNotEmpty == true ? language! : defaults.languageCode,
     );
@@ -269,6 +276,7 @@ class AppSettings {
         'CurrencyCode': currencyCode,
         'VatPercent': vatPercent,
         'ThemeMode': themeMode,
+        'UiStyle': uiStyle,
         'LanguageCode': languageCode,
       };
 
@@ -314,6 +322,7 @@ class AppSettings {
     String? currencyCode,
     double? vatPercent,
     String? themeMode,
+    String? uiStyle,
     String? languageCode,
   }) =>
       AppSettings(
@@ -330,6 +339,7 @@ class AppSettings {
         currencyCode: currencyCode ?? this.currencyCode,
         vatPercent: vatPercent ?? this.vatPercent,
         themeMode: themeMode ?? this.themeMode,
+        uiStyle: uiStyle ?? this.uiStyle,
         languageCode: languageCode ?? this.languageCode,
       );
 }

@@ -37,6 +37,7 @@ class _SettingsPageState extends State<SettingsPage> {
   late bool _showLogo;
   late String _currencyCode;
   late String _themeMode;
+  late String _uiStyle;
   late String _languageCode;
   late List<LabelPrinterProfile> _labelPrinters;
   late List<FiscalRegisterProfile> _fiscalRegisters;
@@ -69,6 +70,7 @@ class _SettingsPageState extends State<SettingsPage> {
     _showLogo = widget.current.showLogoInMenu;
     _currencyCode = widget.current.currencyCode;
     _themeMode = widget.current.themeMode;
+    _uiStyle = widget.current.uiStyle;
     _languageCode = AppStrings.hasLanguage(widget.current.languageCode)
         ? AppStrings.normalizeLanguageCode(widget.current.languageCode)
         : AppStrings.fallbackLanguageCode;
@@ -139,6 +141,7 @@ class _SettingsPageState extends State<SettingsPage> {
         currencyCode: _currencyCode,
         vatPercent: parsedVat,
         themeMode: _themeMode,
+        uiStyle: _uiStyle,
         languageCode: _languageCode,
         labelPrinterProfiles: _labelPrinters,
         fiscalRegisterProfiles: _fiscalRegisters,
@@ -931,6 +934,22 @@ class _SettingsPageState extends State<SettingsPage> {
                           ],
                           onChanged: (value) =>
                               setState(() => _themeMode = value ?? 'system'),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: GlassDropdown<String>(
+                          value: _uiStyle,
+                          labelText: _itEn('Stile', 'Style'),
+                          items: const [
+                            GlassDropdownItem(
+                              value: 'glassmorphism',
+                              label: 'Glassmorphism',
+                            ),
+                          ],
+                          onChanged: (value) => setState(
+                            () => _uiStyle = value ?? 'glassmorphism',
+                          ),
                         ),
                       ),
                       const SizedBox(width: 10),
