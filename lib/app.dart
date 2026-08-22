@@ -82,7 +82,7 @@ class _StoreAppState extends State<StoreApp> {
       );
     }
     return theme.copyWith(
-      extensions: <ThemeExtension<dynamic>>[
+      extensions: [
         ...theme.extensions.values,
         layout,
       ],
