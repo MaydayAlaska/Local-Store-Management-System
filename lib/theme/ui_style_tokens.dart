@@ -29,6 +29,8 @@ class UiStyleTokens extends ThemeExtension<UiStyleTokens> {
     required this.captionHover,
     required this.surfaceBlur,
     required this.menuBlur,
+    this.backgroundImagePath,
+    this.backgroundImageOpacity = 1,
   });
 
   final Color backgroundStart;
@@ -57,6 +59,8 @@ class UiStyleTokens extends ThemeExtension<UiStyleTokens> {
   final Color captionHover;
   final double surfaceBlur;
   final double menuBlur;
+  final String? backgroundImagePath;
+  final double backgroundImageOpacity;
 
   List<Color> get backgroundGradient => [
         backgroundStart,
@@ -98,6 +102,8 @@ class UiStyleTokens extends ThemeExtension<UiStyleTokens> {
     Color? captionHover,
     double? surfaceBlur,
     double? menuBlur,
+    String? backgroundImagePath,
+    double? backgroundImageOpacity,
   }) =>
       UiStyleTokens(
         backgroundStart: backgroundStart ?? this.backgroundStart,
@@ -128,6 +134,9 @@ class UiStyleTokens extends ThemeExtension<UiStyleTokens> {
         captionHover: captionHover ?? this.captionHover,
         surfaceBlur: surfaceBlur ?? this.surfaceBlur,
         menuBlur: menuBlur ?? this.menuBlur,
+        backgroundImagePath: backgroundImagePath ?? this.backgroundImagePath,
+        backgroundImageOpacity:
+            backgroundImageOpacity ?? this.backgroundImageOpacity,
       );
 
   @override
@@ -167,6 +176,10 @@ class UiStyleTokens extends ThemeExtension<UiStyleTokens> {
       captionHover: Color.lerp(captionHover, other.captionHover, t)!,
       surfaceBlur: lerpDouble(surfaceBlur, other.surfaceBlur),
       menuBlur: lerpDouble(menuBlur, other.menuBlur),
+      backgroundImagePath:
+          t < 0.5 ? backgroundImagePath : other.backgroundImagePath,
+      backgroundImageOpacity:
+          lerpDouble(backgroundImageOpacity, other.backgroundImageOpacity),
     );
   }
 }
