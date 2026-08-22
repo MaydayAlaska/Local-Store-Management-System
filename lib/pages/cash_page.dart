@@ -322,7 +322,7 @@ class _CashPageState extends State<CashPage> {
             )
           : _itEn(
               'Cliente rimosso dal carrello. L’eventuale buono regalo è stato rimosso.',
-              'Customer removed from the cart. Any selected gift card was removed.',
+              'Customer removed from the cart. Any selected gift card was removed too.',
             );
     });
   }
