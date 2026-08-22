@@ -1,0 +1,23 @@
+name: Trigger beta build once
+
+on:
+  push:
+    branches:
+      - Flutter
+    paths:
+      - '.github/workflows/trigger-beta-once.yml'
+
+permissions:
+  actions: write
+  contents: read
+
+jobs:
+  dispatch:
+    name: Dispatch beta pipeline
+    runs-on: ubuntu-latest
+    steps:
+      - name: Dispatch build workflow
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: gh workflow run build.yml --repo "$GITHUB_REPOSITORY" --ref Flutter
