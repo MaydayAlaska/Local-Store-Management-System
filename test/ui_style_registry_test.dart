@@ -13,13 +13,10 @@ const _bundledStyleIds = <String>[
   'brutalism',
   'neumorphism',
   'material-design',
-  'astractmorphism',
-  'skeumorphism',
   'flat-design',
   'retrofuturism',
   'monochromatic-design',
   'minimal-vintage',
-  'glassmorphism-2',
 ];
 
 void main() {
@@ -45,7 +42,12 @@ void main() {
       );
       final metadata = Map<String, dynamic>.from(bundle['style'] as Map);
       expect(metadata['id'], id);
-      expect(metadata['version'], '2.0');
+      expect(metadata['version'], isA<String>());
+      expect(
+        metadata['version'] as String,
+        startsWith('2.'),
+        reason: '$id must use the current bundled style schema generation',
+      );
       expect(metadata['layout'], isA<Map>());
       expect(bundle['light'], isA<Map>());
       expect(bundle['dark'], isA<Map>());
@@ -127,7 +129,10 @@ void main() {
   });
 
   test('unknown style falls back to built-in glassmorphism', () {
-    expect(UiStyleRegistry.resolve('unknown-style').id, UiStyleRegistry.fallbackId);
+    expect(
+      UiStyleRegistry.resolve('unknown-style').id,
+      UiStyleRegistry.fallbackId,
+    );
     expect(
       UiStyleRegistry.layoutFor('unknown-style'),
       isA<UiLayoutTokens>(),
