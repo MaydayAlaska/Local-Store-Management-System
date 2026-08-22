@@ -53,6 +53,16 @@ jobs:
               script = script[:closing] + script[closing:].replace("'''", '\"\"\"', 1)
               cursor = closing + 6
 
+          marker = "'''  List<GiftCard> giftCards([int limit = 5000]) {"
+          opening = script.find(marker)
+          if opening < 0:
+              raise SystemExit('Cannot find giftCards replacement opening')
+          script = script[:opening] + script[opening:].replace("'''", '\"\"\"', 1)
+          closing = script.find("''',\n)", opening + 1)
+          if closing < 0:
+              raise SystemExit('Cannot find giftCards replacement closing')
+          script = script[:closing] + script[closing:].replace("'''", '\"\"\"', 1)
+
           Path('/tmp/implement_optional_gift_card_owner.py').write_text(script)
           subprocess.run(['python3', '-m', 'py_compile', '/tmp/implement_optional_gift_card_owner.py'], check=True)
           subprocess.run(['python3', '/tmp/implement_optional_gift_card_owner.py'], check=True)
@@ -90,4 +100,4 @@ jobs:
           git commit -m 'Make gift card customer association optional'
           git push origin HEAD:Flutter
 
-# trigger 5
+# trigger 6
