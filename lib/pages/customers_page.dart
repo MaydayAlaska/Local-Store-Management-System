@@ -10,6 +10,7 @@ import '../services/birth_place_service.dart';
 import '../services/fiscal_code_service.dart';
 import '../widgets/hid_barcode_listener.dart';
 import 'customer_editor_dialog.dart';
+import 'gift_card_management_dialog.dart';
 import 'order_dialog.dart';
 
 class CustomersPage extends StatefulWidget {
@@ -135,8 +136,8 @@ class _CustomersPageState extends State<CustomersPage> {
     }
     if (giftCards.isNotEmpty) {
       details.add(_itEn(
-        'Verranno eliminati anche ${giftCards.length} buoni regalo associati. Il credito residuo complessivo di ${formatMoney(remainingGiftValue)} verrà perso.',
-        '${giftCards.length} linked gift cards will also be deleted. Their total remaining credit of ${formatMoney(remainingGiftValue)} will be lost.',
+        'Verranno eliminati anche ${giftCards.length} buoni regalo associati. Il credito residuo complessivo di ${formatMoney(remainingGiftValue)} verrà perso. I codici dei buoni resteranno comunque riservati e non saranno riutilizzati.',
+        '${giftCards.length} linked gift cards will also be deleted. Their total remaining credit of ${formatMoney(remainingGiftValue)} will be lost. Their codes will remain reserved and will not be reused.',
       ));
     }
     details.add(_itEn(
@@ -190,6 +191,22 @@ class _CustomersPageState extends State<CustomersPage> {
     }
   }
 
+  Future<void> _manageGiftCards() async {
+    final deleted = await showGiftCardManagementDialog(
+      context,
+      repository: widget.services.customers,
+    );
+    if (!mounted || deleted == null) return;
+    setState(() {
+      if (deleted > 0) {
+        _status = _itEn(
+          '$deleted buoni regalo eliminati dalla gestione attiva. I relativi codici restano riservati.',
+          '$deleted gift cards removed from active management. Their codes remain reserved.',
+        );
+      }
+    });
+  }
+
   Future<void> _openOrder(int orderId) async {
     await showSalesOrderDialog(
       context,
@@ -216,6 +233,12 @@ class _CustomersPageState extends State<CustomersPage> {
                 style: Theme.of(context).textTheme.headlineMedium,
               ),
             ),
+            OutlinedButton.icon(
+              onPressed: _manageGiftCards,
+              icon: const Icon(Icons.card_giftcard_outlined),
+              label: Text(_itEn('Gestisci buoni', 'Manage gift cards')),
+            ),
+            const SizedBox(width: 8),
             FilledButton.icon(
               onPressed: _newCustomer,
               icon: const Icon(Icons.person_add_alt_1),
@@ -451,8 +474,8 @@ class _CustomerDetailState extends State<_CustomerDetail> {
             title: Text(_itEn('Elimina buono regalo', 'Delete gift card')),
             content: Text(
               _itEn(
-                'Eliminare definitivamente ${card.code}? Il credito residuo di ${card.remainingDisplay} verrà perso. Gli ordini storici conserveranno il codice e l’importo del buono eventualmente utilizzato.',
-                'Permanently delete ${card.code}? Its remaining credit of ${card.remainingDisplay} will be lost. Historical orders will keep the gift card code and any amount that was used.',
+                'Eliminare ${card.code} dalla gestione attiva? Il credito residuo di ${card.remainingDisplay} verrà perso. Gli ordini storici conserveranno il codice e l’importo del buono eventualmente utilizzato. Il codice ${card.code} resterà riservato e non potrà essere riutilizzato.',
+                'Remove ${card.code} from active management? Its remaining credit of ${card.remainingDisplay} will be lost. Historical orders will keep the gift card code and any amount that was used. Code ${card.code} will remain reserved and cannot be reused.',
               ),
             ),
             actions: [
@@ -477,7 +500,10 @@ class _CustomerDetailState extends State<_CustomerDetail> {
     final deleted = widget.repository.deleteGiftCard(card.id);
     if (!mounted) return;
     setState(() => _giftStatus = deleted
-        ? _itEn('Buono ${card.code} eliminato.', 'Gift card ${card.code} deleted.')
+        ? _itEn(
+            'Buono ${card.code} eliminato dalla gestione attiva. Il codice resta riservato.',
+            'Gift card ${card.code} removed from active management. Its code remains reserved.',
+          )
         : _itEn('Il buono non esiste più.', 'The gift card no longer exists.'));
   }
 
