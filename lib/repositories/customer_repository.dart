@@ -30,7 +30,6 @@ class CustomerRepository {
           CHECK(spent_value_cents >= 0 AND spent_value_cents <= total_value_cents),
         expires_at_utc TEXT,
         purchase_order_id INTEGER,
-        deleted_at_utc TEXT,
         created_at_utc TEXT NOT NULL,
         updated_at_utc TEXT NOT NULL,
         FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE CASCADE
@@ -94,7 +93,7 @@ class CustomerRepository {
 
     _ensureColumn('gift_cards', 'expires_at_utc', 'TEXT');
     _ensureColumn('gift_cards', 'purchase_order_id', 'INTEGER');
-    _ensureColumn('gift_cards', 'deleted_at_utc', 'TEXT');
+    _migrateGiftCardSchemaIfNeeded();
     _ensureColumn('sales_orders', 'customer_code', 'INTEGER');
     _ensureColumn('sales_orders', 'customer_display_name', 'TEXT');
     _ensureColumn('sales_orders', 'customer_fiscal_code', 'TEXT');
@@ -115,10 +114,12 @@ class CustomerRepository {
         ON sales_orders(cancelled_at_utc, created_at_utc DESC, id DESC);
       CREATE INDEX IF NOT EXISTS ix_sales_orders_gift_card
         ON sales_orders(gift_card_id, created_at_utc DESC, id DESC);
+      CREATE INDEX IF NOT EXISTS ix_gift_cards_customer
+        ON gift_cards(customer_id, created_at_utc DESC, id DESC);
       CREATE INDEX IF NOT EXISTS ix_gift_cards_purchase_order
         ON gift_cards(purchase_order_id);
       CREATE INDEX IF NOT EXISTS ix_gift_cards_cleanup
-        ON gift_cards(deleted_at_utc, created_at_utc, expires_at_utc);
+        ON gift_cards(created_at_utc, expires_at_utc);
       INSERT OR IGNORE INTO gift_card_code_registry (code, issued_at_utc)
         SELECT code, created_at_utc FROM gift_cards;
     ''');
@@ -198,6 +199,56 @@ class CustomerRepository {
     }
   }
 
+  void _migrateGiftCardSchemaIfNeeded() {
+    if (!_hasColumn('gift_cards', 'deleted_at_utc')) return;
+
+    final db = database.db;
+    db.execute('''
+      INSERT OR IGNORE INTO gift_card_code_registry (code, issued_at_utc)
+      SELECT code, created_at_utc FROM gift_cards;
+    ''');
+    db.execute('DELETE FROM gift_cards WHERE deleted_at_utc IS NOT NULL;');
+    db.execute('DROP INDEX IF EXISTS ix_gift_cards_cleanup;');
+
+    db.execute('PRAGMA foreign_keys = OFF;');
+    try {
+      db.execute('BEGIN IMMEDIATE;');
+      db.execute('DROP TABLE IF EXISTS gift_cards_new;');
+      db.execute('''
+        CREATE TABLE gift_cards_new (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          code TEXT NOT NULL COLLATE NOCASE UNIQUE,
+          customer_id INTEGER NOT NULL,
+          total_value_cents INTEGER NOT NULL CHECK(total_value_cents > 0),
+          spent_value_cents INTEGER NOT NULL DEFAULT 0
+            CHECK(spent_value_cents >= 0 AND spent_value_cents <= total_value_cents),
+          expires_at_utc TEXT,
+          purchase_order_id INTEGER,
+          created_at_utc TEXT NOT NULL,
+          updated_at_utc TEXT NOT NULL,
+          FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE CASCADE
+        );
+      ''');
+      db.execute('''
+        INSERT INTO gift_cards_new (
+          id, code, customer_id, total_value_cents, spent_value_cents,
+          expires_at_utc, purchase_order_id, created_at_utc, updated_at_utc)
+        SELECT
+          id, code, customer_id, total_value_cents, spent_value_cents,
+          expires_at_utc, purchase_order_id, created_at_utc, updated_at_utc
+        FROM gift_cards;
+      ''');
+      db.execute('DROP TABLE gift_cards;');
+      db.execute('ALTER TABLE gift_cards_new RENAME TO gift_cards;');
+      db.execute('COMMIT;');
+    } catch (_) {
+      db.execute('ROLLBACK;');
+      rethrow;
+    } finally {
+      db.execute('PRAGMA foreign_keys = ON;');
+    }
+  }
+
   void _backfillCustomerSnapshots() {
     database.db.execute('''
       UPDATE sales_orders
@@ -230,7 +281,6 @@ class CustomerRepository {
       SELECT id, customer_id, total_value_cents, created_at_utc
       FROM gift_cards
       WHERE purchase_order_id IS NULL
-        AND deleted_at_utc IS NULL
       ORDER BY created_at_utc, id;
     ''');
     for (final row in rows) {
@@ -268,7 +318,6 @@ class CustomerRepository {
           FROM gift_cards linked
           WHERE linked.purchase_order_id=so.id
             AND linked.total_value_cents=?
-            AND linked.deleted_at_utc IS NULL
         )
       ORDER BY
         ABS((julianday(so.created_at_utc) - julianday(?)) * 86400.0),
@@ -459,7 +508,6 @@ class CustomerRepository {
     final rows = database.db.select('''
       SELECT * FROM gift_cards
       WHERE customer_id=?
-        AND deleted_at_utc IS NULL
       ORDER BY created_at_utc DESC, id DESC
       LIMIT ?;
     ''', [customerId, limit.clamp(1, 5000)]);
@@ -471,7 +519,6 @@ class CustomerRepository {
     final rows = database.db.select('''
       SELECT * FROM gift_cards
       WHERE customer_id=?
-        AND deleted_at_utc IS NULL
         AND spent_value_cents < total_value_cents
         AND (expires_at_utc IS NULL OR expires_at_utc > ?)
       ORDER BY created_at_utc DESC, id DESC
@@ -482,7 +529,7 @@ class CustomerRepository {
 
   GiftCard? getGiftCard(int giftCardId) {
     final rows = database.db.select(
-      'SELECT * FROM gift_cards WHERE id=? AND deleted_at_utc IS NULL LIMIT 1;',
+      'SELECT * FROM gift_cards WHERE id=? LIMIT 1;',
       [giftCardId],
     );
     return rows.isEmpty ? null : _giftCardFromRow(rows.first);
@@ -539,7 +586,7 @@ class CustomerRepository {
 
   SalesOrderSummary? purchaseOrderForGiftCard(int giftCardId) {
     final rows = database.db.select(
-      'SELECT purchase_order_id FROM gift_cards WHERE id=? AND deleted_at_utc IS NULL LIMIT 1;',
+      'SELECT purchase_order_id FROM gift_cards WHERE id=? LIMIT 1;',
       [giftCardId],
     );
     if (rows.isEmpty) return null;
@@ -554,7 +601,6 @@ class CustomerRepository {
       FROM gift_cards gc
       JOIN sales_orders so ON so.id=gc.purchase_order_id
       WHERE gc.id=?
-        AND gc.deleted_at_utc IS NULL
       LIMIT 1;
     ''', [giftCardId]);
     if (rows.isEmpty || rows.first['receipt_blob'] == null) return null;
@@ -567,13 +613,30 @@ class CustomerRepository {
   }
 
   bool deleteGiftCard(int giftCardId) {
-    final now = DateTime.now().toUtc().toIso8601String();
-    database.db.execute('''
-      UPDATE gift_cards
-      SET deleted_at_utc=?, updated_at_utc=?
-      WHERE id=? AND deleted_at_utc IS NULL;
-    ''', [now, now, giftCardId]);
-    return database.db.updatedRows > 0;
+    final db = database.db;
+    db.execute('BEGIN IMMEDIATE;');
+    try {
+      final rows = db.select(
+        'SELECT code, created_at_utc FROM gift_cards WHERE id=? LIMIT 1;',
+        [giftCardId],
+      );
+      if (rows.isEmpty) {
+        db.execute('ROLLBACK;');
+        return false;
+      }
+      final row = rows.first;
+      db.execute('''
+        INSERT OR IGNORE INTO gift_card_code_registry (code, issued_at_utc)
+        VALUES (?, ?);
+      ''', [row['code'] as String, row['created_at_utc'] as String]);
+      db.execute('DELETE FROM gift_cards WHERE id=?;', [giftCardId]);
+      final deleted = db.updatedRows > 0;
+      db.execute('COMMIT;');
+      return deleted;
+    } catch (_) {
+      db.execute('ROLLBACK;');
+      rethrow;
+    }
   }
 
   int countGiftCardsForCleanup({
@@ -613,13 +676,22 @@ class CustomerRepository {
       args: args,
     );
     if (where == null) return 0;
-    final nowText = now.toIso8601String();
-    database.db.execute('''
-      UPDATE gift_cards
-      SET deleted_at_utc=?, updated_at_utc=?
-      WHERE $where;
-    ''', [nowText, nowText, ...args]);
-    return database.db.updatedRows;
+
+    final db = database.db;
+    db.execute('BEGIN IMMEDIATE;');
+    try {
+      db.execute('''
+        INSERT OR IGNORE INTO gift_card_code_registry (code, issued_at_utc)
+        SELECT code, created_at_utc FROM gift_cards WHERE $where;
+      ''', args);
+      db.execute('DELETE FROM gift_cards WHERE $where;', args);
+      final deleted = db.updatedRows;
+      db.execute('COMMIT;');
+      return deleted;
+    } catch (_) {
+      db.execute('ROLLBACK;');
+      rethrow;
+    }
   }
 
   String? _giftCardCleanupWhere({
@@ -655,7 +727,7 @@ class CustomerRepository {
       args.add(nowUtc.toIso8601String());
     }
     if (conditions.isEmpty) return null;
-    return 'deleted_at_utc IS NULL AND (${conditions.join(' OR ')})';
+    return '(${conditions.join(' OR ')})';
   }
 
   List<SalesOrderSummary> ordersForCustomer(int customerId, [int limit = 500]) {
@@ -889,7 +961,7 @@ class CustomerRepository {
           throw ArgumentError('Il buono regalo supera il totale della vendita.');
         }
         final cards = db.select(
-          'SELECT * FROM gift_cards WHERE id=? AND deleted_at_utc IS NULL LIMIT 1;',
+          'SELECT * FROM gift_cards WHERE id=? LIMIT 1;',
           [draft.giftCardId],
         );
         if (cards.isEmpty) throw StateError('Il buono regalo selezionato non esiste più.');
@@ -990,7 +1062,7 @@ class CustomerRepository {
         db.execute('''
           UPDATE gift_cards
           SET spent_value_cents = spent_value_cents + ?, updated_at_utc = ?
-          WHERE id=? AND deleted_at_utc IS NULL;
+          WHERE id=?;
         ''', [draft.giftCardAppliedCents, nowText, draft.giftCardId]);
         if (db.updatedRows != 1) {
           throw StateError('Impossibile aggiornare il buono regalo.');
