@@ -1,0 +1,28 @@
+name: Probe beta publisher once
+
+on:
+  push:
+    branches:
+      - Flutter
+    paths:
+      - '.github/workflows/probe-publisher-once.yml'
+
+permissions:
+  actions: read
+  contents: write
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Record publisher run
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          RUN="$(gh run list --repo "$GITHUB_REPOSITORY" --workflow publish-beta-once.yml --branch Flutter --limit 1 --json databaseId,url,status,conclusion,headSha,createdAt,updatedAt)"
+          printf '%s\n' "$RUN" > result.json
+          CONTENT="$(base64 -w0 result.json)"
+          gh api --method PUT "repos/$GITHUB_REPOSITORY/contents/.github/beta-publisher-probe.json" \
+            -f message='Record beta publisher probe' -f content="$CONTENT" -f branch='Flutter' >/dev/null
