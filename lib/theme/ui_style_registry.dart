@@ -26,14 +26,17 @@ class UiStyleRegistry {
     'assets/styles/bundled/brutalism.json',
     'assets/styles/bundled/neumorphism.json',
     'assets/styles/bundled/material-design.json',
-    'assets/styles/bundled/astractmorphism.json',
-    'assets/styles/bundled/skeumorphism.json',
     'assets/styles/bundled/flat-design.json',
     'assets/styles/bundled/retrofuturism.json',
     'assets/styles/bundled/monochromatic-design.json',
     'assets/styles/bundled/minimal-vintage.json',
-    'assets/styles/bundled/glassmorphism-2.json',
   ];
+  static const _retiredBundledStyleFolders = <String, String>{
+    'Astractmorphism': 'astractmorphism',
+    'Glassmorphism 2': 'glassmorphism-2',
+    'Skeumorphism': 'skeumorphism',
+    'Flutiger Aero': 'flutiger-aero',
+  };
 
   static final Map<String, AppUiStyle> _external = {};
   static final Map<String, UiLayoutTokens> _layouts = {};
@@ -52,6 +55,7 @@ class UiStyleRegistry {
   static Future<void> initialize() => reload();
 
   static Future<void> reload() async {
+    await _removeRetiredBundledStyleFolders();
     await _seedBundledGlassmorphism();
     await _seedBundledStyles();
     await reloadFromDirectory(AppPaths.stylesDirectory);
@@ -160,9 +164,21 @@ class UiStyleRegistry {
     }
 
     return UiLayoutTokens(
-      navigation: enumValue('navigation', const {'rail', 'sidebar', 'top', 'dock'}, 'rail'),
-      surfaceStyle: enumValue('surfaceStyle', const {'glass', 'flat', 'outlined', 'raised', 'paper', 'neon'}, 'glass'),
-      backgroundPattern: enumValue('backgroundPattern', const {'none', 'grid', 'dots', 'stripes'}, 'none'),
+      navigation: enumValue(
+        'navigation',
+        const {'rail', 'sidebar', 'top', 'dock'},
+        'rail',
+      ),
+      surfaceStyle: enumValue(
+        'surfaceStyle',
+        const {'glass', 'flat', 'outlined', 'raised', 'paper', 'neon'},
+        'glass',
+      ),
+      backgroundPattern: enumValue(
+        'backgroundPattern',
+        const {'none', 'grid', 'dots', 'stripes'},
+        'none',
+      ),
       shellPadding: number('shellPadding', 10, 0, 40),
       shellGap: number('shellGap', 10, 0, 40),
       navigationExtent: number('navigationExtent', 116, 52, 280),
@@ -179,6 +195,27 @@ class UiStyleRegistry {
     );
   }
 
+  static Future<void> _removeRetiredBundledStyleFolders() async {
+    final root = Directory(AppPaths.stylesDirectory);
+    await root.create(recursive: true);
+    for (final entry in _retiredBundledStyleFolders.entries) {
+      final directory = Directory(p.join(root.path, entry.key));
+      if (!await directory.exists()) continue;
+      final metadataFile = File(p.join(directory.path, 'style.json'));
+      if (!await metadataFile.exists()) continue;
+      try {
+        final decoded = jsonDecode(await metadataFile.readAsString());
+        if (decoded is! Map) continue;
+        final metadata = Map<String, dynamic>.from(decoded);
+        final id = (metadata['id'] as String?)?.trim().toLowerCase();
+        if (id != entry.value) continue;
+        await directory.delete(recursive: true);
+      } catch (_) {
+        // Non eliminare cartelle che non possiamo identificare con certezza.
+      }
+    }
+  }
+
   static Future<void> _seedBundledGlassmorphism() async {
     final root = Directory(AppPaths.stylesDirectory);
     await root.create(recursive: true);
@@ -187,7 +224,8 @@ class UiStyleRegistry {
     await destination.create(recursive: true);
     for (final entry in _bundledGlassmorphismFiles.entries) {
       final content = await rootBundle.loadString(entry.key);
-      await File(p.join(destination.path, entry.value)).writeAsString(content, flush: true);
+      await File(p.join(destination.path, entry.value))
+          .writeAsString(content, flush: true);
     }
   }
 
@@ -206,17 +244,27 @@ class UiStyleRegistry {
       final style = bundle['style'];
       final light = bundle['light'];
       final dark = bundle['dark'];
-      if (folder is! String || folder.trim().isEmpty || style is! Map || light is! Map || dark is! Map) {
-        throw FormatException('$assetPath è un pacchetto stile integrato non valido.');
+      if (folder is! String ||
+          folder.trim().isEmpty ||
+          style is! Map ||
+          light is! Map ||
+          dark is! Map) {
+        throw FormatException(
+          '$assetPath è un pacchetto stile integrato non valido.',
+        );
       }
       final safeFolder = folder.trim();
       if (p.basename(safeFolder) != safeFolder) {
-        throw FormatException('$assetPath contiene un nome cartella non valido.');
+        throw FormatException(
+          '$assetPath contiene un nome cartella non valido.',
+        );
       }
 
       final bundledStyle = Map<String, dynamic>.from(style);
-      final bundledId = (bundledStyle['id'] as String?)?.trim().toLowerCase();
-      final bundledVersion = (bundledStyle['version'] as String?)?.trim() ?? '0';
+      final bundledId =
+          (bundledStyle['id'] as String?)?.trim().toLowerCase();
+      final bundledVersion =
+          (bundledStyle['version'] as String?)?.trim() ?? '0';
       final destination = Directory(p.join(root.path, safeFolder));
 
       if (await destination.exists()) {
@@ -227,8 +275,10 @@ class UiStyleRegistry {
             final installed = jsonDecode(await metadataFile.readAsString());
             if (installed is Map) {
               final installedMap = Map<String, dynamic>.from(installed);
-              final installedId = (installedMap['id'] as String?)?.trim().toLowerCase();
-              final installedVersion = (installedMap['version'] as String?)?.trim() ?? '0';
+              final installedId =
+                  (installedMap['id'] as String?)?.trim().toLowerCase();
+              final installedVersion =
+                  (installedMap['version'] as String?)?.trim() ?? '0';
               shouldUpdate = installedId == bundledId &&
                   _comparePackVersions(bundledVersion, installedVersion) > 0;
             }
@@ -240,19 +290,26 @@ class UiStyleRegistry {
       }
 
       await destination.create(recursive: true);
-      await File(p.join(destination.path, 'style.json')).writeAsString(encoder.convert(style), flush: true);
-      await File(p.join(destination.path, 'light.json')).writeAsString(encoder.convert(light), flush: true);
-      await File(p.join(destination.path, 'dark.json')).writeAsString(encoder.convert(dark), flush: true);
+      await File(p.join(destination.path, 'style.json'))
+          .writeAsString(encoder.convert(style), flush: true);
+      await File(p.join(destination.path, 'light.json'))
+          .writeAsString(encoder.convert(light), flush: true);
+      await File(p.join(destination.path, 'dark.json'))
+          .writeAsString(encoder.convert(dark), flush: true);
     }
   }
 
   static int _comparePackVersions(String left, String right) {
-    List<int> parse(String value) => value.split('.').map((part) => int.tryParse(part.trim()) ?? 0).toList(growable: false);
+    List<int> parse(String value) => value
+        .split('.')
+        .map((part) => int.tryParse(part.trim()) ?? 0)
+        .toList(growable: false);
     final a = parse(left);
     final b = parse(right);
     final length = a.length > b.length ? a.length : b.length;
     for (var i = 0; i < length; i++) {
-      final comparison = (i < a.length ? a[i] : 0).compareTo(i < b.length ? b[i] : 0);
+      final comparison =
+          (i < a.length ? a[i] : 0).compareTo(i < b.length ? b[i] : 0);
       if (comparison != 0) return comparison;
     }
     return 0;
