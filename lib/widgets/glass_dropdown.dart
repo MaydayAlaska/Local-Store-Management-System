@@ -3,6 +3,7 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 
 import '../l10n/app_strings.dart';
+import '../theme/ui_style_tokens.dart';
 
 class GlassDropdownItem<T> {
   const GlassDropdownItem({
@@ -72,9 +73,7 @@ class _GlassDropdownState<T> extends State<GlassDropdown<T>> {
       _items = List<GlassDropdownItem<T>>.of(widget.items);
     }
     if (_entry != null &&
-        (!_enabled ||
-            itemsChanged ||
-            oldWidget.value != widget.value)) {
+        (!_enabled || itemsChanged || oldWidget.value != widget.value)) {
       _close();
     }
   }
@@ -122,9 +121,7 @@ class _GlassDropdownState<T> extends State<GlassDropdown<T>> {
       if (!mounted) return;
       ScaffoldMessenger.maybeOf(context)?.showSnackBar(
         SnackBar(
-          content: Text(
-            '${AppStrings.t('error')}: $error',
-          ),
+          content: Text('${AppStrings.t('error')}: $error'),
         ),
       );
     } finally {
@@ -140,6 +137,7 @@ class _GlassDropdownState<T> extends State<GlassDropdown<T>> {
 
     final targetSize = targetBox.size;
     final theme = Theme.of(context);
+    final tokens = UiStyleTokens.of(context);
     final isDark = theme.brightness == Brightness.dark;
 
     _entry = OverlayEntry(
@@ -165,25 +163,20 @@ class _GlassDropdownState<T> extends State<GlassDropdown<T>> {
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(16),
                   child: BackdropFilter(
-                    filter: ui.ImageFilter.blur(sigmaX: 30, sigmaY: 30),
+                    filter: ui.ImageFilter.blur(
+                      sigmaX: tokens.menuBlur,
+                      sigmaY: tokens.menuBlur,
+                    ),
                     child: Container(
                       constraints:
                           BoxConstraints(maxHeight: widget.maxMenuHeight),
                       decoration: BoxDecoration(
-                        color: isDark
-                            ? const Color(0xE0212836)
-                            : const Color(0xE8FFFFFF),
+                        color: tokens.menuSurface,
                         borderRadius: BorderRadius.circular(16),
-                        border: Border.all(
-                          color: isDark
-                              ? const Color(0x55FFFFFF)
-                              : const Color(0xB8FFFFFF),
-                        ),
+                        border: Border.all(color: tokens.menuBorder),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withValues(
-                              alpha: isDark ? 0.38 : 0.16,
-                            ),
+                            color: tokens.menuShadow,
                             blurRadius: 28,
                             offset: const Offset(0, 12),
                           ),
