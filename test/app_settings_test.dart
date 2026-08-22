@@ -13,7 +13,26 @@ void main() {
     expect(settings.currencyCode, 'EUR');
     expect(settings.vatPercent, 22);
     expect(settings.themeMode, 'system');
+    expect(settings.uiStyle, 'glassmorphism');
     expect(settings.languageCode, 'it');
+  });
+
+  test('safe external UI style IDs survive settings parsing', () {
+    final settings = AppSettings.fromJson(<String, dynamic>{
+      'ShopName': 'Negozio test',
+      'UiStyle': 'community-style',
+    });
+
+    expect(settings.uiStyle, 'community-style');
+  });
+
+  test('invalid UI style IDs fall back to glassmorphism', () {
+    final settings = AppSettings.fromJson(<String, dynamic>{
+      'ShopName': 'Negozio test',
+      'UiStyle': '../bad/style',
+    });
+
+    expect(settings.uiStyle, 'glassmorphism');
   });
 
   test('new interface preferences round-trip through json', () {
@@ -22,6 +41,7 @@ void main() {
       currencyCode: 'USD',
       vatPercent: 10.5,
       themeMode: 'dark',
+      uiStyle: 'glassmorphism',
       languageCode: 'en',
     );
 
@@ -29,6 +49,7 @@ void main() {
     expect(restored.currencyCode, 'USD');
     expect(restored.vatPercent, 10.5);
     expect(restored.themeMode, 'dark');
+    expect(restored.uiStyle, 'glassmorphism');
     expect(restored.languageCode, 'en');
   });
 

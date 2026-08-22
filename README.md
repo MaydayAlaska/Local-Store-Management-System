@@ -2,7 +2,7 @@
 
 Gestionale desktop **offline** per negozi, sviluppato in **Flutter/Dart** con database locale **SQLite**.
 
-La versione stabile corrente è **0.1.9** sul branch `main`.
+La versione stabile corrente è **0.2.0** sul branch `main`.
 
 Il branch `Flutter` resta il canale **BETA/TEST** per lo sviluppo delle versioni successive. I canali OTA STABLE e BETA sono separati: una build stabile riceve solo release stabili e una build Beta riceve solo prerelease Beta.
 
@@ -18,6 +18,28 @@ Le release stabili vengono pubblicate su GitHub con tag `v<versione>` e includon
 | macOS | Apple Silicon ARM64 | `.dmg` con `.app` |
 | Linux | x86_64 | `.AppImage`, `.deb` |
 | Linux | ARM64 | `.AppImage`, `.deb` |
+
+## Novità della 0.2.0
+
+La **0.2.0** promuove in stabile il ciclo Beta fino alla `0.2.0-b9`.
+
+### Sistema di stili dell'interfaccia
+
+Gli style pack possono ora definire non solo colori e trasparenze, ma anche composizione della shell, navigazione, superfici, densità, bordi, ombre e pattern di sfondo. Gli stili integrati attuali includono Glassmorphism, Glassmorphism Horizontal, Brutalism, Neumorphism, Material Design, Flat Design, Retrofuturism, Monochromatic Design e Minimal Vintage.
+
+Le etichette della navigazione sono centrate in modo uniforme e Material Design usa una rail più larga per mantenere le voci lunghe su una sola riga quando possibile.
+
+### Registratori di cassa RT
+
+È disponibile la configurazione di più registratori di cassa RT, con profili e connessioni separati. La Cassa resta indipendente dall'hardware e ogni modello può usare il proprio driver fiscale.
+
+### Dashboard e Cassa
+
+La ricerca prodotti della Dashboard e della Cassa supporta sia la visualizzazione a elenco sia la griglia con immagini delle varianti.
+
+### CI desktop
+
+Le build Windows x64/ARM64, macOS Intel/Apple Silicon e Linux x64/ARM64 vengono eseguite tramite matrix job paralleli dopo il job comune di verifica.
 
 ## Novità della 0.1.9
 
@@ -44,7 +66,7 @@ La distribuzione Linux usa in modo coerente l'application ID **`com.maydayalaska
 - `Name` resta **Local Store Management System**;
 - il runner Flutter Linux viene verificato e configurato con lo stesso `APPLICATION_ID`;
 - il riferimento AppStream `launchable` punta allo stesso desktop ID;
-- GNOME/Wayland può associare correttamente la finestra alla voce applicazione invece di mostrare il nome tecnico con un'icona generica;
+- GNOME/Wayland può quindi associare correttamente la finestra alla voce applicazione invece di mostrare il nome tecnico con un'icona generica;
 - `StartupWMClass=local_store_management` resta disponibile come associazione per X11.
 
 Le icone Linux vengono generate dalla sorgente ufficiale dell'app nelle dimensioni **16, 32, 48, 64, 128 e 256 px** e installate nella gerarchia `hicolor` con il nome dell'application ID.
@@ -61,13 +83,15 @@ I canali STABLE e BETA restano completamente separati. Nelle Impostazioni la bui
 
 - catalogo prodotti e varianti con SKU, barcode multipli, prezzi, giacenze e immagine opzionale per variante;
 - magazzino con movimenti di carico/scarico;
+- dashboard con scanner HID, ricerca prodotti e visualizzazione elenco/griglia con anteprime;
 - cassa con scanner HID, ricerca prodotti, visualizzazione elenco/griglia con anteprime, tastierino numerico, sconti, articoli generici e cliente associato;
 - clienti con codice identificativo interno, codice fiscale facoltativo e storico acquisti;
 - gestione ordini e vendite, annullamento con ripristino della merce ed eliminazione dello storico;
 - buoni regalo associati ai clienti, con utilizzo parziale o totale, valore residuo e scadenza facoltativa;
+- registratori di cassa RT configurabili tramite profili e driver fiscali dedicati;
 - etichette con anteprima, EAN-13, Code 128 B e stampa diretta TCP/BPL-Z;
 - export inventario Excel/PDF, backup e scelta della posizione del database;
-- interfaccia in Italiano e English, tema chiaro/scuro/sistema e valuta configurabile;
+- interfaccia in Italiano e English, tema chiaro/scuro/sistema, style pack e valuta configurabile;
 - traduzioni separate dal codice dell'applicazione tramite file di traduzione esterni;
 - aggiornamenti OTA separati tra canale STABLE e canale BETA;
 - una sola istanza operativa dell'applicazione alla volta.
@@ -139,7 +163,7 @@ I prezzi esportati e visualizzati usano la valuta configurata nelle Impostazioni
 
 ## Impostazioni
 
-Le preferenze di negozio, tema, lingua, valuta, logo, icona e stampante etichette vengono salvate localmente. I file di impostazioni delle versioni precedenti restano compatibili e i nuovi campi mancanti ricevono valori predefiniti sicuri.
+Le preferenze di negozio, tema, stile, lingua, valuta, logo, icona, registratori RT e stampante etichette vengono salvate localmente. I file di impostazioni delle versioni precedenti restano compatibili e i nuovi campi mancanti ricevono valori predefiniti sicuri.
 
 ## Database
 

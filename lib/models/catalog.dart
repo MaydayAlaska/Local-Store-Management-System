@@ -56,6 +56,42 @@ class ProductVariant {
       ? AppStrings.pair('Attivo', 'Active')
       : AppStrings.pair('Disattivato', 'Disabled');
 
+  String get cartTitleDisplay {
+    final parts = <String>[];
+    if (brand?.trim().isNotEmpty == true) parts.add(brand!.trim());
+    if (name.trim().isNotEmpty) parts.add(name.trim());
+    return parts.join(' ');
+  }
+
+  String get cartVariantSizeDisplay {
+    final parts = <String>[];
+    if (category?.trim().isNotEmpty == true) parts.add(category!.trim());
+    if (variant?.trim().isNotEmpty == true) parts.add(variant!.trim());
+    if (size?.trim().isNotEmpty == true) {
+      parts.add('${AppStrings.t('size')} ${size!.trim()}');
+    }
+    return parts.isEmpty
+        ? AppStrings.pair('Variante base', 'Base variant')
+        : parts.join(' · ');
+  }
+
+  /// Descrizione commerciale standard consegnata ai driver dei registratori
+  /// telematici: Categoria Brand Articolo - Variante - Taglia.
+  String get fiscalReceiptDescription {
+    final head = <String>[];
+    if (category?.trim().isNotEmpty == true) head.add(category!.trim());
+    if (brand?.trim().isNotEmpty == true) head.add(brand!.trim());
+    if (name.trim().isNotEmpty) head.add(name.trim());
+
+    final details = <String>[];
+    if (variant?.trim().isNotEmpty == true) details.add(variant!.trim());
+    if (size?.trim().isNotEmpty == true) details.add(size!.trim());
+
+    final base = head.join(' ');
+    if (details.isEmpty) return base;
+    return '$base - ${details.join(' - ')}';
+  }
+
   String get variantDisplay {
     final parts = <String>[];
     if (variant?.trim().isNotEmpty == true) parts.add(variant!.trim());

@@ -1,0 +1,43 @@
+{
+  "seedColor": "#FF315FCE",
+  "tokens": {
+    "backgroundStart": "#FFE9F2FF",
+    "backgroundMiddle": "#FFF5EEFF",
+    "backgroundEnd": "#FFE8FAF7",
+    "glowPrimary": "#553A86FF",
+    "glowSecondary": "#44B95CFF",
+    "glowTertiary": "#3D37D6B0",
+    "cardSurface": "#8FFFFFFF",
+    "strongSurface": "#FAFFFFFF",
+    "subtleSurface": "#70FFFFFF",
+    "surfaceBase": "#FFFFFFFF",
+    "surfaceOpacity": 0.42,
+    "contentSurfaceOpacity": 0.24,
+    "notificationSurfaceOpacity": 0.58,
+    "border": "#A8FFFFFF",
+    "softBorder": "#72FFFFFF",
+    "shadow": "#0F000000",
+    "menuSurface": "#E8FFFFFF",
+    "menuBorder": "#B8FFFFFF",
+    "menuShadow": "#29000000",
+    "tooltipSurface": "#FAFFFFFF",
+    "tooltipBorder": "#A8FFFFFF",
+    "tooltipShadow": "#2E000000",
+    "imagePreviewSurface": "#75FFFFFF",
+    "captionHover": "#57FFFFFF",
+    "surfaceBlur": 22,
+    "menuBlur": 30
+  },
+  "components": {
+    "cardRadius": 20,
+    "inputRadius": 16,
+    "menuRadius": 16,
+    "dialogRadius": 24,
+    "snackBarRadius": 16,
+    "buttonRadius": 14,
+    "iconButtonRadius": 12,
+    "listTileRadius": 14,
+    "railIndicatorOpacity": 0.16,
+    "selectedTileOpacity": 0.10
+  }
+}

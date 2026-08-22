@@ -14,6 +14,7 @@ import 'services/app_services.dart';
 import 'services/birth_place_service.dart';
 import 'services/database_location_service.dart';
 import 'services/single_instance_service.dart';
+import 'theme/ui_style_registry.dart';
 
 void main() {
   runZonedGuarded(() async {
@@ -67,6 +68,7 @@ Future<void> _bootstrap() async {
 
     await windowManager.ensureInitialized();
     await AppStrings.initialize();
+    await UiStyleRegistry.initialize();
     await BirthPlaceService.initialize();
 
     final databaseLocation = DatabaseLocationService();

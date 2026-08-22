@@ -7,6 +7,8 @@ import 'package:path/path.dart' as p;
 import '../core/app_paths.dart';
 import '../l10n/app_strings.dart';
 import '../models/app_settings.dart';
+import '../models/fiscal_register.dart';
+import '../theme/ui_style_registry.dart';
 
 class SettingsService {
   static const defaultIconSourceToken = ':default-app-icon:';
@@ -17,9 +19,16 @@ class SettingsService {
     try {
       final decoded = jsonDecode(file.readAsStringSync());
       if (decoded is! Map<String, dynamic>) return AppSettings.defaults;
-      final settings = AppSettings.fromJson(decoded);
-      if (AppStrings.hasLanguage(settings.languageCode)) return settings;
-      return settings.copyWith(languageCode: AppStrings.fallbackLanguageCode);
+      var settings = AppSettings.fromJson(decoded);
+      if (!AppStrings.hasLanguage(settings.languageCode)) {
+        settings = settings.copyWith(
+          languageCode: AppStrings.fallbackLanguageCode,
+        );
+      }
+      if (!UiStyleRegistry.hasStyle(settings.uiStyle)) {
+        settings = settings.copyWith(uiStyle: UiStyleRegistry.fallbackId);
+      }
+      return settings;
     } catch (_) {
       return AppSettings.defaults;
     }
@@ -32,8 +41,10 @@ class SettingsService {
     required String currencyCode,
     required double vatPercent,
     required String themeMode,
+    String? uiStyle,
     required String languageCode,
     List<LabelPrinterProfile>? labelPrinterProfiles,
+    List<FiscalRegisterProfile>? fiscalRegisterProfiles,
     String? iconSourcePath,
     String? logoSourcePath,
   }) {
@@ -61,6 +72,12 @@ class SettingsService {
         AppSettings.supportedThemeModes.contains(themeMode.toLowerCase())
             ? themeMode.toLowerCase()
             : AppSettings.defaults.themeMode;
+    final requestedUiStyle = uiStyle?.trim().toLowerCase();
+    final normalizedUiStyle = UiStyleRegistry.hasStyle(requestedUiStyle)
+        ? requestedUiStyle!
+        : UiStyleRegistry.hasStyle(current.uiStyle)
+            ? current.uiStyle
+            : UiStyleRegistry.fallbackId;
     final requestedLanguage = AppStrings.normalizeLanguageCode(languageCode);
     final normalizedLanguage = AppStrings.hasLanguage(requestedLanguage)
         ? requestedLanguage
@@ -77,9 +94,13 @@ class SettingsService {
           List<LabelPrinterProfile>.unmodifiable(
         labelPrinterProfiles ?? current.labelPrinterProfiles,
       ),
+      fiscalRegisterProfiles: List<FiscalRegisterProfile>.unmodifiable(
+        fiscalRegisterProfiles ?? current.fiscalRegisterProfiles,
+      ),
       currencyCode: normalizedCurrency,
       vatPercent: normalizedVatPercent,
       themeMode: normalizedTheme,
+      uiStyle: normalizedUiStyle,
       languageCode: normalizedLanguage,
     );
     _writeSettings(settings);
@@ -102,9 +123,11 @@ class SettingsService {
       lastLabelPrinterUrl: url.trim().isEmpty ? null : url.trim(),
       lastLabelPrinterName: name.trim().isEmpty ? null : name.trim(),
       labelPrinterProfiles: current.labelPrinterProfiles,
+      fiscalRegisterProfiles: current.fiscalRegisterProfiles,
       currencyCode: current.currencyCode,
       vatPercent: current.vatPercent,
       themeMode: current.themeMode,
+      uiStyle: current.uiStyle,
       languageCode: current.languageCode,
     );
     _writeSettings(settings);

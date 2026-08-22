@@ -8,6 +8,7 @@ import 'application_icon_service.dart';
 import 'backup_service.dart';
 import 'database_location_service.dart';
 import 'export_service.dart';
+import 'fiscal_register_service.dart';
 import 'label_service.dart';
 import 'settings_service.dart';
 import 'update_service.dart';
@@ -26,6 +27,7 @@ class AppServices {
     applicationIcon = ApplicationIconService(settings);
     backup = BackupService(database);
     labels = LabelService(settings);
+    fiscalRegisters = FiscalRegisterService(settings);
     export = ExportService(products, settings);
     updates = UpdateService();
   }
@@ -41,6 +43,7 @@ class AppServices {
   late final ApplicationIconService applicationIcon;
   late final BackupService backup;
   late final LabelService labels;
+  late final FiscalRegisterService fiscalRegisters;
   late final ExportService export;
   late final UpdateService updates;
 }
