@@ -11,15 +11,17 @@ dependencies:
     sdk: flutter
   flutter_localizations:
     sdk: flutter
-  path: ^1.9.1
-  sqlite3: ^3.1.1
-  file_selector: ^1.0.4
-  window_manager: ^0.5.1
-  printing: 5.15.0
-  pdf: ^3.13.0
-  image: ^4.9.0
+  barcode: ^2.2.9
+  barcode_widget: ^2.0.4
   excel_plus: ^2.14.2
-  cupertino_icons: ^1.0.8
+  file_selector: ^1.1.0
+  image: ^4.9.0
+  path: ^1.9.1
+  path_provider: ^2.1.6
+  pdf: ^3.13.0
+  printing: 5.15.0
+  sqlite3: ^3.5.0
+  window_manager: ^0.5.1
 
 dev_dependencies:
   flutter_test:
@@ -29,6 +31,6 @@ dev_dependencies:
 flutter:
   uses-material-design: true
   assets:
+    - assets/app-icon.base64
     - assets/data/
     - assets/translations/
-    - assets/app-icon.base64
