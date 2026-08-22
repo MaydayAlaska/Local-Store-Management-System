@@ -17,10 +17,19 @@ void main() {
     expect(settings.languageCode, 'it');
   });
 
-  test('unsupported UI styles fall back to glassmorphism', () {
+  test('safe external UI style IDs survive settings parsing', () {
     final settings = AppSettings.fromJson(<String, dynamic>{
       'ShopName': 'Negozio test',
-      'UiStyle': 'unknown-style',
+      'UiStyle': 'community-style',
+    });
+
+    expect(settings.uiStyle, 'community-style');
+  });
+
+  test('invalid UI style IDs fall back to glassmorphism', () {
+    final settings = AppSettings.fromJson(<String, dynamic>{
+      'ShopName': 'Negozio test',
+      'UiStyle': '../bad/style',
     });
 
     expect(settings.uiStyle, 'glassmorphism');
