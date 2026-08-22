@@ -6,7 +6,7 @@ import 'l10n/app_strings.dart';
 import 'models/app_settings.dart';
 import 'pages/shell_page.dart';
 import 'services/app_services.dart';
-import 'theme/glass_theme.dart';
+import 'theme/ui_style_registry.dart';
 
 class StoreApp extends StatefulWidget {
   const StoreApp({super.key, required this.services});
@@ -46,12 +46,13 @@ class _StoreAppState extends State<StoreApp> {
   Widget build(BuildContext context) {
     AppRuntime.apply(_settings);
     final materialLocale = _localeForLanguage(_settings.languageCode);
+    final uiStyle = UiStyleRegistry.resolve(_settings.uiStyle);
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'Local Store Management System',
       themeMode: _themeMode,
-      theme: GlassTheme.light(),
-      darkTheme: GlassTheme.dark(),
+      theme: uiStyle.lightTheme(),
+      darkTheme: uiStyle.darkTheme(),
       locale: materialLocale,
       supportedLocales: [materialLocale],
       localizationsDelegates: GlobalMaterialLocalizations.delegates,
