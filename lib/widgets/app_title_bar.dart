@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:window_manager/window_manager.dart';
 
 import '../l10n/app_strings.dart';
+import '../theme/ui_style_tokens.dart';
 
 class AppTitleBar extends StatelessWidget {
   const AppTitleBar({super.key});
@@ -67,6 +68,7 @@ class _CaptionButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final tokens = UiStyleTokens.of(context);
     return SizedBox(
       width: 40,
       height: 32,
@@ -76,9 +78,7 @@ class _CaptionButton extends StatelessWidget {
         onPressed: onPressed,
         hoverColor: danger
             ? theme.colorScheme.errorContainer.withValues(alpha: 0.78)
-            : Colors.white.withValues(
-                alpha: theme.brightness == Brightness.dark ? 0.10 : 0.34,
-              ),
+            : tokens.captionHover,
         icon: CustomPaint(
           size: const Size.square(18),
           painter: _WindowGlyphPainter(

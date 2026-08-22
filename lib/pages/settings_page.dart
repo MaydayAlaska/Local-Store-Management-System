@@ -4,9 +4,12 @@ import 'package:flutter/material.dart';
 import '../core/app_paths.dart';
 import '../l10n/app_strings.dart';
 import '../models/app_settings.dart';
+import '../models/fiscal_register.dart';
 import '../services/app_services.dart';
 import '../services/settings_service.dart';
 import '../services/update_service.dart';
+import '../theme/ui_style_registry.dart';
+import '../widgets/fiscal_register_settings_section.dart';
 import '../widgets/glass_dropdown.dart';
 
 class SettingsPage extends StatefulWidget {
@@ -35,8 +38,10 @@ class _SettingsPageState extends State<SettingsPage> {
   late bool _showLogo;
   late String _currencyCode;
   late String _themeMode;
+  late String _uiStyle;
   late String _languageCode;
   late List<LabelPrinterProfile> _labelPrinters;
+  late List<FiscalRegisterProfile> _fiscalRegisters;
   final Map<String, String> _printerTestMessages = {};
   final Set<String> _printerTestSuccess = {};
   final Set<String> _testingPrinterIds = {};
@@ -66,11 +71,15 @@ class _SettingsPageState extends State<SettingsPage> {
     _showLogo = widget.current.showLogoInMenu;
     _currencyCode = widget.current.currencyCode;
     _themeMode = widget.current.themeMode;
+    _uiStyle = widget.current.uiStyle;
     _languageCode = AppStrings.hasLanguage(widget.current.languageCode)
         ? AppStrings.normalizeLanguageCode(widget.current.languageCode)
         : AppStrings.fallbackLanguageCode;
     _labelPrinters = List<LabelPrinterProfile>.of(
       widget.current.labelPrinterProfiles,
+    );
+    _fiscalRegisters = List<FiscalRegisterProfile>.of(
+      widget.current.fiscalRegisterProfiles,
     );
     _update = widget.initialUpdate;
     _status = widget.initialUpdate?.message;
@@ -88,6 +97,9 @@ class _SettingsPageState extends State<SettingsPage> {
       _vatPercent.text = _formatPercent(widget.current.vatPercent);
       _labelPrinters = List<LabelPrinterProfile>.of(
         widget.current.labelPrinterProfiles,
+      );
+      _fiscalRegisters = List<FiscalRegisterProfile>.of(
+        widget.current.fiscalRegisterProfiles,
       );
     }
   }
@@ -130,8 +142,10 @@ class _SettingsPageState extends State<SettingsPage> {
         currencyCode: _currencyCode,
         vatPercent: parsedVat,
         themeMode: _themeMode,
+        uiStyle: _uiStyle,
         languageCode: _languageCode,
         labelPrinterProfiles: _labelPrinters,
+        fiscalRegisterProfiles: _fiscalRegisters,
         iconSourcePath: _iconSource,
         logoSourcePath: _logoSource,
       );
@@ -145,6 +159,9 @@ class _SettingsPageState extends State<SettingsPage> {
         _vatPercent.text = _formatPercent(settings.vatPercent);
         _labelPrinters = List<LabelPrinterProfile>.of(
           settings.labelPrinterProfiles,
+        );
+        _fiscalRegisters = List<FiscalRegisterProfile>.of(
+          settings.fiscalRegisterProfiles,
         );
         _status = AppStrings.t(
           databasePathChanged
@@ -923,6 +940,24 @@ class _SettingsPageState extends State<SettingsPage> {
                       const SizedBox(width: 10),
                       Expanded(
                         child: GlassDropdown<String>(
+                          value: _uiStyle,
+                          labelText: _itEn('Stile', 'Style'),
+                          items: [
+                            for (final style in UiStyleRegistry.all)
+                              GlassDropdownItem(
+                                value: style.id,
+                                label: style.label,
+                              ),
+                          ],
+                          onChanged: (value) => setState(
+                            () => _uiStyle =
+                                value ?? UiStyleRegistry.fallbackId,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: GlassDropdown<String>(
                           value: _languageCode,
                           labelText: AppStrings.t('language'),
                           items: [
@@ -990,6 +1025,14 @@ class _SettingsPageState extends State<SettingsPage> {
                 ],
               ),
             ),
+          ),
+          const SizedBox(height: 12),
+          FiscalRegisterSettingsSection(
+            service: widget.services.fiscalRegisters,
+            profiles: _fiscalRegisters,
+            enabled: !_saving,
+            onChanged: (profiles) =>
+                setState(() => _fiscalRegisters = List.of(profiles)),
           ),
           const SizedBox(height: 12),
           Card(

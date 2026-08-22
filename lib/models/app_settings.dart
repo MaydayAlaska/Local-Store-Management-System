@@ -1,3 +1,5 @@
+import 'fiscal_register.dart';
+
 class LabelPrinterProfile {
   const LabelPrinterProfile({
     required this.id,
@@ -158,9 +160,11 @@ class AppSettings {
     this.lastLabelPrinterUrl,
     this.lastLabelPrinterName,
     this.labelPrinterProfiles = const [],
+    this.fiscalRegisterProfiles = const [],
     this.currencyCode = 'EUR',
     this.vatPercent = 22,
     this.themeMode = 'system',
+    this.uiStyle = 'glassmorphism',
     this.languageCode = 'it',
   });
 
@@ -172,13 +176,21 @@ class AppSettings {
   final String? lastLabelPrinterUrl;
   final String? lastLabelPrinterName;
   final List<LabelPrinterProfile> labelPrinterProfiles;
+  final List<FiscalRegisterProfile> fiscalRegisterProfiles;
   final String currencyCode;
   final double vatPercent;
   final String themeMode;
+  final String uiStyle;
   final String languageCode;
 
   static const supportedCurrencies = ['EUR', 'USD', 'GBP', 'CHF'];
   static const supportedThemeModes = ['system', 'light', 'dark'];
+
+  static bool isSafeUiStyleId(String? value) {
+    final normalized = value?.trim().toLowerCase();
+    return normalized != null &&
+        RegExp(r'^[a-z0-9][a-z0-9_-]{0,63}$').hasMatch(normalized);
+  }
 
   static const defaults = AppSettings(shopName: 'Negozio');
 
@@ -187,6 +199,7 @@ class AppSettings {
     final rawVatPercent =
         (json['VatPercent'] as num?)?.toDouble() ?? defaults.vatPercent;
     final theme = (json['ThemeMode'] as String?)?.trim().toLowerCase();
+    final uiStyle = (json['UiStyle'] as String?)?.trim().toLowerCase();
     final language = (json['LanguageCode'] as String?)
         ?.trim()
         .replaceAll('_', '-')
@@ -211,6 +224,19 @@ class AppSettings {
             .toList(growable: false)
         : const <LabelPrinterProfile>[LabelPrinterProfile.legacyApiX110];
 
+    final rawFiscalRegisters = json['FiscalRegisters'];
+    final fiscalRegisters = rawFiscalRegisters is List
+        ? rawFiscalRegisters
+            .whereType<Map>()
+            .map(
+              (item) => FiscalRegisterProfile.fromJson(
+                Map<String, dynamic>.from(item),
+              ),
+            )
+            .where((profile) => profile.name.trim().isNotEmpty)
+            .toList(growable: false)
+        : const <FiscalRegisterProfile>[];
+
     return AppSettings(
       shopName: (json['ShopName'] as String?)?.trim().isNotEmpty == true
           ? (json['ShopName'] as String).trim()
@@ -228,9 +254,11 @@ class AppSettings {
               ? (json['LastLabelPrinterName'] as String).trim()
               : null,
       labelPrinterProfiles: profiles,
+      fiscalRegisterProfiles: fiscalRegisters,
       currencyCode: supportedCurrencies.contains(currency) ? currency! : 'EUR',
       vatPercent: rawVatPercent.clamp(0, 100).toDouble(),
       themeMode: supportedThemeModes.contains(theme) ? theme! : 'system',
+      uiStyle: isSafeUiStyleId(uiStyle) ? uiStyle! : defaults.uiStyle,
       languageCode:
           language?.isNotEmpty == true ? language! : defaults.languageCode,
     );
@@ -246,9 +274,12 @@ class AppSettings {
         'LastLabelPrinterName': lastLabelPrinterName,
         'LabelPrinters':
             labelPrinterProfiles.map((profile) => profile.toJson()).toList(),
+        'FiscalRegisters':
+            fiscalRegisterProfiles.map((profile) => profile.toJson()).toList(),
         'CurrencyCode': currencyCode,
         'VatPercent': vatPercent,
         'ThemeMode': themeMode,
+        'UiStyle': uiStyle,
         'LanguageCode': languageCode,
       };
 
@@ -290,9 +321,11 @@ class AppSettings {
     String? lastLabelPrinterUrl,
     String? lastLabelPrinterName,
     List<LabelPrinterProfile>? labelPrinterProfiles,
+    List<FiscalRegisterProfile>? fiscalRegisterProfiles,
     String? currencyCode,
     double? vatPercent,
     String? themeMode,
+    String? uiStyle,
     String? languageCode,
   }) =>
       AppSettings(
@@ -304,9 +337,12 @@ class AppSettings {
         lastLabelPrinterUrl: lastLabelPrinterUrl ?? this.lastLabelPrinterUrl,
         lastLabelPrinterName: lastLabelPrinterName ?? this.lastLabelPrinterName,
         labelPrinterProfiles: labelPrinterProfiles ?? this.labelPrinterProfiles,
+        fiscalRegisterProfiles:
+            fiscalRegisterProfiles ?? this.fiscalRegisterProfiles,
         currencyCode: currencyCode ?? this.currencyCode,
         vatPercent: vatPercent ?? this.vatPercent,
         themeMode: themeMode ?? this.themeMode,
+        uiStyle: uiStyle ?? this.uiStyle,
         languageCode: languageCode ?? this.languageCode,
       );
 }

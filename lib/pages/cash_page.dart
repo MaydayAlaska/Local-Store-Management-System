@@ -10,6 +10,7 @@ import '../models/catalog.dart';
 import '../models/customer.dart';
 import '../services/app_services.dart';
 import '../services/fiscal_code_service.dart';
+import '../theme/ui_style_tokens.dart';
 import '../widgets/hid_barcode_listener.dart';
 import 'customer_editor_dialog.dart';
 import 'customer_picker_dialog.dart';
@@ -794,6 +795,9 @@ class _CashPageState extends State<CashPage> {
     final variantImages = _productViewMode == _ProductViewMode.grid
         ? widget.services.variantImages.getMany(results.map((item) => item.id))
         : const <int, Uint8List>{};
+    final cartVariantImages = widget.services.variantImages.getMany(
+      _cart.map((line) => line.variantId).whereType<int>(),
+    );
     final itemDiscountRaw =
         _discountableGrossCents - _discountableSubtotalCents;
     final itemDiscount = itemDiscountRaw < 0 ? 0 : itemDiscountRaw;
@@ -1057,7 +1061,11 @@ class _CashPageState extends State<CashPage> {
                           ? Center(child: Text(AppStrings.t('empty_cart')))
                           : ListView(children: [
                               ..._cart.map((line) => _CartTile(
+                                    key: ValueKey(line.key),
                                     line: line,
+                                    imageBytes: line.variantId == null
+                                        ? null
+                                        : cartVariantImages[line.variantId],
                                     onDecrease: () =>
                                         _changeQuantity(line, -1),
                                     onIncrease: () => _changeQuantity(line, 1),
@@ -1625,9 +1633,11 @@ class _CashKeypad extends StatelessWidget {
       );
 }
 
-class _CartTile extends StatelessWidget {
+class _CartTile extends StatefulWidget {
   const _CartTile({
+    super.key,
     required this.line,
+    required this.imageBytes,
     required this.onDecrease,
     required this.onIncrease,
     required this.onDiscount,
@@ -1635,76 +1645,320 @@ class _CartTile extends StatelessWidget {
   });
 
   final _CashLine line;
+  final Uint8List? imageBytes;
   final VoidCallback onDecrease;
   final VoidCallback onIncrease;
   final ValueChanged<String> onDiscount;
   final VoidCallback onRemove;
 
   @override
-  Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-        child: Row(children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  line.productName,
-                  style: Theme.of(context).textTheme.titleSmall,
-                ),
-                Text(
-                  line.isGiftCardPurchase
-                      ? '${AppStrings.pair('Valore buono', 'Gift card value')} · ${formatMoney(line.unitPriceCents)} · ${line.variantDisplay}'
-                      : line.isGeneric
-                          ? '${AppStrings.isEnglish ? 'Generic item' : 'Articolo generico'} · ${formatMoney(line.unitPriceCents)} ${AppStrings.t('each')}'
-                          : '${line.variantDisplay} · ${line.sku} · ${formatMoney(line.unitPriceCents)} ${AppStrings.t('each')}',
-                ),
-              ],
+  State<_CartTile> createState() => _CartTileState();
+}
+
+class _CartTileState extends State<_CartTile> {
+  final GlobalKey _articleKey = GlobalKey();
+  OverlayEntry? _previewOverlay;
+
+  void _showPreview() {
+    final bytes = widget.imageBytes;
+    if (bytes == null || _previewOverlay != null || !mounted) return;
+
+    final overlay = Overlay.of(context, rootOverlay: true);
+    final targetBox =
+        _articleKey.currentContext?.findRenderObject() as RenderBox?;
+    final overlayBox = overlay.context.findRenderObject() as RenderBox?;
+    if (targetBox == null || overlayBox == null) return;
+
+    final targetTopLeft =
+        targetBox.localToGlobal(Offset.zero, ancestor: overlayBox);
+    const previewBodySize = 190.0;
+    const arrowWidth = 12.0;
+    const previewWidth = previewBodySize + arrowWidth;
+    const previewHeight = previewBodySize;
+    const gap = 10.0;
+    const edgePadding = 8.0;
+
+    final showLeft = targetTopLeft.dx >= previewWidth + gap + edgePadding;
+    final rawLeft = showLeft
+        ? targetTopLeft.dx - previewWidth - gap
+        : targetTopLeft.dx + targetBox.size.width + gap;
+    final maxLeft = overlayBox.size.width - previewWidth - edgePadding;
+    final left = rawLeft.clamp(edgePadding, maxLeft).toDouble();
+
+    final rawTop = targetTopLeft.dy +
+        (targetBox.size.height / 2) -
+        (previewHeight / 2);
+    final maxTop = overlayBox.size.height - previewHeight - edgePadding;
+    final top = rawTop.clamp(edgePadding, maxTop).toDouble();
+
+    final entry = OverlayEntry(
+      builder: (_) => Positioned(
+        left: left,
+        top: top,
+        child: IgnorePointer(
+          child: Material(
+            type: MaterialType.transparency,
+            child: _CartImageHoverPreview(
+              imageBytes: bytes,
+              arrowOnRight: showLeft,
             ),
           ),
-          IconButton(
-            onPressed: line.isGiftCardPurchase ? null : onDecrease,
-            icon: const Icon(Icons.remove_circle_outline),
-          ),
-          Text('${line.quantity}'),
-          IconButton(
-            onPressed: line.isGiftCardPurchase ? null : onIncrease,
-            icon: const Icon(Icons.add_circle_outline),
-          ),
-          SizedBox(
-            width: 84,
-            child: TextFormField(
-              key: ValueKey('${line.key}-${line.discountPercent}'),
-              initialValue: line.discountPercent == 0
-                  ? ''
-                  : line.discountPercent.toString().replaceAll('.', ','),
-              enabled: !line.isGiftCardPurchase,
-              keyboardType:
-                  const TextInputType.numberWithOptions(decimal: true),
-              onFieldSubmitted: onDiscount,
-              decoration: InputDecoration(
-                isDense: true,
-                labelText: AppStrings.isEnglish ? 'Discount' : 'Sconto',
-                floatingLabelBehavior: FloatingLabelBehavior.always,
-                suffixText: '%',
+        ),
+      ),
+    );
+    _previewOverlay = entry;
+    overlay.insert(entry);
+  }
+
+  void _hidePreview() {
+    _previewOverlay?.remove();
+    _previewOverlay = null;
+  }
+
+  Future<void> _showLargeImage() async {
+    final bytes = widget.imageBytes;
+    if (bytes == null) return;
+    _hidePreview();
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) {
+        final size = MediaQuery.sizeOf(dialogContext);
+        return AlertDialog(
+          title: Text(widget.line.cartTitle),
+          content: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxWidth: size.width * 0.72,
+              maxHeight: size.height * 0.72,
+            ),
+            child: InteractiveViewer(
+              minScale: 0.5,
+              maxScale: 4,
+              child: Image.memory(
+                bytes,
+                fit: BoxFit.contain,
+                gaplessPlayback: true,
               ),
             ),
           ),
-          const SizedBox(width: 10),
-          SizedBox(
-            width: 88,
-            child: Text(
-              formatMoney(line.lineTotalCents),
-              textAlign: TextAlign.right,
+          actions: [
+            TextButton.icon(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              icon: const Icon(Icons.close),
+              label: Text(AppStrings.pair('Chiudi', 'Close')),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  @override
+  void didUpdateWidget(covariant _CartTile oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.imageBytes != widget.imageBytes) _hidePreview();
+  }
+
+  @override
+  void dispose() {
+    _hidePreview();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final line = widget.line;
+    final bytes = widget.imageBytes;
+    final theme = Theme.of(context);
+    final articleDetails = IntrinsicWidth(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            line.cartTitle,
+            style: theme.textTheme.titleSmall?.copyWith(
+              fontWeight: FontWeight.w700,
             ),
           ),
-          IconButton(
-            onPressed: onRemove,
-            tooltip: AppStrings.t('remove'),
-            icon: const Icon(Icons.close),
+          Text(line.cartSubtitle),
+        ],
+      ),
+    );
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      child: Row(children: [
+        Flexible(
+          fit: FlexFit.loose,
+          child: MouseRegion(
+            key: _articleKey,
+            cursor: bytes == null
+                ? MouseCursor.defer
+                : SystemMouseCursors.click,
+            onEnter: bytes == null ? null : (_) => _showPreview(),
+            onExit: bytes == null ? null : (_) => _hidePreview(),
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: bytes == null ? null : _showLargeImage,
+              child: articleDetails,
+            ),
           ),
-        ]),
-      );
+        ),
+        const Spacer(),
+        IconButton(
+          onPressed: line.isGiftCardPurchase ? null : widget.onDecrease,
+          icon: const Icon(Icons.remove_circle_outline),
+        ),
+        Text('${line.quantity}'),
+        IconButton(
+          onPressed: line.isGiftCardPurchase ? null : widget.onIncrease,
+          icon: const Icon(Icons.add_circle_outline),
+        ),
+        SizedBox(
+          width: 84,
+          child: TextFormField(
+            key: ValueKey('${line.key}-${line.discountPercent}'),
+            initialValue: line.discountPercent == 0
+                ? ''
+                : line.discountPercent.toString().replaceAll('.', ','),
+            enabled: !line.isGiftCardPurchase,
+            keyboardType:
+                const TextInputType.numberWithOptions(decimal: true),
+            onFieldSubmitted: widget.onDiscount,
+            decoration: InputDecoration(
+              isDense: true,
+              labelText: AppStrings.isEnglish ? 'Discount' : 'Sconto',
+              floatingLabelBehavior: FloatingLabelBehavior.always,
+              suffixText: '%',
+            ),
+          ),
+        ),
+        const SizedBox(width: 10),
+        SizedBox(
+          width: 88,
+          child: Text(
+            formatMoney(line.lineTotalCents),
+            textAlign: TextAlign.right,
+          ),
+        ),
+        IconButton(
+          onPressed: widget.onRemove,
+          tooltip: AppStrings.t('remove'),
+          icon: const Icon(Icons.close),
+        ),
+      ]),
+    );
+  }
+}
+
+class _CartImageHoverPreview extends StatelessWidget {
+  const _CartImageHoverPreview({
+    required this.imageBytes,
+    required this.arrowOnRight,
+  });
+
+  final Uint8List imageBytes;
+  final bool arrowOnRight;
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = UiStyleTokens.of(context);
+    final background = tokens.tooltipSurface;
+    final border = tokens.tooltipBorder;
+    final shadow = tokens.tooltipShadow;
+
+    final body = Container(
+      width: 190,
+      height: 190,
+      padding: const EdgeInsets.all(8),
+      decoration: BoxDecoration(
+        color: background,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: border),
+        boxShadow: [
+          BoxShadow(
+            color: shadow,
+            blurRadius: 18,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(14),
+        child: ColoredBox(
+          color: tokens.imagePreviewSurface,
+          child: Image.memory(
+            imageBytes,
+            fit: BoxFit.contain,
+            gaplessPlayback: true,
+          ),
+        ),
+      ),
+    );
+
+    final arrow = CustomPaint(
+      size: const Size(12, 28),
+      painter: _CartPreviewArrowPainter(
+        fillColor: background,
+        borderColor: border,
+        shadowColor: shadow,
+        pointsRight: arrowOnRight,
+      ),
+    );
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: arrowOnRight ? [body, arrow] : [arrow, body],
+    );
+  }
+}
+
+class _CartPreviewArrowPainter extends CustomPainter {
+  const _CartPreviewArrowPainter({
+    required this.fillColor,
+    required this.borderColor,
+    required this.shadowColor,
+    required this.pointsRight,
+  });
+
+  final Color fillColor;
+  final Color borderColor;
+  final Color shadowColor;
+  final bool pointsRight;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final path = Path();
+    if (pointsRight) {
+      path
+        ..moveTo(0, 0)
+        ..lineTo(size.width, size.height / 2)
+        ..lineTo(0, size.height);
+    } else {
+      path
+        ..moveTo(size.width, 0)
+        ..lineTo(0, size.height / 2)
+        ..lineTo(size.width, size.height);
+    }
+    path.close();
+
+    canvas.drawShadow(path, shadowColor, 5, true);
+    canvas.drawPath(path, Paint()..color = fillColor);
+    canvas.drawPath(
+      path,
+      Paint()
+        ..color = borderColor
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _CartPreviewArrowPainter oldDelegate) =>
+      fillColor != oldDelegate.fillColor ||
+      borderColor != oldDelegate.borderColor ||
+      shadowColor != oldDelegate.shadowColor ||
+      pointsRight != oldDelegate.pointsRight;
 }
 
 class _CashLine {
@@ -1767,6 +2021,19 @@ class _CashLine {
   String get productName => isGiftCardPurchase
       ? AppStrings.pair('Buono regalo', 'Gift card')
       : product?.name ?? genericName ?? 'Articolo generico';
+
+  String get cartTitle => product?.cartTitleDisplay ?? productName;
+
+  String get cartSubtitle {
+    if (isGiftCardPurchase) {
+      return '${AppStrings.pair('Valore buono', 'Gift card value')} · ${formatMoney(unitPriceCents)} · $variantDisplay';
+    }
+    if (isGeneric) {
+      return '${AppStrings.isEnglish ? 'Generic item' : 'Articolo generico'} · ${formatMoney(unitPriceCents)} ${AppStrings.t('each')}';
+    }
+    return product?.cartVariantSizeDisplay ?? variantDisplay;
+  }
+
   String get variantDisplay {
     if (isGiftCardPurchase) {
       final expiration = giftCardExpiresAtUtc;
