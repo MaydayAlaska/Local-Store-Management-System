@@ -199,6 +199,13 @@ void main() {
       expect(columns.any((row) => row['name'] == 'deleted_at_utc'), isFalse);
       expect(repository.getGiftCard(1)?.code, 'AAAABBBB');
       expect(repository.getGiftCard(2), isNull);
+      final customerColumn =
+          columns.firstWhere((row) => row['name'] == 'customer_id');
+      expect(customerColumn['notnull'], 0);
+      final customerFk = service.db
+          .select('PRAGMA foreign_key_list(gift_cards);')
+          .firstWhere((row) => row['from'] == 'customer_id');
+      expect((customerFk['on_delete'] as String).toUpperCase(), 'SET NULL');
       expect(
         service.db.select(
           "SELECT name FROM sqlite_master WHERE type='table' AND name='gift_card_code_registry';",

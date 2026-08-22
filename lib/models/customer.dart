@@ -84,7 +84,7 @@ class GiftCard {
 
   final int id;
   final String code;
-  final int customerId;
+  final int? customerId;
   final int totalValueCents;
   final int spentValueCents;
   final DateTime? expiresAtUtc;

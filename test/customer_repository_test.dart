@@ -369,7 +369,7 @@ void main() {
     }
   });
 
-  test('deleting a customer deletes gift cards and releases customer code', () async {
+  test('deleting a customer detaches gift cards and releases customer code', () async {
     final temp = await Directory.systemTemp.createTemp(
       'lsms-flutter-customer-gifts-delete-',
     );
@@ -390,7 +390,8 @@ void main() {
       expect(repository.getGiftCard(card.id), isNotNull);
 
       expect(repository.deleteCustomer(first.id), isTrue);
-      expect(repository.getGiftCard(card.id), isNull);
+      expect(repository.getGiftCard(card.id), isNotNull);
+      expect(repository.getGiftCard(card.id)!.customerId, isNull);
       expect(
         service.db.select(
           "SELECT name FROM sqlite_master WHERE type='table' AND name='gift_card_code_registry';",
@@ -404,6 +405,83 @@ void main() {
       ));
       expect(replacement.customerCode, first.customerCode);
       expect(second.customerCode, 2);
+    } finally {
+      service.dispose();
+      await temp.delete(recursive: true);
+    }
+  });
+
+  test('gift card customer association is optional and editable', () async {
+    final temp = await Directory.systemTemp.createTemp(
+      'lsms-flutter-gift-card-optional-owner-',
+    );
+    final path = '${temp.path}${Platform.pathSeparator}store.db';
+    final service = DatabaseService(path);
+    try {
+      await service.initialize();
+      final repository = CustomerRepository(service);
+      final first = repository.save(const CustomerDraft(
+        firstName: 'Mario',
+        lastName: 'Rossi',
+      ));
+      final second = repository.save(const CustomerDraft(
+        firstName: 'Luigi',
+        lastName: 'Bianchi',
+      ));
+
+      final card = repository.createGiftCard(null, 5000);
+      expect(card.customerId, isNull);
+
+      final assigned = repository.updateGiftCard(
+        card.id,
+        customerId: first.id,
+        expiresAtUtc: null,
+      );
+      expect(assigned.customerId, first.id);
+
+      final changed = repository.updateGiftCard(
+        card.id,
+        customerId: second.id,
+        expiresAtUtc: DateTime.utc(2027, 12, 31, 23, 59, 59),
+      );
+      expect(changed.customerId, second.id);
+      expect(changed.expiresAtUtc, isNotNull);
+
+      final unassigned = repository.updateGiftCard(
+        card.id,
+        customerId: null,
+        expiresAtUtc: null,
+      );
+      expect(unassigned.customerId, isNull);
+      expect(unassigned.expiresAtUtc, isNull);
+
+      final sale = repository.recordSale(SalesOrderDraft(
+        customerId: null,
+        giftCardId: card.id,
+        giftCardAppliedCents: 1000,
+        lines: const [
+          SalesOrderDraftLine(
+            variantId: null,
+            sku: 'GENERIC',
+            productName: 'Articolo generico',
+            variantDisplay: '',
+            quantity: 1,
+            unitPriceCents: 1000,
+            discountBasisPoints: 0,
+            grossTotalCents: 1000,
+            finalTotalCents: 1000,
+          ),
+        ],
+        grossTotalCents: 1000,
+        itemDiscountCents: 0,
+        orderDiscountBasisPoints: 0,
+        orderPercentDiscountCents: 0,
+        fixedDiscountCents: 0,
+        finalTotalCents: 1000,
+      ));
+      expect(sale.customerId, isNull);
+      expect(sale.giftCardCode, card.code);
+      expect(repository.getGiftCard(card.id)!.remainingValueCents, 4000);
     } finally {
       service.dispose();
       await temp.delete(recursive: true);

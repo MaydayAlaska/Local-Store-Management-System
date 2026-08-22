@@ -6,19 +6,22 @@ import '../l10n/app_strings.dart';
 class GiftCardPurchaseDraft {
   const GiftCardPurchaseDraft({
     required this.valueCents,
+    required this.associateCustomer,
     this.expiresAtUtc,
   });
 
   final int valueCents;
+  final bool associateCustomer;
   final DateTime? expiresAtUtc;
 }
 
 Future<GiftCardPurchaseDraft?> showGiftCardPurchaseDialog(
   BuildContext context, {
-  required String customerName,
+  String? customerName,
 }) async {
   final valueController = TextEditingController();
   DateTime? expirationDate;
+  var associateCustomer = customerName != null;
   String? error;
 
   String dateText(DateTime value) =>
@@ -72,6 +75,7 @@ Future<GiftCardPurchaseDraft?> showGiftCardPurchaseDialog(
           Navigator.of(dialogContext).pop(
             GiftCardPurchaseDraft(
               valueCents: cents,
+              associateCustomer: associateCustomer,
               expiresAtUtc: expiresAtUtc,
             ),
           );
@@ -86,11 +90,38 @@ Future<GiftCardPurchaseDraft?> showGiftCardPurchaseDialog(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Text(
-                  AppStrings.t(
-                    'gift_card_purchase_help',
-                    {'customerName': customerName},
-                  ),
+                  customerName == null
+                      ? AppStrings.pair(
+                          'Il buono verrà emesso senza cliente associato. Potrai associarlo successivamente dalla gestione Buoni regalo.',
+                          'The gift card will be issued without an associated customer. You can assign one later from Gift card management.',
+                        )
+                      : AppStrings.t(
+                          'gift_card_purchase_help',
+                          {'customerName': customerName},
+                        ),
                 ),
+                if (customerName != null) ...[
+                  const SizedBox(height: 10),
+                  CheckboxListTile(
+                    contentPadding: EdgeInsets.zero,
+                    value: associateCustomer,
+                    onChanged: (value) => setDialogState(
+                      () => associateCustomer = value ?? false,
+                    ),
+                    title: Text(
+                      AppStrings.pair(
+                        'Associa il buono a $customerName',
+                        'Associate the gift card with $customerName',
+                      ),
+                    ),
+                    subtitle: Text(
+                      AppStrings.pair(
+                        'Facoltativo: l’associazione potrà essere cambiata o rimossa in seguito.',
+                        'Optional: the association can be changed or removed later.',
+                      ),
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 14),
                 TextField(
                   controller: valueController,

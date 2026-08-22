@@ -64,6 +64,15 @@ class _CashPageState extends State<CashPage> {
   List<ProductVariant> get _results =>
       widget.services.products.search(_search.text, 50);
 
+  bool get _showGiftCardVirtualItem {
+    final query = _search.text.trim().toLowerCase();
+    if (query.isEmpty) return true;
+    return 'buono regalo'.contains(query) ||
+        'gift card'.contains(query) ||
+        'regalo'.contains(query) ||
+        'gift'.contains(query);
+  }
+
   String _itEn(String it, String en) => AppStrings.isEnglish ? en : it;
 
   String _dateText(DateTime value) {
@@ -683,13 +692,6 @@ class _CashPageState extends State<CashPage> {
     final pendingGiftCards =
         _cart.where((line) => line.isGiftCardPurchase).toList(growable: false);
     final customer = _customer;
-    if (pendingGiftCards.isNotEmpty && customer == null) {
-      return _cartMessage(_itEn(
-        'Associa un cliente prima di registrare l’acquisto del buono regalo.',
-        'Link a customer before registering the gift-card purchase.',
-      ));
-    }
-
     final itemDiscountRaw =
         _discountableGrossCents - _discountableSubtotalCents;
     final itemDiscount = itemDiscountRaw < 0 ? 0 : itemDiscountRaw;
@@ -734,9 +736,10 @@ class _CashPageState extends State<CashPage> {
         for (final line in pendingGiftCards) {
           createdGiftCards.add(
             widget.services.customers.createGiftCard(
-              customer!.id,
+              line.giftCardCustomerId,
               line.unitPriceCents,
               expiresAtUtc: line.giftCardExpiresAtUtc,
+              purchaseOrderId: registeredOrder.id,
             ),
           );
         }
@@ -808,9 +811,8 @@ class _CashPageState extends State<CashPage> {
     final count = _cart.fold<int>(0, (sum, line) => sum + line.quantity);
     final vatPercent = widget.services.settings.load().vatPercent;
     final vatCents = calculateVatCents(_finalTotalCents, vatPercent);
-    final availableGiftCards = _customer == null
-        ? const <GiftCard>[]
-        : widget.services.customers.availableGiftCardsForCustomer(_customer!.id);
+    final availableGiftCards =
+        widget.services.customers.availableGiftCardsForCash(_customer?.id);
     final fiscalCode = _customer?.fiscalCode?.trim();
 
     return HidBarcodeListener(
@@ -884,15 +886,33 @@ class _CashPageState extends State<CashPage> {
                     Expanded(
                       child: Card(
                         clipBehavior: Clip.antiAlias,
-                        child: results.isEmpty
+                        child: results.isEmpty && !_showGiftCardVirtualItem
                             ? Center(child: Text(AppStrings.t('no_product_found')))
                             : _productViewMode == _ProductViewMode.list
                                 ? ListView.separated(
-                                    itemCount: results.length,
+                                    itemCount: results.length +
+                                        (_showGiftCardVirtualItem ? 1 : 0),
                                     separatorBuilder: (_, _) =>
                                         const Divider(height: 1),
                                     itemBuilder: (context, index) {
-                                      final product = results[index];
+                                      if (_showGiftCardVirtualItem && index == 0) {
+                                        return ListTile(
+                                          leading: Icon(
+                                            Icons.card_giftcard_rounded,
+                                            color: Theme.of(context).colorScheme.primary,
+                                          ),
+                                          title: Text(_itEn('Buono regalo', 'Gift card')),
+                                          subtitle: Text(_itEn(
+                                            'Articolo speciale · valore da impostare',
+                                            'Special item · value to be entered',
+                                          )),
+                                          trailing: Text(_itEn('Valore libero', 'Custom value')),
+                                          onTap: _addGiftCardPurchase,
+                                        );
+                                      }
+                                      final productIndex = index -
+                                          (_showGiftCardVirtualItem ? 1 : 0);
+                                      final product = results[productIndex];
                                       return ListTile(
                                         title: Text(product.name),
                                         subtitle: Text(
@@ -922,9 +942,17 @@ class _CashPageState extends State<CashPage> {
                                           mainAxisSpacing: 10,
                                           childAspectRatio: 0.88,
                                         ),
-                                        itemCount: results.length,
+                                        itemCount: results.length +
+                                            (_showGiftCardVirtualItem ? 1 : 0),
                                         itemBuilder: (context, index) {
-                                          final product = results[index];
+                                          if (_showGiftCardVirtualItem && index == 0) {
+                                            return _GiftCardGridTile(
+                                              onTap: _addGiftCardPurchase,
+                                            );
+                                          }
+                                          final productIndex = index -
+                                              (_showGiftCardVirtualItem ? 1 : 0);
+                                          final product = results[productIndex];
                                           return _ProductGridTile(
                                             product: product,
                                             imageBytes:
@@ -1355,6 +1383,68 @@ class _CashPageState extends State<CashPage> {
   }
 }
 
+class _GiftCardGridTile extends StatelessWidget {
+  const _GiftCardGridTile({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final tokens = UiStyleTokens.of(context);
+    return Card(
+      margin: EdgeInsets.zero,
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Expanded(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: tokens.imagePreviewSurface,
+                ),
+                child: Center(
+                  child: Icon(
+                    Icons.card_giftcard_rounded,
+                    size: 82,
+                    color: theme.colorScheme.primary,
+                  ),
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    AppStrings.pair('Buono regalo', 'Gift card'),
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    AppStrings.pair('Valore da impostare', 'Custom value'),
+                    style: theme.textTheme.bodySmall,
+                  ),
+                  const SizedBox(height: 5),
+                  Text(
+                    AppStrings.pair('Articolo speciale', 'Special item'),
+                    style: theme.textTheme.labelSmall,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _ProductGridTile extends StatelessWidget {
   const _ProductGridTile({
     required this.product,
@@ -1774,11 +1864,26 @@ class _CartTileState extends State<_CartTile> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            line.cartTitle,
-            style: theme.textTheme.titleSmall?.copyWith(
-              fontWeight: FontWeight.w700,
-            ),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (line.isGiftCardPurchase) ...[
+                Icon(
+                  Icons.card_giftcard_rounded,
+                  size: 18,
+                  color: theme.colorScheme.primary,
+                ),
+                const SizedBox(width: 6),
+              ],
+              Flexible(
+                child: Text(
+                  line.cartTitle,
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ],
           ),
           Text(line.cartSubtitle),
         ],
@@ -1971,7 +2076,9 @@ class _CashLine {
         genericName = null,
         genericUnitPriceCents = null,
         giftCardLineId = null,
-        giftCardExpiresAtUtc = null;
+        giftCardExpiresAtUtc = null,
+        giftCardCustomerId = null,
+        giftCardCustomerName = null;
 
   const _CashLine.generic({
     required int genericId,
@@ -1984,18 +2091,24 @@ class _CashLine {
         genericName = genericName,
         genericUnitPriceCents = unitPriceCents,
         giftCardLineId = null,
-        giftCardExpiresAtUtc = null;
+        giftCardExpiresAtUtc = null,
+        giftCardCustomerId = null,
+        giftCardCustomerName = null;
 
   const _CashLine.giftCard({
     required int giftCardLineId,
     required int unitPriceCents,
     DateTime? expiresAtUtc,
+    int? customerId,
+    String? customerName,
   })  : product = null,
         genericId = null,
         genericName = 'Buono regalo',
         genericUnitPriceCents = unitPriceCents,
         giftCardLineId = giftCardLineId,
         giftCardExpiresAtUtc = expiresAtUtc,
+        giftCardCustomerId = customerId,
+        giftCardCustomerName = customerName,
         quantity = 1,
         discountPercent = 0;
 
@@ -2005,6 +2118,8 @@ class _CashLine {
   final int? genericUnitPriceCents;
   final int? giftCardLineId;
   final DateTime? giftCardExpiresAtUtc;
+  final int? giftCardCustomerId;
+  final String? giftCardCustomerName;
   final int quantity;
   final double discountPercent;
 
@@ -2026,7 +2141,13 @@ class _CashLine {
 
   String get cartSubtitle {
     if (isGiftCardPurchase) {
-      return '${AppStrings.pair('Valore buono', 'Gift card value')} · ${formatMoney(unitPriceCents)} · $variantDisplay';
+      final owner = giftCardCustomerName == null
+          ? AppStrings.pair('Nessun cliente', 'No customer')
+          : AppStrings.pair(
+              'Cliente: $giftCardCustomerName',
+              'Customer: $giftCardCustomerName',
+            );
+      return '${AppStrings.pair('Valore buono', 'Gift card value')} · ${formatMoney(unitPriceCents)} · $variantDisplay · $owner';
     }
     if (isGeneric) {
       return '${AppStrings.isEnglish ? 'Generic item' : 'Articolo generico'} · ${formatMoney(unitPriceCents)} ${AppStrings.t('each')}';
@@ -2065,6 +2186,8 @@ class _CashLine {
         giftCardLineId: giftCardLineId!,
         unitPriceCents: genericUnitPriceCents!,
         expiresAtUtc: giftCardExpiresAtUtc,
+        customerId: giftCardCustomerId,
+        customerName: giftCardCustomerName,
       );
     }
     if (isGeneric) {

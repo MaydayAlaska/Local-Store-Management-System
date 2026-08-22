@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../l10n/app_strings.dart';
 import '../models/customer.dart';
 import '../services/app_services.dart';
+import 'gift_card_editor_dialog.dart';
 import 'gift_card_management_dialog.dart';
 
 class GiftCardsPage extends StatefulWidget {
@@ -40,6 +41,37 @@ class _GiftCardsPageState extends State<GiftCardsPage> {
             )
           : null;
     });
+  }
+
+  Future<void> _editGiftCard(GiftCard card) async {
+    final draft = await showGiftCardEditorDialog(
+      context,
+      repository: widget.services.customers,
+      card: card,
+    );
+    if (!mounted || draft == null) return;
+    try {
+      final updated = widget.services.customers.updateGiftCard(
+        card.id,
+        customerId: draft.customerId,
+        expiresAtUtc: draft.expiresAtUtc,
+      );
+      if (!mounted) return;
+      setState(() {
+        _status = _t(
+          'Buono ${updated.code} aggiornato.',
+          'Gift card ${updated.code} updated.',
+        );
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _status = _t(
+          'Impossibile aggiornare il buono: $error',
+          'Unable to update the gift card: $error',
+        );
+      });
+    }
   }
 
   Future<void> _deleteGiftCard(GiftCard card, Customer? customer) async {
@@ -113,21 +145,23 @@ class _GiftCardsPageState extends State<GiftCardsPage> {
     final customerById = <int, Customer>{
       for (final customer in customers) customer.id: customer,
     };
-    final entries = <_GiftCardEntry>[];
-    for (final customer in customers) {
-      for (final card in repository.giftCardsForCustomer(customer.id, 5000)) {
-        entries.add(_GiftCardEntry(card: card, customer: customer));
-      }
-    }
-    entries.sort(
-      (a, b) => b.card.createdAtUtc.compareTo(a.card.createdAtUtc),
-    );
+    final entries = repository
+        .giftCards(5000)
+        .map(
+          (card) => _GiftCardEntry(
+            card: card,
+            customer: card.customerId == null
+                ? null
+                : customerById[card.customerId!],
+          ),
+        )
+        .toList(growable: false);
 
     final query = _search.text.trim().toLowerCase();
     final visibleEntries = query.isEmpty
         ? entries
         : entries.where((entry) {
-            final customer = customerById[entry.card.customerId];
+            final customer = entry.customer;
             final haystack = <String>[
               entry.card.code,
               customer?.displayName ?? '',
@@ -252,7 +286,7 @@ class _GiftCardsPageState extends State<GiftCardsPage> {
                             style: const TextStyle(fontWeight: FontWeight.w700),
                           ),
                           subtitle: Text(
-                            '${customer.displayName} · ${customer.customerCodeDisplay}\n'
+                            '${customer == null ? _t('Nessun cliente associato', 'No associated customer') : '${customer.displayName} · ${customer.customerCodeDisplay}'}\n'
                             '${_t('Totale', 'Total')}: ${card.totalDisplay} · '
                             '${_t('Speso', 'Spent')}: ${card.spentDisplay} · '
                             '${_t('Residuo', 'Remaining')}: ${card.remainingDisplay}\n'
@@ -260,10 +294,36 @@ class _GiftCardsPageState extends State<GiftCardsPage> {
                             '${expiration == null ? _t('Nessuna scadenza', 'No expiration') : '${_t('Scadenza', 'Expires')}: $expiration'}',
                           ),
                           isThreeLine: true,
-                          trailing: IconButton(
-                            tooltip: _t('Elimina buono', 'Delete gift card'),
-                            onPressed: () => _deleteGiftCard(card, customer),
-                            icon: const Icon(Icons.delete_outline),
+                          trailing: PopupMenuButton<String>(
+                            tooltip: _t('Azioni buono', 'Gift card actions'),
+                            onSelected: (value) {
+                              if (value == 'edit') {
+                                _editGiftCard(card);
+                              } else if (value == 'delete') {
+                                _deleteGiftCard(card, customer);
+                              }
+                            },
+                            itemBuilder: (context) => [
+                              PopupMenuItem(
+                                value: 'edit',
+                                child: ListTile(
+                                  contentPadding: EdgeInsets.zero,
+                                  leading: const Icon(Icons.edit_outlined),
+                                  title: Text(_t('Modifica', 'Edit')),
+                                ),
+                              ),
+                              PopupMenuItem(
+                                value: 'delete',
+                                child: ListTile(
+                                  contentPadding: EdgeInsets.zero,
+                                  leading: Icon(
+                                    Icons.delete_outline,
+                                    color: Theme.of(context).colorScheme.error,
+                                  ),
+                                  title: Text(_t('Elimina', 'Delete')),
+                                ),
+                              ),
+                            ],
                           ),
                         );
                       },
@@ -280,7 +340,7 @@ class _GiftCardEntry {
   const _GiftCardEntry({required this.card, required this.customer});
 
   final GiftCard card;
-  final Customer customer;
+  final Customer? customer;
 }
 
 class _SummaryCard extends StatelessWidget {

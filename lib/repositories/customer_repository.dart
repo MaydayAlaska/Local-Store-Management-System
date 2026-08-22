@@ -24,7 +24,7 @@ class CustomerRepository {
       CREATE TABLE IF NOT EXISTS gift_cards (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         code TEXT NOT NULL COLLATE NOCASE UNIQUE,
-        customer_id INTEGER NOT NULL,
+        customer_id INTEGER,
         total_value_cents INTEGER NOT NULL CHECK(total_value_cents > 0),
         spent_value_cents INTEGER NOT NULL DEFAULT 0
           CHECK(spent_value_cents >= 0 AND spent_value_cents <= total_value_cents),
@@ -32,7 +32,7 @@ class CustomerRepository {
         purchase_order_id INTEGER,
         created_at_utc TEXT NOT NULL,
         updated_at_utc TEXT NOT NULL,
-        FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE CASCADE
+        FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE SET NULL
       );
       CREATE TABLE IF NOT EXISTS sales_orders (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -195,10 +195,29 @@ class CustomerRepository {
   }
 
   void _migrateGiftCardSchemaIfNeeded() {
-    if (!_hasColumn('gift_cards', 'deleted_at_utc')) return;
+    final columns = database.db.select('PRAGMA table_info(gift_cards);');
+    final customerColumn = columns.firstWhere(
+      (row) => (row['name'] as String).toLowerCase() == 'customer_id',
+    );
+    final hasDeletedAt = columns.any(
+      (row) => (row['name'] as String).toLowerCase() == 'deleted_at_utc',
+    );
+    final customerIsRequired = (customerColumn['notnull'] as int) != 0;
+    final foreignKeys = database.db.select('PRAGMA foreign_key_list(gift_cards);');
+    final customerForeignKey = foreignKeys.where(
+      (row) => (row['from'] as String).toLowerCase() == 'customer_id',
+    );
+    final customerDeleteActionIsWrong = customerForeignKey.isEmpty ||
+        ((customerForeignKey.first['on_delete'] as String?) ?? '').toUpperCase() !=
+            'SET NULL';
+    if (!hasDeletedAt && !customerIsRequired && !customerDeleteActionIsWrong) {
+      return;
+    }
 
     final db = database.db;
-    db.execute('DELETE FROM gift_cards WHERE deleted_at_utc IS NOT NULL;');
+    if (hasDeletedAt) {
+      db.execute('DELETE FROM gift_cards WHERE deleted_at_utc IS NOT NULL;');
+    }
     db.execute('DROP INDEX IF EXISTS ix_gift_cards_cleanup;');
 
     db.execute('PRAGMA foreign_keys = OFF;');
@@ -209,7 +228,7 @@ class CustomerRepository {
         CREATE TABLE gift_cards_new (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
           code TEXT NOT NULL COLLATE NOCASE UNIQUE,
-          customer_id INTEGER NOT NULL,
+          customer_id INTEGER,
           total_value_cents INTEGER NOT NULL CHECK(total_value_cents > 0),
           spent_value_cents INTEGER NOT NULL DEFAULT 0
             CHECK(spent_value_cents >= 0 AND spent_value_cents <= total_value_cents),
@@ -217,9 +236,10 @@ class CustomerRepository {
           purchase_order_id INTEGER,
           created_at_utc TEXT NOT NULL,
           updated_at_utc TEXT NOT NULL,
-          FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE CASCADE
+          FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE SET NULL
         );
       ''');
+      final activeFilter = hasDeletedAt ? ' WHERE deleted_at_utc IS NULL' : '';
       db.execute('''
         INSERT INTO gift_cards_new (
           id, code, customer_id, total_value_cents, spent_value_cents,
@@ -227,7 +247,7 @@ class CustomerRepository {
         SELECT
           id, code, customer_id, total_value_cents, spent_value_cents,
           expires_at_utc, purchase_order_id, created_at_utc, updated_at_utc
-        FROM gift_cards;
+        FROM gift_cards$activeFilter;
       ''');
       db.execute('DROP TABLE gift_cards;');
       db.execute('ALTER TABLE gift_cards_new RENAME TO gift_cards;');
@@ -276,7 +296,7 @@ class CustomerRepository {
     ''');
     for (final row in rows) {
       final orderId = _findAvailableGiftCardPurchaseOrder(
-        customerId: row['customer_id'] as int,
+        customerId: row['customer_id'] as int?,
         totalValueCents: row['total_value_cents'] as int,
         giftCardCreatedAtUtc: row['created_at_utc'] as String,
       );
@@ -289,14 +309,14 @@ class CustomerRepository {
   }
 
   int? _findAvailableGiftCardPurchaseOrder({
-    required int customerId,
+    required int? customerId,
     required int totalValueCents,
     required String giftCardCreatedAtUtc,
   }) {
     final rows = database.db.select('''
       SELECT so.id
       FROM sales_orders so
-      WHERE so.customer_id=?
+      WHERE ((? IS NULL AND so.customer_id IS NULL) OR so.customer_id=?)
         AND ABS((julianday(so.created_at_utc) - julianday(?)) * 86400.0) <= 120
         AND (
           SELECT COALESCE(SUM(soi.quantity), 0)
@@ -315,6 +335,7 @@ class CustomerRepository {
         so.id DESC
       LIMIT 1;
     ''', [
+      customerId,
       customerId,
       giftCardCreatedAtUtc,
       totalValueCents,
@@ -481,6 +502,11 @@ class CustomerRepository {
             customer_id = NULL
         WHERE customer_id=?;
       ''', [displayName, customerCode, fiscalCode, customerId]);
+      final giftCardUpdatedAt = DateTime.now().toUtc().toIso8601String();
+      db.execute(
+        'UPDATE gift_cards SET customer_id=NULL, updated_at_utc=? WHERE customer_id=?;',
+        [giftCardUpdatedAt, customerId],
+      );
       db.execute('DELETE FROM customers WHERE id=?;', [customerId]);
       db.execute('COMMIT;');
       return true;
@@ -497,6 +523,28 @@ class CustomerRepository {
       ORDER BY created_at_utc DESC, id DESC
       LIMIT ?;
     ''', [customerId, limit.clamp(1, 5000)]);
+    return rows.map(_giftCardFromRow).toList();
+  }
+
+  List<GiftCard> giftCards([int limit = 5000]) {
+    final rows = database.db.select('''
+      SELECT * FROM gift_cards
+      ORDER BY created_at_utc DESC, id DESC
+      LIMIT ?;
+    ''', [limit.clamp(1, 10000)]);
+    return rows.map(_giftCardFromRow).toList();
+  }
+
+  List<GiftCard> availableGiftCardsForCash(int? customerId, [int limit = 500]) {
+    final now = DateTime.now().toUtc().toIso8601String();
+    final rows = database.db.select('''
+      SELECT * FROM gift_cards
+      WHERE (customer_id IS NULL OR customer_id=?)
+        AND spent_value_cents < total_value_cents
+        AND (expires_at_utc IS NULL OR expires_at_utc > ?)
+      ORDER BY created_at_utc DESC, id DESC
+      LIMIT ?;
+    ''', [customerId, now, limit.clamp(1, 5000)]);
     return rows.map(_giftCardFromRow).toList();
   }
 
@@ -522,9 +570,10 @@ class CustomerRepository {
   }
 
   GiftCard createGiftCard(
-    int customerId,
+    int? customerId,
     int totalValueCents, {
     DateTime? expiresAtUtc,
+    int? purchaseOrderId,
   }) {
     if (totalValueCents <= 0) {
       throw ArgumentError('Il valore del buono regalo deve essere maggiore di zero.');
@@ -532,20 +581,25 @@ class CustomerRepository {
     final db = database.db;
     db.execute('BEGIN IMMEDIATE;');
     try {
-      final customerExists = db.select(
-        'SELECT 1 FROM customers WHERE id=? LIMIT 1;',
-        [customerId],
-      ).isNotEmpty;
-      if (!customerExists) throw StateError('Il cliente selezionato non esiste più.');
+      if (customerId != null) {
+        final customerExists = db.select(
+          'SELECT 1 FROM customers WHERE id=? LIMIT 1;',
+          [customerId],
+        ).isNotEmpty;
+        if (!customerExists) {
+          throw StateError('Il cliente selezionato non esiste più.');
+        }
+      }
 
       final nowUtc = DateTime.now().toUtc();
       final now = nowUtc.toIso8601String();
       final expiration = expiresAtUtc?.toUtc().toIso8601String();
-      final purchaseOrderId = _findAvailableGiftCardPurchaseOrder(
-        customerId: customerId,
-        totalValueCents: totalValueCents,
-        giftCardCreatedAtUtc: now,
-      );
+      final resolvedPurchaseOrderId = purchaseOrderId ??
+          _findAvailableGiftCardPurchaseOrder(
+            customerId: customerId,
+            totalValueCents: totalValueCents,
+            giftCardCreatedAtUtc: now,
+          );
       final id = _nextAvailableGiftCardId();
       final code = _newUniqueGiftCardCode();
       db.execute('''
@@ -559,12 +613,53 @@ class CustomerRepository {
         customerId,
         totalValueCents,
         expiration,
-        purchaseOrderId,
+        resolvedPurchaseOrderId,
         now,
         now,
       ]);
       db.execute('COMMIT;');
       return getGiftCard(id)!;
+    } catch (_) {
+      db.execute('ROLLBACK;');
+      rethrow;
+    }
+  }
+
+  GiftCard updateGiftCard(
+    int giftCardId, {
+    required int? customerId,
+    required DateTime? expiresAtUtc,
+  }) {
+    final db = database.db;
+    db.execute('BEGIN IMMEDIATE;');
+    try {
+      final exists = db.select(
+        'SELECT 1 FROM gift_cards WHERE id=? LIMIT 1;',
+        [giftCardId],
+      ).isNotEmpty;
+      if (!exists) throw StateError('Buono regalo non trovato.');
+      if (customerId != null) {
+        final customerExists = db.select(
+          'SELECT 1 FROM customers WHERE id=? LIMIT 1;',
+          [customerId],
+        ).isNotEmpty;
+        if (!customerExists) {
+          throw StateError('Il cliente selezionato non esiste più.');
+        }
+      }
+      final now = DateTime.now().toUtc().toIso8601String();
+      db.execute('''
+        UPDATE gift_cards
+        SET customer_id=?, expires_at_utc=?, updated_at_utc=?
+        WHERE id=?;
+      ''', [
+        customerId,
+        expiresAtUtc?.toUtc().toIso8601String(),
+        now,
+        giftCardId,
+      ]);
+      db.execute('COMMIT;');
+      return getGiftCard(giftCardId)!;
     } catch (_) {
       db.execute('ROLLBACK;');
       rethrow;
@@ -901,9 +996,6 @@ class CustomerRepository {
           throw ArgumentError('Importo buono regalo senza un buono selezionato.');
         }
       } else {
-        if (draft.customerId == null) {
-          throw ArgumentError('Per usare un buono regalo è necessario associare il cliente.');
-        }
         if (draft.giftCardAppliedCents <= 0) {
           throw ArgumentError('Il buono regalo selezionato non ha un importo da utilizzare.');
         }
@@ -916,8 +1008,9 @@ class CustomerRepository {
         );
         if (cards.isEmpty) throw StateError('Il buono regalo selezionato non esiste più.');
         final card = cards.first;
-        if ((card['customer_id'] as int) != draft.customerId) {
-          throw StateError('Il buono regalo non appartiene al cliente selezionato.');
+        final ownerId = card['customer_id'] as int?;
+        if (ownerId != null && ownerId != draft.customerId) {
+          throw StateError('Il buono regalo è associato a un altro cliente.');
         }
         final expirationText = card['expires_at_utc'] as String?;
         if (expirationText != null &&
@@ -1073,7 +1166,7 @@ class CustomerRepository {
   GiftCard _giftCardFromRow(dynamic row) => GiftCard(
         id: row['id'] as int,
         code: row['code'] as String,
-        customerId: row['customer_id'] as int,
+        customerId: row['customer_id'] as int?,
         totalValueCents: row['total_value_cents'] as int,
         spentValueCents: row['spent_value_cents'] as int,
         expiresAtUtc: row['expires_at_utc'] == null
