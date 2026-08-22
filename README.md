@@ -1,14 +1,14 @@
-# Local Store Management System — Flutter BETA
+# Local Store Management System
 
 Gestionale desktop **offline** per negozi, sviluppato in **Flutter/Dart** con database locale **SQLite**.
 
-Il branch `Flutter` è il canale **BETA/TEST** del progetto. La versione BETA corrente è **0.1.9-b1** e viene pubblicata come prerelease `beta-latest`.
+La versione stabile corrente è **0.1.9** sul branch `main`.
 
-La versione stabile corrente su `main` è **0.1.7**. I canali OTA STABLE e BETA sono separati: una build stabile riceve solo release stabili e una build Beta riceve solo prerelease Beta.
+Il branch `Flutter` resta il canale **BETA/TEST** per lo sviluppo delle versioni successive. I canali OTA STABLE e BETA sono separati: una build stabile riceve solo release stabili e una build Beta riceve solo prerelease Beta.
 
-## Download BETA
+## Download
 
-Le build BETA vengono pubblicate per:
+Le release stabili vengono pubblicate su GitHub con tag `v<versione>` e includono:
 
 | Sistema | Architettura | Formati |
 | --- | --- | --- |
@@ -19,41 +19,43 @@ Le build BETA vengono pubblicate per:
 | Linux | x86_64 | `.AppImage`, `.deb` |
 | Linux | ARM64 | `.AppImage`, `.deb` |
 
-## Novità 0.1.9-b1
+## Novità della 0.1.9
+
+La **0.1.9** promuove in stabile le modifiche validate nel ciclo Beta successivo alla 0.1.7.
 
 ### Immagini per variante e nuova griglia in Cassa
 
-Ogni variante di articolo può ora avere una **propria immagine**. L'immagine viene gestita direttamente nell'editor del prodotto, viene ridimensionata automaticamente quando necessario e viene salvata nel database insieme ai dati della variante.
+Ogni variante di articolo può avere una **propria immagine**. L'immagine viene gestita direttamente nell'editor del prodotto, viene ridimensionata automaticamente quando necessario e viene salvata nel database insieme ai dati della variante.
 
 Nella schermata **Cassa** l'elenco prodotti può essere visualizzato in due modalità:
 
 - **elenco**, che mantiene la visualizzazione compatta già esistente;
 - **anteprima a griglia**, con immagine della variante, nome prodotto, variante, SKU, prezzo e giacenza.
 
-A destra della barra di ricerca è presente un selettore a due posizioni con le icone **elenco** e **griglia**, così da passare immediatamente da una modalità all'altra senza interrompere la scansione o la ricerca.
+A destra della barra di ricerca è presente un selettore con le icone **elenco** e **griglia**, così da passare immediatamente da una modalità all'altra senza interrompere la scansione o la ricerca.
 
-Lo schema SQLite passa a `PRAGMA user_version = 4` e aggiunge la tabella `variant_images`, collegata alle singole varianti.
-
-## Novità 0.1.8-b1
+Lo schema SQLite usa ora `PRAGMA user_version = 4` e include la tabella `variant_images`, collegata alle singole varianti.
 
 ### Identità e icone Linux
 
-La distribuzione Linux usa ora in modo coerente l'application ID **`com.maydayalaska.local_store_management`**.
+La distribuzione Linux usa in modo coerente l'application ID **`com.maydayalaska.local_store_management`**.
 
 - il file desktop installato è `com.maydayalaska.local_store_management.desktop`;
 - `Name` resta **Local Store Management System**;
 - il runner Flutter Linux viene verificato e configurato con lo stesso `APPLICATION_ID`;
 - il riferimento AppStream `launchable` punta allo stesso desktop ID;
-- GNOME/Wayland può quindi associare correttamente la finestra alla voce applicazione invece di mostrare il nome tecnico con un'icona generica;
+- GNOME/Wayland può associare correttamente la finestra alla voce applicazione invece di mostrare il nome tecnico con un'icona generica;
 - `StartupWMClass=local_store_management` resta disponibile come associazione per X11.
 
 Le icone Linux vengono generate dalla sorgente ufficiale dell'app nelle dimensioni **16, 32, 48, 64, 128 e 256 px** e installate nella gerarchia `hicolor` con il nome dell'application ID.
 
 L'**AppImage** contiene inoltre il desktop file e l'icona alla radice dell'AppDir, con `.DirIcon` collegato all'icona da 256 px. Il pacchetto **DEB** installa desktop file, icone multi-risoluzione e metadati AppStream e aggiorna, quando disponibili, le cache desktop e icone dopo installazione o rimozione.
 
-L'icona mostrata direttamente sul file `.deb` o `.AppImage` nel file manager dipende comunque dal desktop environment e dal supporto del file manager ai metadati del formato; il pacchetto contiene ora tutte le risorse corrette per l'integrazione dell'applicazione una volta installata o integrata.
-
 La CI controlla esplicitamente che desktop ID, AppStream e application ID del runner restino allineati.
+
+### Aggiornamenti OTA e interfaccia
+
+I canali STABLE e BETA restano completamente separati. Nelle Impostazioni la build stabile mostra solo il canale STABILE senza esporre il nome del branch, mentre le build Beta continuano a identificare il proprio canale di test.
 
 ## Funzioni principali
 
@@ -191,5 +193,7 @@ Strategia branch:
 - `main` → STABLE, tag `v<versione>`, OTA stabile;
 - `Flutter` → BETA/TEST, prerelease `beta-latest`, OTA Beta;
 - `avalonia` → implementazione storica/alternativa.
+
+Ogni push su `main` esegue analisi e test, compila i pacchetti desktop e, se tutto termina correttamente, pubblica automaticamente la release stabile.
 
 Per le regole complete vedere `VERSIONING.md`.
