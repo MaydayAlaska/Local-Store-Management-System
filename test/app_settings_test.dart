@@ -17,6 +17,15 @@ void main() {
     expect(settings.languageCode, 'it');
   });
 
+  test('unsupported UI styles fall back to glassmorphism', () {
+    final settings = AppSettings.fromJson(<String, dynamic>{
+      'ShopName': 'Negozio test',
+      'UiStyle': 'unknown-style',
+    });
+
+    expect(settings.uiStyle, 'glassmorphism');
+  });
+
   test('new interface preferences round-trip through json', () {
     const settings = AppSettings(
       shopName: 'Shop',
