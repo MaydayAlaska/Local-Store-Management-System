@@ -8,6 +8,7 @@ import '../core/app_paths.dart';
 import '../l10n/app_strings.dart';
 import '../models/app_settings.dart';
 import '../models/fiscal_register.dart';
+import '../theme/ui_style_registry.dart';
 
 class SettingsService {
   static const defaultIconSourceToken = ':default-app-icon:';
@@ -18,9 +19,16 @@ class SettingsService {
     try {
       final decoded = jsonDecode(file.readAsStringSync());
       if (decoded is! Map<String, dynamic>) return AppSettings.defaults;
-      final settings = AppSettings.fromJson(decoded);
-      if (AppStrings.hasLanguage(settings.languageCode)) return settings;
-      return settings.copyWith(languageCode: AppStrings.fallbackLanguageCode);
+      var settings = AppSettings.fromJson(decoded);
+      if (!AppStrings.hasLanguage(settings.languageCode)) {
+        settings = settings.copyWith(
+          languageCode: AppStrings.fallbackLanguageCode,
+        );
+      }
+      if (!UiStyleRegistry.hasStyle(settings.uiStyle)) {
+        settings = settings.copyWith(uiStyle: UiStyleRegistry.fallbackId);
+      }
+      return settings;
     } catch (_) {
       return AppSettings.defaults;
     }
@@ -65,9 +73,11 @@ class SettingsService {
             ? themeMode.toLowerCase()
             : AppSettings.defaults.themeMode;
     final requestedUiStyle = uiStyle?.trim().toLowerCase();
-    final normalizedUiStyle = AppSettings.supportedUiStyles.contains(requestedUiStyle)
+    final normalizedUiStyle = UiStyleRegistry.hasStyle(requestedUiStyle)
         ? requestedUiStyle!
-        : current.uiStyle;
+        : UiStyleRegistry.hasStyle(current.uiStyle)
+            ? current.uiStyle
+            : UiStyleRegistry.fallbackId;
     final requestedLanguage = AppStrings.normalizeLanguageCode(languageCode);
     final normalizedLanguage = AppStrings.hasLanguage(requestedLanguage)
         ? requestedLanguage
