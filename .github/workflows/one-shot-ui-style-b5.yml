@@ -5,6 +5,8 @@ on:
     branches: [Flutter]
     paths:
       - '.github/workflows/one-shot-ui-style-b5.yml'
+  pull_request:
+    branches: [Flutter]
 
 permissions:
   contents: write
@@ -70,7 +72,7 @@ jobs:
               raise SystemExit('settings_page.dart: style picker block mismatch')
           path.write_text(text.replace(old, new, 1))
 
-          # Shell: use semantic surface roles instead of style-specific opacity values.
+          # Shell: semantic roles replace style-specific opacity values.
           p = Path('lib/pages/shell_page.dart')
           text = p.read_text()
           old_notification = """              child: GlassSurface(
@@ -100,11 +102,10 @@ jobs:
           if text.count(old_content) != 1:
               raise SystemExit('shell_page.dart: content surface block mismatch')
           text = text.replace(old_content, new_content, 1)
-          # isDark was used only for the opacity after these replacements inside overlay builders.
           text = text.replace("        final isDark = theme.brightness == Brightness.dark;\n", "")
           p.write_text(text)
 
-          # Cash tooltip: consume style tokens instead of embedded Glassmorphism colors.
+          # Cash tooltip: consume style tokens instead of embedded style colors.
           p = Path('lib/pages/cash_page.dart')
           text = p.read_text()
           marker = "import '../services/fiscal_code_service.dart';\n"
@@ -124,8 +125,7 @@ jobs:
         : const Color(0xA8FFFFFF);
     final shadow = Colors.black.withValues(alpha: isDark ? 0.42 : 0.18);
 """
-          new_vars = """    final theme = Theme.of(context);
-    final tokens = UiStyleTokens.of(context);
+          new_vars = """    final tokens = UiStyleTokens.of(context);
     final background = tokens.tooltipSurface;
     final border = tokens.tooltipBorder;
     final shadow = tokens.tooltipShadow;
@@ -151,7 +151,7 @@ jobs:
               "static const currentVersion = '0.2.0-b5';",
           )
 
-          # Registry tests: settings model and runtime style registry must stay aligned.
+          # Registry tests keep the data model and UI registry aligned.
           Path('test/ui_style_registry_test.dart').write_text("""import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:local_store_management/models/app_settings.dart';
@@ -178,17 +178,18 @@ void main() {
   });
 
   test('unknown style falls back to registered default', () {
-    expect(UiStyleRegistry.resolve('unknown-style').id, UiStyleRegistry.fallbackId);
+    expect(
+      UiStyleRegistry.resolve('unknown-style').id,
+      UiStyleRegistry.fallbackId,
+    );
   });
 }
 """)
 
-          # Old monolithic theme is no longer part of the architecture.
           old_theme = Path('lib/theme/glass_theme.dart')
           if old_theme.exists():
               old_theme.unlink()
 
-          # One-shot workflow removes itself from the resulting branch.
           Path('.github/workflows/one-shot-ui-style-b5.yml').unlink()
           PY
 
