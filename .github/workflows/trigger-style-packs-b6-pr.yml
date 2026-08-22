@@ -1,0 +1,41 @@
+name: Trigger staged style packs b6
+
+on:
+  pull_request:
+    branches: [Flutter]
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: Flutter
+          fetch-depth: 0
+      - name: Execute staged refactor
+        shell: bash
+        run: |
+          rm -f .github/workflows/trigger-style-packs-b6-pr.yml
+          python3 <<'PY'
+          from pathlib import Path
+          import subprocess
+
+          path = Path('.github/workflows/one-shot-style-packs-b6.yml')
+          text = path.read_text(encoding='utf-8')
+          marker = '        run: |\n'
+          if marker not in text:
+              raise SystemExit('one-shot run block not found')
+          block = text.split(marker, 1)[1]
+          lines = block.splitlines()
+          script = '\n'.join(
+              line[10:] if line.startswith('          ') else line
+              for line in lines
+          )
+          subprocess.run(
+              ['bash', '-euxo', 'pipefail', '-c', script],
+              check=True,
+          )
+          PY
