@@ -25,10 +25,9 @@ class UiStyleRegistry {
   static final ValueNotifier<int> revision = ValueNotifier<int>(0);
 
   static List<AppUiStyle> get all {
-    final styles = <String, AppUiStyle>{fallbackId: _fallback, ..._external};
-    final values = styles.values.toList(growable: false)
+    final values = <AppUiStyle>[_fallback, ..._external.values]
       ..sort((a, b) => a.label.toLowerCase().compareTo(b.label.toLowerCase()));
-    return values;
+    return List<AppUiStyle>.unmodifiable(values);
   }
 
   static Map<String, String> get invalidPacks =>
@@ -56,6 +55,9 @@ class UiStyleRegistry {
       final folderName = p.basename(folder.path);
       try {
         final style = ExternalUiStylePack.load(folder);
+        // Glassmorphism is bundled as the reference pack, while the compiled
+        // implementation remains the exact, always-available fallback.
+        if (style.id == fallbackId) continue;
         if (loaded.containsKey(style.id)) {
           throw FormatException('id stile duplicato: ${style.id}.');
         }
@@ -82,10 +84,10 @@ class UiStyleRegistry {
 
   static AppUiStyle resolve(String? id) {
     final normalized = id?.trim().toLowerCase();
+    if (normalized == fallbackId) return _fallback;
     if (normalized != null) {
       final external = _external[normalized];
       if (external != null) return external;
-      if (normalized == fallbackId) return _fallback;
     }
     return _fallback;
   }
