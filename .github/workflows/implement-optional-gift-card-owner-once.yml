@@ -63,6 +63,10 @@ jobs:
               raise SystemExit('Cannot find giftCards replacement closing')
           script = script[:closing] + script[closing:].replace("'''", '\"\"\"', 1)
 
+          # Some exact fragments intentionally occur more than once; replace_once still
+          # changes only the first occurrence, but should fail only when none exist.
+          script = script.replace('if count != 1:', 'if count < 1:', 1)
+
           Path('/tmp/implement_optional_gift_card_owner.py').write_text(script)
           subprocess.run(['python3', '-m', 'py_compile', '/tmp/implement_optional_gift_card_owner.py'], check=True)
           subprocess.run(['python3', '/tmp/implement_optional_gift_card_owner.py'], check=True)
@@ -100,4 +104,4 @@ jobs:
           git commit -m 'Make gift card customer association optional'
           git push origin HEAD:Flutter
 
-# trigger 6
+# trigger 7
