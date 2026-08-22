@@ -1,3 +1,5 @@
+import 'fiscal_register.dart';
+
 class LabelPrinterProfile {
   const LabelPrinterProfile({
     required this.id,
@@ -158,6 +160,7 @@ class AppSettings {
     this.lastLabelPrinterUrl,
     this.lastLabelPrinterName,
     this.labelPrinterProfiles = const [],
+    this.fiscalRegisterProfiles = const [],
     this.currencyCode = 'EUR',
     this.vatPercent = 22,
     this.themeMode = 'system',
@@ -172,6 +175,7 @@ class AppSettings {
   final String? lastLabelPrinterUrl;
   final String? lastLabelPrinterName;
   final List<LabelPrinterProfile> labelPrinterProfiles;
+  final List<FiscalRegisterProfile> fiscalRegisterProfiles;
   final String currencyCode;
   final double vatPercent;
   final String themeMode;
@@ -211,6 +215,19 @@ class AppSettings {
             .toList(growable: false)
         : const <LabelPrinterProfile>[LabelPrinterProfile.legacyApiX110];
 
+    final rawFiscalRegisters = json['FiscalRegisters'];
+    final fiscalRegisters = rawFiscalRegisters is List
+        ? rawFiscalRegisters
+            .whereType<Map>()
+            .map(
+              (item) => FiscalRegisterProfile.fromJson(
+                Map<String, dynamic>.from(item),
+              ),
+            )
+            .where((profile) => profile.name.trim().isNotEmpty)
+            .toList(growable: false)
+        : const <FiscalRegisterProfile>[];
+
     return AppSettings(
       shopName: (json['ShopName'] as String?)?.trim().isNotEmpty == true
           ? (json['ShopName'] as String).trim()
@@ -228,6 +245,7 @@ class AppSettings {
               ? (json['LastLabelPrinterName'] as String).trim()
               : null,
       labelPrinterProfiles: profiles,
+      fiscalRegisterProfiles: fiscalRegisters,
       currencyCode: supportedCurrencies.contains(currency) ? currency! : 'EUR',
       vatPercent: rawVatPercent.clamp(0, 100).toDouble(),
       themeMode: supportedThemeModes.contains(theme) ? theme! : 'system',
@@ -246,6 +264,8 @@ class AppSettings {
         'LastLabelPrinterName': lastLabelPrinterName,
         'LabelPrinters':
             labelPrinterProfiles.map((profile) => profile.toJson()).toList(),
+        'FiscalRegisters':
+            fiscalRegisterProfiles.map((profile) => profile.toJson()).toList(),
         'CurrencyCode': currencyCode,
         'VatPercent': vatPercent,
         'ThemeMode': themeMode,
@@ -290,6 +310,7 @@ class AppSettings {
     String? lastLabelPrinterUrl,
     String? lastLabelPrinterName,
     List<LabelPrinterProfile>? labelPrinterProfiles,
+    List<FiscalRegisterProfile>? fiscalRegisterProfiles,
     String? currencyCode,
     double? vatPercent,
     String? themeMode,
@@ -304,6 +325,8 @@ class AppSettings {
         lastLabelPrinterUrl: lastLabelPrinterUrl ?? this.lastLabelPrinterUrl,
         lastLabelPrinterName: lastLabelPrinterName ?? this.lastLabelPrinterName,
         labelPrinterProfiles: labelPrinterProfiles ?? this.labelPrinterProfiles,
+        fiscalRegisterProfiles:
+            fiscalRegisterProfiles ?? this.fiscalRegisterProfiles,
         currencyCode: currencyCode ?? this.currencyCode,
         vatPercent: vatPercent ?? this.vatPercent,
         themeMode: themeMode ?? this.themeMode,

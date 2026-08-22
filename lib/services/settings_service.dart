@@ -7,6 +7,7 @@ import 'package:path/path.dart' as p;
 import '../core/app_paths.dart';
 import '../l10n/app_strings.dart';
 import '../models/app_settings.dart';
+import '../models/fiscal_register.dart';
 
 class SettingsService {
   static const defaultIconSourceToken = ':default-app-icon:';
@@ -34,6 +35,7 @@ class SettingsService {
     required String themeMode,
     required String languageCode,
     List<LabelPrinterProfile>? labelPrinterProfiles,
+    List<FiscalRegisterProfile>? fiscalRegisterProfiles,
     String? iconSourcePath,
     String? logoSourcePath,
   }) {
@@ -77,6 +79,9 @@ class SettingsService {
           List<LabelPrinterProfile>.unmodifiable(
         labelPrinterProfiles ?? current.labelPrinterProfiles,
       ),
+      fiscalRegisterProfiles: List<FiscalRegisterProfile>.unmodifiable(
+        fiscalRegisterProfiles ?? current.fiscalRegisterProfiles,
+      ),
       currencyCode: normalizedCurrency,
       vatPercent: normalizedVatPercent,
       themeMode: normalizedTheme,
@@ -102,6 +107,7 @@ class SettingsService {
       lastLabelPrinterUrl: url.trim().isEmpty ? null : url.trim(),
       lastLabelPrinterName: name.trim().isEmpty ? null : name.trim(),
       labelPrinterProfiles: current.labelPrinterProfiles,
+      fiscalRegisterProfiles: current.fiscalRegisterProfiles,
       currencyCode: current.currencyCode,
       vatPercent: current.vatPercent,
       themeMode: current.themeMode,

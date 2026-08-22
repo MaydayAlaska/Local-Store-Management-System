@@ -4,9 +4,11 @@ import 'package:flutter/material.dart';
 import '../core/app_paths.dart';
 import '../l10n/app_strings.dart';
 import '../models/app_settings.dart';
+import '../models/fiscal_register.dart';
 import '../services/app_services.dart';
 import '../services/settings_service.dart';
 import '../services/update_service.dart';
+import '../widgets/fiscal_register_settings_section.dart';
 import '../widgets/glass_dropdown.dart';
 
 class SettingsPage extends StatefulWidget {
@@ -37,6 +39,7 @@ class _SettingsPageState extends State<SettingsPage> {
   late String _themeMode;
   late String _languageCode;
   late List<LabelPrinterProfile> _labelPrinters;
+  late List<FiscalRegisterProfile> _fiscalRegisters;
   final Map<String, String> _printerTestMessages = {};
   final Set<String> _printerTestSuccess = {};
   final Set<String> _testingPrinterIds = {};
@@ -72,6 +75,9 @@ class _SettingsPageState extends State<SettingsPage> {
     _labelPrinters = List<LabelPrinterProfile>.of(
       widget.current.labelPrinterProfiles,
     );
+    _fiscalRegisters = List<FiscalRegisterProfile>.of(
+      widget.current.fiscalRegisterProfiles,
+    );
     _update = widget.initialUpdate;
     _status = widget.initialUpdate?.message;
   }
@@ -88,6 +94,9 @@ class _SettingsPageState extends State<SettingsPage> {
       _vatPercent.text = _formatPercent(widget.current.vatPercent);
       _labelPrinters = List<LabelPrinterProfile>.of(
         widget.current.labelPrinterProfiles,
+      );
+      _fiscalRegisters = List<FiscalRegisterProfile>.of(
+        widget.current.fiscalRegisterProfiles,
       );
     }
   }
@@ -132,6 +141,7 @@ class _SettingsPageState extends State<SettingsPage> {
         themeMode: _themeMode,
         languageCode: _languageCode,
         labelPrinterProfiles: _labelPrinters,
+        fiscalRegisterProfiles: _fiscalRegisters,
         iconSourcePath: _iconSource,
         logoSourcePath: _logoSource,
       );
@@ -145,6 +155,9 @@ class _SettingsPageState extends State<SettingsPage> {
         _vatPercent.text = _formatPercent(settings.vatPercent);
         _labelPrinters = List<LabelPrinterProfile>.of(
           settings.labelPrinterProfiles,
+        );
+        _fiscalRegisters = List<FiscalRegisterProfile>.of(
+          settings.fiscalRegisterProfiles,
         );
         _status = AppStrings.t(
           databasePathChanged
@@ -990,6 +1003,14 @@ class _SettingsPageState extends State<SettingsPage> {
                 ],
               ),
             ),
+          ),
+          const SizedBox(height: 12),
+          FiscalRegisterSettingsSection(
+            service: widget.services.fiscalRegisters,
+            profiles: _fiscalRegisters,
+            enabled: !_saving,
+            onChanged: (profiles) =>
+                setState(() => _fiscalRegisters = List.of(profiles)),
           ),
           const SizedBox(height: 12),
           Card(

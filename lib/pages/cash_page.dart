@@ -1649,16 +1649,12 @@ class _CartTile extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  line.productName,
-                  style: Theme.of(context).textTheme.titleSmall,
+                  line.cartTitle,
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
                 ),
-                Text(
-                  line.isGiftCardPurchase
-                      ? '${AppStrings.pair('Valore buono', 'Gift card value')} · ${formatMoney(line.unitPriceCents)} · ${line.variantDisplay}'
-                      : line.isGeneric
-                          ? '${AppStrings.isEnglish ? 'Generic item' : 'Articolo generico'} · ${formatMoney(line.unitPriceCents)} ${AppStrings.t('each')}'
-                          : '${line.variantDisplay} · ${line.sku} · ${formatMoney(line.unitPriceCents)} ${AppStrings.t('each')}',
-                ),
+                Text(line.cartSubtitle),
               ],
             ),
           ),
@@ -1767,6 +1763,19 @@ class _CashLine {
   String get productName => isGiftCardPurchase
       ? AppStrings.pair('Buono regalo', 'Gift card')
       : product?.name ?? genericName ?? 'Articolo generico';
+
+  String get cartTitle => product?.cartTitleDisplay ?? productName;
+
+  String get cartSubtitle {
+    if (isGiftCardPurchase) {
+      return '${AppStrings.pair('Valore buono', 'Gift card value')} · ${formatMoney(unitPriceCents)} · $variantDisplay';
+    }
+    if (isGeneric) {
+      return '${AppStrings.isEnglish ? 'Generic item' : 'Articolo generico'} · ${formatMoney(unitPriceCents)} ${AppStrings.t('each')}';
+    }
+    return product?.cartVariantSizeDisplay ?? variantDisplay;
+  }
+
   String get variantDisplay {
     if (isGiftCardPurchase) {
       final expiration = giftCardExpiresAtUtc;
