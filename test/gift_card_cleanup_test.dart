@@ -6,7 +6,7 @@ import 'package:local_store_management/models/customer.dart';
 import 'package:local_store_management/repositories/customer_repository.dart';
 
 void main() {
-  test('deleting a gift card physically removes it, preserves its code and frees its id', () async {
+  test('deleting a gift card physically removes it and frees its id', () async {
     final temp = await Directory.systemTemp.createTemp(
       'lsms-flutter-gift-card-hard-delete-',
     );
@@ -39,12 +39,12 @@ void main() {
 
       final columns = service.db.select('PRAGMA table_info(gift_cards);');
       expect(columns.any((row) => row['name'] == 'deleted_at_utc'), isFalse);
-
-      final registry = service.db.select(
-        'SELECT code FROM gift_card_code_registry WHERE code=? LIMIT 1;',
-        [card.code],
+      expect(
+        service.db.select(
+          "SELECT name FROM sqlite_master WHERE type='table' AND name='gift_card_code_registry';",
+        ),
+        isEmpty,
       );
-      expect(registry, hasLength(1));
 
       final replacement = repository.createGiftCard(customer.id, 2500);
       expect(
@@ -52,7 +52,6 @@ void main() {
         card.id,
         reason: 'Il primo ID libero deve essere riutilizzato anche se esistono ID più alti.',
       );
-      expect(replacement.code, isNot(card.code));
       expect(repository.getGiftCard(secondCard.id)?.code, secondCard.code);
     } finally {
       service.dispose();
@@ -116,18 +115,19 @@ void main() {
         'SELECT COUNT(*) AS count FROM gift_cards;',
       ).first['count'] as int;
       expect(storedCount, 1);
-
-      final registryCount = service.db.select(
-        'SELECT COUNT(*) AS count FROM gift_card_code_registry;',
-      ).first['count'] as int;
-      expect(registryCount, 4);
+      expect(
+        service.db.select(
+          "SELECT name FROM sqlite_master WHERE type='table' AND name='gift_card_code_registry';",
+        ),
+        isEmpty,
+      );
     } finally {
       service.dispose();
       await temp.delete(recursive: true);
     }
   });
 
-  test('soft-delete beta schema is migrated to physical deletion', () async {
+  test('soft-delete beta schema and old code registry are removed', () async {
     final temp = await Directory.systemTemp.createTemp(
       'lsms-flutter-gift-card-hard-delete-migration-',
     );
@@ -163,6 +163,10 @@ void main() {
           updated_at_utc TEXT NOT NULL,
           FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE CASCADE
         );
+        CREATE TABLE gift_card_code_registry (
+          code TEXT PRIMARY KEY COLLATE NOCASE,
+          issued_at_utc TEXT NOT NULL
+        );
       ''');
       service.db.execute('''
         INSERT INTO customers (
@@ -184,6 +188,10 @@ void main() {
         created,
         created,
       ]);
+      service.db.execute('''
+        INSERT INTO gift_card_code_registry (code, issued_at_utc)
+        VALUES ('AAAABBBB', ?), ('CCCCDDDD', ?);
+      ''', [created, created]);
 
       final repository = CustomerRepository(service);
 
@@ -192,10 +200,10 @@ void main() {
       expect(repository.getGiftCard(1)?.code, 'AAAABBBB');
       expect(repository.getGiftCard(2), isNull);
       expect(
-        service.db.select('SELECT code FROM gift_card_code_registry ORDER BY code;')
-            .map((row) => row['code'] as String)
-            .toList(),
-        ['AAAABBBB', 'CCCCDDDD'],
+        service.db.select(
+          "SELECT name FROM sqlite_master WHERE type='table' AND name='gift_card_code_registry';",
+        ),
+        isEmpty,
       );
     } finally {
       service.dispose();
