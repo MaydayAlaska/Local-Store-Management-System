@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
@@ -14,6 +15,7 @@ class GlassBackground extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final tokens = UiStyleTokens.of(context);
+    final backgroundImagePath = tokens.backgroundImagePath;
     return DecoratedBox(
       decoration: BoxDecoration(
         gradient: LinearGradient(
@@ -25,6 +27,17 @@ class GlassBackground extends StatelessWidget {
       child: Stack(
         fit: StackFit.expand,
         children: [
+          if (backgroundImagePath != null)
+            IgnorePointer(
+              child: Opacity(
+                opacity: tokens.backgroundImageOpacity,
+                child: Image.file(
+                  File(backgroundImagePath),
+                  fit: BoxFit.cover,
+                  gaplessPlayback: true,
+                ),
+              ),
+            ),
           _GlowOrb(
             alignment: const Alignment(-1.15, -1.05),
             size: 430,
