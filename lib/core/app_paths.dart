@@ -97,7 +97,7 @@ class AppPaths {
     String destination,
   ) async {
     final sourceFile = File(source);
-    if (await sourceFile.exists() && !await File(destination).existsSync()) {
+    if (await sourceFile.exists() && !await File(destination).exists()) {
       await sourceFile.copy(destination);
     }
   }
