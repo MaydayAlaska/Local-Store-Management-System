@@ -28,10 +28,12 @@ void main() {
       }
 
       expect(codes, hasLength(250));
-      final registryCount = service.db.select(
-        'SELECT COUNT(*) AS count FROM gift_card_code_registry;',
-      ).first['count'] as int;
-      expect(registryCount, 250);
+      expect(
+        service.db.select(
+          "SELECT name FROM sqlite_master WHERE type='table' AND name='gift_card_code_registry';",
+        ),
+        isEmpty,
+      );
     } finally {
       service.dispose();
       await temp.delete(recursive: true);
