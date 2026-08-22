@@ -46,21 +46,26 @@ class _StoreAppState extends State<StoreApp> {
   Widget build(BuildContext context) {
     AppRuntime.apply(_settings);
     final materialLocale = _localeForLanguage(_settings.languageCode);
-    final uiStyle = UiStyleRegistry.resolve(_settings.uiStyle);
-    return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      title: 'Local Store Management System',
-      themeMode: _themeMode,
-      theme: uiStyle.lightTheme(),
-      darkTheme: uiStyle.darkTheme(),
-      locale: materialLocale,
-      supportedLocales: [materialLocale],
-      localizationsDelegates: GlobalMaterialLocalizations.delegates,
-      home: ShellPage(
-        services: widget.services,
-        settings: _settings,
-        onSettingsChanged: (settings) => setState(() => _settings = settings),
-      ),
+    return ValueListenableBuilder<int>(
+      valueListenable: UiStyleRegistry.revision,
+      builder: (context, _, _) {
+        final uiStyle = UiStyleRegistry.resolve(_settings.uiStyle);
+        return MaterialApp(
+          debugShowCheckedModeBanner: false,
+          title: 'Local Store Management System',
+          themeMode: _themeMode,
+          theme: uiStyle.lightTheme(),
+          darkTheme: uiStyle.darkTheme(),
+          locale: materialLocale,
+          supportedLocales: [materialLocale],
+          localizationsDelegates: GlobalMaterialLocalizations.delegates,
+          home: ShellPage(
+            services: widget.services,
+            settings: _settings,
+            onSettingsChanged: (settings) => setState(() => _settings = settings),
+          ),
+        );
+      },
     );
   }
 }
