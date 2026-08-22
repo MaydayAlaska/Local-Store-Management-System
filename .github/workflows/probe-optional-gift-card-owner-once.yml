@@ -21,7 +21,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          gh run list --repo "$GITHUB_REPOSITORY" --workflow implement-optional-gift-card-owner-once.yml --branch Flutter --limit 3 --json databaseId,url,status,conclusion,headSha,createdAt,updatedAt > result.json
+          gh run list --repo "$GITHUB_REPOSITORY" --workflow implement-optional-gift-card-owner-once.yml --branch Flutter --limit 5 --json databaseId,url,status,conclusion,headSha,createdAt,updatedAt > result.json
           CONTENT="$(base64 -w0 result.json)"
           EXISTING_SHA="$(gh api "repos/$GITHUB_REPOSITORY/contents/.github/optional-gift-card-owner-probe.json?ref=Flutter" --jq .sha 2>/dev/null || true)"
           if [ -n "$EXISTING_SHA" ]; then
@@ -34,4 +34,4 @@ jobs:
               -f content="$CONTENT" -f branch='Flutter' >/dev/null
           fi
 
-# refresh 2
+# refresh 3
