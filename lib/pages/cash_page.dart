@@ -794,6 +794,9 @@ class _CashPageState extends State<CashPage> {
     final variantImages = _productViewMode == _ProductViewMode.grid
         ? widget.services.variantImages.getMany(results.map((item) => item.id))
         : const <int, Uint8List>{};
+    final cartVariantImages = widget.services.variantImages.getMany(
+      _cart.map((line) => line.variantId).whereType<int>(),
+    );
     final itemDiscountRaw =
         _discountableGrossCents - _discountableSubtotalCents;
     final itemDiscount = itemDiscountRaw < 0 ? 0 : itemDiscountRaw;
@@ -1058,6 +1061,9 @@ class _CashPageState extends State<CashPage> {
                           : ListView(children: [
                               ..._cart.map((line) => _CartTile(
                                     line: line,
+                                    imageBytes: line.variantId == null
+                                        ? null
+                                        : cartVariantImages[line.variantId],
                                     onDecrease: () =>
                                         _changeQuantity(line, -1),
                                     onIncrease: () => _changeQuantity(line, 1),
@@ -1625,9 +1631,10 @@ class _CashKeypad extends StatelessWidget {
       );
 }
 
-class _CartTile extends StatelessWidget {
+class _CartTile extends StatefulWidget {
   const _CartTile({
     required this.line,
+    required this.imageBytes,
     required this.onDecrease,
     required this.onIncrease,
     required this.onDiscount,
@@ -1635,72 +1642,166 @@ class _CartTile extends StatelessWidget {
   });
 
   final _CashLine line;
+  final Uint8List? imageBytes;
   final VoidCallback onDecrease;
   final VoidCallback onIncrease;
   final ValueChanged<String> onDiscount;
   final VoidCallback onRemove;
 
   @override
-  Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-        child: Row(children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  line.cartTitle,
-                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.w700,
-                      ),
-                ),
-                Text(line.cartSubtitle),
-              ],
+  State<_CartTile> createState() => _CartTileState();
+}
+
+class _CartTileState extends State<_CartTile> {
+  bool _hoveringArticle = false;
+
+  Future<void> _showLargeImage() async {
+    final bytes = widget.imageBytes;
+    if (bytes == null) return;
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) {
+        final size = MediaQuery.sizeOf(dialogContext);
+        return AlertDialog(
+          title: Text(widget.line.cartTitle),
+          content: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxWidth: size.width * 0.72,
+              maxHeight: size.height * 0.72,
             ),
-          ),
-          IconButton(
-            onPressed: line.isGiftCardPurchase ? null : onDecrease,
-            icon: const Icon(Icons.remove_circle_outline),
-          ),
-          Text('${line.quantity}'),
-          IconButton(
-            onPressed: line.isGiftCardPurchase ? null : onIncrease,
-            icon: const Icon(Icons.add_circle_outline),
-          ),
-          SizedBox(
-            width: 84,
-            child: TextFormField(
-              key: ValueKey('${line.key}-${line.discountPercent}'),
-              initialValue: line.discountPercent == 0
-                  ? ''
-                  : line.discountPercent.toString().replaceAll('.', ','),
-              enabled: !line.isGiftCardPurchase,
-              keyboardType:
-                  const TextInputType.numberWithOptions(decimal: true),
-              onFieldSubmitted: onDiscount,
-              decoration: InputDecoration(
-                isDense: true,
-                labelText: AppStrings.isEnglish ? 'Discount' : 'Sconto',
-                floatingLabelBehavior: FloatingLabelBehavior.always,
-                suffixText: '%',
+            child: InteractiveViewer(
+              minScale: 0.5,
+              maxScale: 4,
+              child: Image.memory(
+                bytes,
+                fit: BoxFit.contain,
+                gaplessPlayback: true,
               ),
             ),
           ),
-          const SizedBox(width: 10),
-          SizedBox(
-            width: 88,
-            child: Text(
-              formatMoney(line.lineTotalCents),
-              textAlign: TextAlign.right,
+          actions: [
+            TextButton.icon(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              icon: const Icon(Icons.close),
+              label: Text(AppStrings.pair('Chiudi', 'Close')),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final line = widget.line;
+    final bytes = widget.imageBytes;
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      child: Row(children: [
+        Expanded(
+          child: MouseRegion(
+            onEnter: bytes == null
+                ? null
+                : (_) => setState(() => _hoveringArticle = true),
+            onExit: bytes == null
+                ? null
+                : (_) => setState(() => _hoveringArticle = false),
+            child: Row(
+              mainAxisSize: MainAxisSize.max,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        line.cartTitle,
+                        style: theme.textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      Text(line.cartSubtitle),
+                    ],
+                  ),
+                ),
+                if (_hoveringArticle && bytes != null) ...[
+                  const SizedBox(width: 8),
+                  Tooltip(
+                    message: AppStrings.pair(
+                      'Clicca per ingrandire',
+                      'Click to enlarge',
+                    ),
+                    child: InkWell(
+                      onTap: _showLargeImage,
+                      borderRadius: BorderRadius.circular(8),
+                      child: Container(
+                        width: 64,
+                        height: 64,
+                        clipBehavior: Clip.antiAlias,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(8),
+                          color: theme.colorScheme.surfaceContainerHighest,
+                          border: Border.all(
+                            color: theme.colorScheme.outlineVariant,
+                          ),
+                        ),
+                        child: Image.memory(
+                          bytes,
+                          fit: BoxFit.contain,
+                          gaplessPlayback: true,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ],
             ),
           ),
-          IconButton(
-            onPressed: onRemove,
-            tooltip: AppStrings.t('remove'),
-            icon: const Icon(Icons.close),
+        ),
+        IconButton(
+          onPressed: line.isGiftCardPurchase ? null : widget.onDecrease,
+          icon: const Icon(Icons.remove_circle_outline),
+        ),
+        Text('${line.quantity}'),
+        IconButton(
+          onPressed: line.isGiftCardPurchase ? null : widget.onIncrease,
+          icon: const Icon(Icons.add_circle_outline),
+        ),
+        SizedBox(
+          width: 84,
+          child: TextFormField(
+            key: ValueKey('${line.key}-${line.discountPercent}'),
+            initialValue: line.discountPercent == 0
+                ? ''
+                : line.discountPercent.toString().replaceAll('.', ','),
+            enabled: !line.isGiftCardPurchase,
+            keyboardType:
+                const TextInputType.numberWithOptions(decimal: true),
+            onFieldSubmitted: widget.onDiscount,
+            decoration: InputDecoration(
+              isDense: true,
+              labelText: AppStrings.isEnglish ? 'Discount' : 'Sconto',
+              floatingLabelBehavior: FloatingLabelBehavior.always,
+              suffixText: '%',
+            ),
           ),
-        ]),
-      );
+        ),
+        const SizedBox(width: 10),
+        SizedBox(
+          width: 88,
+          child: Text(
+            formatMoney(line.lineTotalCents),
+            textAlign: TextAlign.right,
+          ),
+        ),
+        IconButton(
+          onPressed: widget.onRemove,
+          tooltip: AppStrings.t('remove'),
+          icon: const Icon(Icons.close),
+        ),
+      ]),
+    );
+  }
 }
 
 class _CashLine {
