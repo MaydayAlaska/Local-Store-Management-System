@@ -69,13 +69,13 @@ class _GiftCardManagementDialogState
           context: context,
           builder: (confirmContext) => AlertDialog(
             title: Text(_itEn(
-              'Eliminare i buoni selezionati?',
-              'Delete selected gift cards?',
+              'Eliminare definitivamente i buoni selezionati?',
+              'Permanently delete selected gift cards?',
             )),
             content: Text(_itEn(
-              'Verranno rimossi dalla gestione attiva $count buoni regalo. '
+              'Verranno eliminati definitivamente $count buoni regalo dal database. '
                   'I loro codici resteranno riservati in modo permanente e non potranno essere riutilizzati.',
-              '$count gift cards will be removed from active management. '
+              '$count gift cards will be permanently deleted from the database. '
                   'Their codes will remain permanently reserved and cannot be reused.',
             )),
             actions: [
@@ -107,8 +107,8 @@ class _GiftCardManagementDialogState
       setState(() {
         _deletedTotal += deleted;
         _status = _itEn(
-          '$deleted buoni regalo eliminati dalla gestione attiva. I codici restano riservati.',
-          '$deleted gift cards removed from active management. Their codes remain reserved.',
+          '$deleted buoni regalo eliminati definitivamente. I codici restano riservati.',
+          '$deleted gift cards permanently deleted. Their codes remain reserved.',
         );
       });
     } catch (error) {
@@ -225,10 +225,10 @@ class _GiftCardManagementDialogState
             const SizedBox(height: 8),
             Text(
               _itEn(
-                'L’eliminazione è logica: i buoni non saranno più visibili né utilizzabili, '
-                    'ma il loro codice esadecimale resterà registrato per sempre.',
-                'Deletion is logical: gift cards will no longer be visible or usable, '
-                    'but their hexadecimal code remains permanently registered.',
+                'L’eliminazione è fisica e definitiva: i buoni verranno rimossi dalla tabella gift_cards. '
+                    'Il solo codice esadecimale resterà nel registro permanente dei codici emessi.',
+                'Deletion is physical and permanent: gift cards are removed from the gift_cards table. '
+                    'Only the hexadecimal code remains in the permanent issued-code registry.',
               ),
               style: theme.textTheme.bodySmall,
             ),
