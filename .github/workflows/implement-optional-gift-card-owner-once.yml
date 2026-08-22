@@ -71,6 +71,8 @@ jobs:
           git add -- lib/pages/customers_page.dart lib/pages/cash_page.dart lib/repositories/customer_repository.dart test/customer_repository_test.dart
           git diff --cached --check
           git commit -m 'Refine gift card creation and payment flow'
+          git reset --hard HEAD
+          git clean -fd
           git fetch origin Flutter
           git rebase origin/Flutter
           git push origin HEAD:Flutter
