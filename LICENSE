@@ -1,175 +1,69 @@
-# LOCAL STORE MANAGEMENT SYSTEM
-## PROPRIETARY SOURCE-AVAILABLE LICENSE
+LOCAL STORE MANAGEMENT SYSTEM PROPRIETARY LICENSE
 
-Copyright © 2026 MaydayAlaska. All rights reserved.
+Copyright (c) 2026 MaydayAlaska. All rights reserved.
 
-This Proprietary Source-Available License ("License") applies to the software project known as **Local Store Management System**, including its source code, executable files, installers, documentation, assets, scripts, configuration files, and other materials distributed as part of the project (collectively, the "Software").
+This software, including its source code, binaries, documentation, assets, and other original components (collectively, the "Software"), is proprietary to MaydayAlaska, except for third-party components that are provided under their respective licenses.
 
-The Software is proprietary software. Except for the limited rights expressly granted by this License, all rights are reserved by the copyright holder ("Licensor").
+1. LICENSE GRANT
 
-## 1. Source Code Availability
+Subject to compliance with this License, MaydayAlaska grants you a limited, non-exclusive, non-transferable, non-sublicensable right to install and use official binary distributions of the Software solely for lawful personal or other non-commercial purposes.
 
-The source code of the Software may be publicly accessible for transparency, inspection, educational purposes, security review, evaluation, and contribution purposes.
+No rights to the source code are granted except through an express written authorization from MaydayAlaska.
 
-Public availability of the source code does **not** make the Software open source and does not grant any rights beyond those expressly stated in this License.
+2. COMMERCIAL USE
 
-Accessing, viewing, downloading, cloning, or otherwise obtaining a copy of the source code does not grant ownership of the Software or any intellectual property rights in it.
-
-## 2. Permitted Non-Commercial Use
-
-Subject to the terms of this License, you may:
-
-- view and inspect the source code;
-- download and compile the Software for personal, educational, testing, research, or evaluation purposes;
-- download, install, and use official binary releases of the Software for personal or other non-commercial purposes;
-- create private modifications for personal, educational, testing, research, or evaluation purposes, provided such modifications are not distributed, published, sold, licensed, or used commercially;
-- submit proposed modifications or contributions to the official project repository.
-
-These permissions are granted on a non-exclusive, revocable, non-transferable, and non-sublicensable basis.
-
-## 3. Commercial Use Requires Authorization
-
-Any **Commercial Use** of the Software requires prior explicit authorization from the Licensor or a separate commercial license issued by the Licensor.
+Any Commercial Use of the Software or its binaries is prohibited unless MaydayAlaska has granted prior, explicit, written authorization for that use.
 
 For purposes of this License, "Commercial Use" includes, without limitation:
 
-- using the Software in connection with a business, company, shop, professional activity, organization, or other revenue-generating activity;
-- using the Software to manage sales, inventory, customers, payments, orders, accounting, business operations, or other commercial processes;
-- using the Software in the provision of paid goods or services;
-- using the Software internally within a for-profit organization;
-- selling, renting, leasing, sublicensing, or otherwise commercially exploiting the Software;
-- including the Software, in whole or in part, in a commercial product or service;
-- operating the Software as part of a hosted service, Software-as-a-Service (SaaS), cloud service, managed service, or similar commercial offering;
-- providing paid installation, hosting, support, customization, integration, maintenance, or consulting services substantially based on the Software;
-- creating or distributing a competing commercial product substantially derived from the Software.
+- use of the Software in connection with a business, trade, professional practice, retail activity, company, commercial organization, or other revenue-generating activity;
+- use of the Software for internal business operations, including sales, inventory, customer, order, accounting, point-of-sale, or store-management activities;
+- use of the Software to provide paid products or services to third parties;
+- use intended to obtain direct or indirect commercial advantage, revenue, compensation, or other economic benefit;
+- resale, commercial redistribution, rental, leasing, sublicensing, or inclusion of the Software in a commercial product or service.
 
-Commercial authorization must be granted explicitly by the Licensor. Absence of a response, public availability of the Software, possession of a copy, or previous non-commercial use does not constitute commercial authorization.
+Public availability or free-of-charge download of the Software does not grant any right to Commercial Use.
 
-## 4. Restrictions
+Commercial authorization may be subject to separate terms, conditions, fees, or a separate commercial license agreed to in writing with MaydayAlaska.
 
-Except where expressly authorized in writing by the Licensor, you may not:
+3. RESTRICTIONS
 
-- sell, resell, rent, lease, sublicense, or commercially distribute the Software;
-- redistribute compiled binaries, installers, or modified versions of the Software;
-- publish or distribute modified copies or derivative works of the Software;
-- create and distribute forks intended for public or commercial use;
-- remove, obscure, or alter copyright notices, licensing information, attribution, trademarks, logos, or proprietary notices;
-- represent yourself or any third party as the author, owner, or official distributor of the Software;
-- use the Software or its source code to create a substantially similar competing commercial product;
-- incorporate substantial portions of the source code into another product without written permission;
-- sublicense any rights granted under this License;
-- circumvent licensing, authorization, update, security, or access-control mechanisms included in the Software;
-- use the Software in violation of applicable law.
+Except where expressly permitted in writing by MaydayAlaska, you may not:
 
-## 5. Reverse Engineering
+- copy or redistribute the Software, except for copies reasonably necessary for an authorized installation or backup;
+- sell, sublicense, rent, lease, publish, distribute, or otherwise make the Software available to third parties;
+- modify, adapt, translate, or create derivative works from the Software;
+- reverse engineer, decompile, disassemble, or otherwise attempt to derive the source code or internal implementation of the Software, except to the extent that such a restriction is prohibited by applicable law;
+- remove, alter, or obscure copyright, trademark, license, attribution, or other proprietary notices;
+- use or disclose source code obtained without express written authorization from MaydayAlaska;
+- use the Software for any Commercial Use without prior, explicit, written authorization from MaydayAlaska.
 
-You may not reverse engineer, decompile, disassemble, decode, or otherwise attempt to derive source code or internal implementation details from distributed binary versions of the Software, except:
+4. OWNERSHIP
 
-1. where the corresponding source code has already been made publicly available by the Licensor; or
-2. to the limited extent that such restriction is prohibited by mandatory applicable law.
+The Software is licensed, not sold. MaydayAlaska retains all right, title, and interest in and to the Software and all intellectual property rights in the original components of the Software.
 
-Nothing in this section grants permission to reuse, redistribute, modify, or commercially exploit the resulting information.
+5. THIRD-PARTY COMPONENTS
 
-## 6. Modifications and Derivative Works
+The Software may include or depend on third-party software, libraries, frameworks, fonts, assets, or other components. Those components remain subject to their own license terms. Nothing in this License limits rights granted under applicable third-party licenses.
 
-Private modifications may be created solely for the permitted purposes described in Section 2.
+6. TERMINATION
 
-Any publication, distribution, commercialization, sublicensing, or public deployment of a modified version or derivative work requires prior written permission from the Licensor.
+The rights granted under this License terminate automatically if you materially breach its terms. Upon termination, you must cease use of the Software and delete copies in your possession or control, except where retention is required by law.
 
-Any authorized derivative work remains subject to the terms specified by the Licensor unless a separate written agreement states otherwise.
+7. DISCLAIMER OF WARRANTY
 
-## 7. Contributions
+TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, THE SOFTWARE IS PROVIDED "AS IS" AND "AS AVAILABLE", WITHOUT WARRANTIES OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, TITLE, AND NON-INFRINGEMENT.
 
-Unless otherwise agreed in writing, submitting code, documentation, translations, bug fixes, patches, or other material to the official project constitutes permission for the Licensor to use, reproduce, modify, distribute, sublicense, and incorporate that contribution into the Software.
+8. LIMITATION OF LIABILITY
 
-Contributors retain copyright in their original contributions unless those rights are separately assigned.
+TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, MAYDAYALASKA SHALL NOT BE LIABLE FOR ANY INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, EXEMPLARY, OR PUNITIVE DAMAGES, OR FOR LOSS OF PROFITS, REVENUE, DATA, BUSINESS, OR GOODWILL, ARISING FROM OR RELATED TO THE SOFTWARE OR ITS USE.
 
-Submission of a contribution does not grant the contributor ownership of the Software as a whole.
+9. WRITTEN PERMISSIONS
 
-## 8. Official Binary Distribution
+Any permission, exception, Commercial Use authorization, commercial distribution right, source-code access right, or alternative licensing arrangement must be granted expressly in writing by MaydayAlaska.
 
-The Licensor may make compiled binaries, installers, packages, or other executable versions of the Software publicly available.
+10. PRIOR RELEASES
 
-Public availability or free download of an official binary does not waive the restrictions contained in this License.
+Versions of the Software previously distributed under a different license remain governed by the license terms under which those versions were originally distributed. This License applies only to versions or copies distributed under these terms.
 
-A publicly downloadable binary may therefore still require separate authorization for Commercial Use.
-
-Only binaries distributed through channels officially designated by the Licensor should be considered official releases.
-
-## 9. Third-Party Components
-
-The Software may include or depend upon third-party libraries, frameworks, assets, tools, or other components distributed under their own licenses.
-
-Those third-party components remain governed by their respective licenses.
-
-Nothing in this License is intended to restrict rights independently granted by the license of a third-party component.
-
-Where there is a conflict between this License and a third-party license solely with respect to that third-party component, the third-party license applies to that component.
-
-## 10. Intellectual Property
-
-The Software, its original source code, architecture, user interface, documentation, branding, logos, and other original materials are protected by copyright and other applicable intellectual property laws.
-
-No trademark rights, ownership rights, patent rights, or other intellectual property rights are transferred under this License except for the limited permissions expressly granted herein.
-
-## 11. No Warranty
-
-THE SOFTWARE IS PROVIDED "AS IS" AND "AS AVAILABLE", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED.
-
-TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, THE LICENSOR DISCLAIMS ALL WARRANTIES, INCLUDING BUT NOT LIMITED TO WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, ACCURACY, RELIABILITY, AVAILABILITY, SECURITY, AND NON-INFRINGEMENT.
-
-THE LICENSOR DOES NOT WARRANT THAT THE SOFTWARE WILL BE ERROR-FREE, UNINTERRUPTED, COMPATIBLE WITH ANY PARTICULAR SYSTEM, OR SUITABLE FOR ANY PARTICULAR BUSINESS OR LEGAL REQUIREMENT.
-
-## 12. Limitation of Liability
-
-TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, THE LICENSOR SHALL NOT BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, CONSEQUENTIAL, OR OTHER DAMAGES ARISING FROM OR RELATED TO THE SOFTWARE OR ITS USE.
-
-THIS INCLUDES, WITHOUT LIMITATION, LOSS OF PROFITS, REVENUE, SALES, DATA, BUSINESS OPPORTUNITIES, BUSINESS INTERRUPTION, HARDWARE OR SOFTWARE DAMAGE, OR OTHER ECONOMIC LOSS.
-
-## 13. Termination
-
-Any rights granted under this License terminate automatically if you materially violate its terms.
-
-Upon termination, you must cease all unauthorized use, distribution, modification, or commercialization of the Software.
-
-Termination does not affect rights or remedies available to the Licensor in relation to violations that occurred before termination.
-
-The Licensor may subsequently grant renewed authorization in writing.
-
-## 14. Separate Commercial Licensing
-
-The Licensor may offer separate commercial licenses that grant additional rights, including rights to:
-
-- use the Software commercially;
-- deploy the Software within a business;
-- redistribute the Software;
-- modify and distribute derivative versions;
-- integrate the Software into other products;
-- provide commercial hosting or SaaS services;
-- obtain commercial support or custom development.
-
-A separate commercial agreement may modify or replace some or all of the restrictions in this License for the licensee concerned.
-
-## 15. No Implied Rights
-
-No rights are granted by implication, estoppel, public availability, prior use, or otherwise.
-
-Any right not expressly granted by this License is reserved by the Licensor.
-
-## 16. Severability
-
-If any provision of this License is found to be invalid or unenforceable under applicable law, that provision shall be interpreted or limited to the minimum extent necessary, while the remaining provisions shall remain in effect.
-
-## 17. Acceptance
-
-By downloading, installing, compiling, copying, modifying, or using the Software, you acknowledge that you have read and understood this License and agree to comply with its terms.
-
-If you do not agree to these terms, you must not use, modify, distribute, or commercially exploit the Software.
-
----
-
-**Repository:** MaydayAlaska/Local-Store-Management-System
-
-**License type:** Proprietary / Source-Available / Commercial Use Restricted
-
-For commercial licensing or other permissions, contact the Licensor through an official contact channel designated by the project.
+By installing, copying, or using a version of the Software distributed under this License, you acknowledge that you have read and agree to these terms.
