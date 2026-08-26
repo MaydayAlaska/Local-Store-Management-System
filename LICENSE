@@ -1,0 +1,175 @@
+# LOCAL STORE MANAGEMENT SYSTEM
+## PROPRIETARY SOURCE-AVAILABLE LICENSE
+
+Copyright © 2026 MaydayAlaska. All rights reserved.
+
+This Proprietary Source-Available License ("License") applies to the software project known as **Local Store Management System**, including its source code, executable files, installers, documentation, assets, scripts, configuration files, and other materials distributed as part of the project (collectively, the "Software").
+
+The Software is proprietary software. Except for the limited rights expressly granted by this License, all rights are reserved by the copyright holder ("Licensor").
+
+## 1. Source Code Availability
+
+The source code of the Software may be publicly accessible for transparency, inspection, educational purposes, security review, evaluation, and contribution purposes.
+
+Public availability of the source code does **not** make the Software open source and does not grant any rights beyond those expressly stated in this License.
+
+Accessing, viewing, downloading, cloning, or otherwise obtaining a copy of the source code does not grant ownership of the Software or any intellectual property rights in it.
+
+## 2. Permitted Non-Commercial Use
+
+Subject to the terms of this License, you may:
+
+- view and inspect the source code;
+- download and compile the Software for personal, educational, testing, research, or evaluation purposes;
+- download, install, and use official binary releases of the Software for personal or other non-commercial purposes;
+- create private modifications for personal, educational, testing, research, or evaluation purposes, provided such modifications are not distributed, published, sold, licensed, or used commercially;
+- submit proposed modifications or contributions to the official project repository.
+
+These permissions are granted on a non-exclusive, revocable, non-transferable, and non-sublicensable basis.
+
+## 3. Commercial Use Requires Authorization
+
+Any **Commercial Use** of the Software requires prior explicit authorization from the Licensor or a separate commercial license issued by the Licensor.
+
+For purposes of this License, "Commercial Use" includes, without limitation:
+
+- using the Software in connection with a business, company, shop, professional activity, organization, or other revenue-generating activity;
+- using the Software to manage sales, inventory, customers, payments, orders, accounting, business operations, or other commercial processes;
+- using the Software in the provision of paid goods or services;
+- using the Software internally within a for-profit organization;
+- selling, renting, leasing, sublicensing, or otherwise commercially exploiting the Software;
+- including the Software, in whole or in part, in a commercial product or service;
+- operating the Software as part of a hosted service, Software-as-a-Service (SaaS), cloud service, managed service, or similar commercial offering;
+- providing paid installation, hosting, support, customization, integration, maintenance, or consulting services substantially based on the Software;
+- creating or distributing a competing commercial product substantially derived from the Software.
+
+Commercial authorization must be granted explicitly by the Licensor. Absence of a response, public availability of the Software, possession of a copy, or previous non-commercial use does not constitute commercial authorization.
+
+## 4. Restrictions
+
+Except where expressly authorized in writing by the Licensor, you may not:
+
+- sell, resell, rent, lease, sublicense, or commercially distribute the Software;
+- redistribute compiled binaries, installers, or modified versions of the Software;
+- publish or distribute modified copies or derivative works of the Software;
+- create and distribute forks intended for public or commercial use;
+- remove, obscure, or alter copyright notices, licensing information, attribution, trademarks, logos, or proprietary notices;
+- represent yourself or any third party as the author, owner, or official distributor of the Software;
+- use the Software or its source code to create a substantially similar competing commercial product;
+- incorporate substantial portions of the source code into another product without written permission;
+- sublicense any rights granted under this License;
+- circumvent licensing, authorization, update, security, or access-control mechanisms included in the Software;
+- use the Software in violation of applicable law.
+
+## 5. Reverse Engineering
+
+You may not reverse engineer, decompile, disassemble, decode, or otherwise attempt to derive source code or internal implementation details from distributed binary versions of the Software, except:
+
+1. where the corresponding source code has already been made publicly available by the Licensor; or
+2. to the limited extent that such restriction is prohibited by mandatory applicable law.
+
+Nothing in this section grants permission to reuse, redistribute, modify, or commercially exploit the resulting information.
+
+## 6. Modifications and Derivative Works
+
+Private modifications may be created solely for the permitted purposes described in Section 2.
+
+Any publication, distribution, commercialization, sublicensing, or public deployment of a modified version or derivative work requires prior written permission from the Licensor.
+
+Any authorized derivative work remains subject to the terms specified by the Licensor unless a separate written agreement states otherwise.
+
+## 7. Contributions
+
+Unless otherwise agreed in writing, submitting code, documentation, translations, bug fixes, patches, or other material to the official project constitutes permission for the Licensor to use, reproduce, modify, distribute, sublicense, and incorporate that contribution into the Software.
+
+Contributors retain copyright in their original contributions unless those rights are separately assigned.
+
+Submission of a contribution does not grant the contributor ownership of the Software as a whole.
+
+## 8. Official Binary Distribution
+
+The Licensor may make compiled binaries, installers, packages, or other executable versions of the Software publicly available.
+
+Public availability or free download of an official binary does not waive the restrictions contained in this License.
+
+A publicly downloadable binary may therefore still require separate authorization for Commercial Use.
+
+Only binaries distributed through channels officially designated by the Licensor should be considered official releases.
+
+## 9. Third-Party Components
+
+The Software may include or depend upon third-party libraries, frameworks, assets, tools, or other components distributed under their own licenses.
+
+Those third-party components remain governed by their respective licenses.
+
+Nothing in this License is intended to restrict rights independently granted by the license of a third-party component.
+
+Where there is a conflict between this License and a third-party license solely with respect to that third-party component, the third-party license applies to that component.
+
+## 10. Intellectual Property
+
+The Software, its original source code, architecture, user interface, documentation, branding, logos, and other original materials are protected by copyright and other applicable intellectual property laws.
+
+No trademark rights, ownership rights, patent rights, or other intellectual property rights are transferred under this License except for the limited permissions expressly granted herein.
+
+## 11. No Warranty
+
+THE SOFTWARE IS PROVIDED "AS IS" AND "AS AVAILABLE", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED.
+
+TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, THE LICENSOR DISCLAIMS ALL WARRANTIES, INCLUDING BUT NOT LIMITED TO WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, ACCURACY, RELIABILITY, AVAILABILITY, SECURITY, AND NON-INFRINGEMENT.
+
+THE LICENSOR DOES NOT WARRANT THAT THE SOFTWARE WILL BE ERROR-FREE, UNINTERRUPTED, COMPATIBLE WITH ANY PARTICULAR SYSTEM, OR SUITABLE FOR ANY PARTICULAR BUSINESS OR LEGAL REQUIREMENT.
+
+## 12. Limitation of Liability
+
+TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, THE LICENSOR SHALL NOT BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, CONSEQUENTIAL, OR OTHER DAMAGES ARISING FROM OR RELATED TO THE SOFTWARE OR ITS USE.
+
+THIS INCLUDES, WITHOUT LIMITATION, LOSS OF PROFITS, REVENUE, SALES, DATA, BUSINESS OPPORTUNITIES, BUSINESS INTERRUPTION, HARDWARE OR SOFTWARE DAMAGE, OR OTHER ECONOMIC LOSS.
+
+## 13. Termination
+
+Any rights granted under this License terminate automatically if you materially violate its terms.
+
+Upon termination, you must cease all unauthorized use, distribution, modification, or commercialization of the Software.
+
+Termination does not affect rights or remedies available to the Licensor in relation to violations that occurred before termination.
+
+The Licensor may subsequently grant renewed authorization in writing.
+
+## 14. Separate Commercial Licensing
+
+The Licensor may offer separate commercial licenses that grant additional rights, including rights to:
+
+- use the Software commercially;
+- deploy the Software within a business;
+- redistribute the Software;
+- modify and distribute derivative versions;
+- integrate the Software into other products;
+- provide commercial hosting or SaaS services;
+- obtain commercial support or custom development.
+
+A separate commercial agreement may modify or replace some or all of the restrictions in this License for the licensee concerned.
+
+## 15. No Implied Rights
+
+No rights are granted by implication, estoppel, public availability, prior use, or otherwise.
+
+Any right not expressly granted by this License is reserved by the Licensor.
+
+## 16. Severability
+
+If any provision of this License is found to be invalid or unenforceable under applicable law, that provision shall be interpreted or limited to the minimum extent necessary, while the remaining provisions shall remain in effect.
+
+## 17. Acceptance
+
+By downloading, installing, compiling, copying, modifying, or using the Software, you acknowledge that you have read and understood this License and agree to comply with its terms.
+
+If you do not agree to these terms, you must not use, modify, distribute, or commercially exploit the Software.
+
+---
+
+**Repository:** MaydayAlaska/Local-Store-Management-System
+
+**License type:** Proprietary / Source-Available / Commercial Use Restricted
+
+For commercial licensing or other permissions, contact the Licensor through an official contact channel designated by the project.
